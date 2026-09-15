@@ -553,7 +553,7 @@
   }
   function pedigreeLineHtml(info) {
     if (!info || (!info.sire && !info.dam)) return '';
-    return '<p class="notes-line">' + ancestorHtml(info.sire, 'Sire') + ' &nbsp;·&nbsp; ' + ancestorHtml(info.dam, 'Dam') + '</p>';
+    return '<p class="notes-line">' + ancestorHtml(info.sire, 'Sire') + '<br>' + ancestorHtml(info.dam, 'Dam') + '</p>';
   }
   function passportOwnerHtml(info) {
     if (!info) return '';
@@ -600,6 +600,7 @@
 
     var ownedList = getOwnedStallions();
     var stallionIdx = ownedList.findIndex(function (x) { return x.id === selectedId; });
+    var stallionHref = s.lifeNumber ? L.safeUrl('https://www.horsereality.com/horses/' + s.lifeNumber + '/') : '';
 
     var html = '<div class="detail-nav">' +
       '<button class="back-link" data-action="back-to-list">← All stallions</button>' +
@@ -627,6 +628,7 @@
         (s.notes ? '<p class="notes-line">' + L.esc(s.notes) + '</p>' : '') +
         pedigreeLineHtml(passportInfo) +
         passportOwnerHtml(passportInfo) +
+        (stallionHref ? '<p class="notes-line"><a href="' + L.esc(stallionHref) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
         '</div>' +
       '</div>' +
         '<div class="detail-actions">' +

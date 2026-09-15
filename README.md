@@ -22,6 +22,7 @@ Click the toolbar icon to open the full dashboard — a proper tab, not a crampe
 
 - **Stallions** — roster, public/private fees per currency (HRC/DP/FT/WT), earnings, Sold/Retired status
 - **My Mares** — scoped to mares *you* own (set your username once in Settings so it can tell your mares apart from customers')
+- **Needs Review** — Pending coverings 6+ days old with no foal yet, badged on the toolbar icon and linked straight to the mare's own page, since Horse Reality only notifies *her* owner when a covering fails
 - Manual add/edit for anything the auto-capture misses, plus a JSON import box for backfilling history
 - **Export Backup / Restore Backup** — save your entire ledger as a JSON file, and restore it later on this or another machine
 

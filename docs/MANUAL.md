@@ -13,12 +13,14 @@ A visual walkthrough of installing and using the extension. For a quick technica
 5. [Looking up any horse](#looking-up-any-horse)
 6. [A stallion's detail page](#a-stallions-detail-page)
 7. [Adding a stallion by hand](#adding-a-stallion-by-hand)
-8. [My Mares](#my-mares)
-9. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
-10. [Understanding breeding statuses](#understanding-breeding-statuses)
-11. [Updating](#updating)
-12. [Privacy](#privacy)
-13. [Troubleshooting](#troubleshooting)
+8. [Bulk-importing breeding records](#bulk-importing-breeding-records)
+9. [My Mares](#my-mares)
+10. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
+11. [Understanding breeding statuses](#understanding-breeding-statuses)
+12. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
+13. [Updating](#updating)
+14. [Privacy](#privacy)
+15. [Troubleshooting](#troubleshooting)
 
 ## Installing
 
@@ -82,6 +84,14 @@ Anything the auto-capture misses can be entered manually — useful for backfill
 
 ![The Add Stallion form](images/04-add-stallion-form.png)
 
+## Bulk-importing breeding records
+
+Both a stallion's detail page and the Stallions tab have an **Import** button, for pasting in a JSON array of breeding records all at once — handy for backfilling history from before you installed the extension, or migrating from a spreadsheet.
+
+![The bulk JSON import form on a stallion's detail page](images/08-import-json.png)
+
+A record naming its own stud (`stallionName` or `stallionLifeNumber`) routes to that stallion automatically — but only if he's already in your ledger; records for a stud that isn't are skipped, and you're told which ones so you can add him first. Anything that doesn't name a stud goes to whichever stallion's page you opened Import from. A record that matches an existing one (same mare, date, foal, and price) updates it in place instead of duplicating.
+
 ## My Mares
 
 Switch to the **My Mares** tab to see every mare *you* own — scoped by the username you set in first-time setup. A mare appears here the moment you view her page, even before she's been bred; once she has breeding history, it shows too.
@@ -108,6 +118,14 @@ While she's pregnant, you'll see her due date and the covering sire (linked), pu
 **A note on failures:** Horse Reality only sends the "covering has failed" notification to the *mare's* owner, never the stud's — so if you're a stud owner, you'd normally never find out a customer's mare didn't take. To cover this gap, the extension automatically marks a "Pending" record **Failed** once it's more than 6 days old with no matching foal for that mare — Horse Reality resolves a covering within about that window, so a longer silence almost always means it didn't take.
 
 You can also change any record's status by hand at any time using the dropdown in its row.
+
+## Reviewing coverings before they auto-fail
+
+Since that 6-day auto-fail happens quietly the next time you're browsing Horse Reality, it's easy to miss — and you'd have no way to double-check it before it happens. So as soon as a "Pending" covering crosses the 6-day mark, it's surfaced at the top of both the Stallions and My Mares tabs, and the toolbar icon badges with a count — even if you haven't opened Horse Reality that day.
+
+![The "Needs Review" panel at the top of the dashboard](images/07-needs-review.png)
+
+Each row links straight to **her page on Horse Reality** — since the failure notification went to her, not you, that's the only place to actually check what happened. From there you can either leave it for the automatic sweep to mark Failed, or jump to the stallion's page and set the status yourself once you know.
 
 ## Updating
 

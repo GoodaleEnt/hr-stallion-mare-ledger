@@ -56,6 +56,19 @@ Click the toolbar icon to open the full dashboard — a proper tab, not a crampe
 
 **Your control.** Since all data lives in your browser's local storage, uninstalling the extension or clearing its storage removes it completely. There is nothing to delete on a server because nothing is ever sent to one.
 
+## Mobile
+
+Standard mobile Chrome and Safari don't support loading extensions this way — "Load unpacked" is a desktop-browser feature, and Kiwi Browser (the one Android workaround) has been discontinued and pulled from the Play Store. Instead, `mobile/hr-ledger.user.js` is a **userscript** version of this same tool — same auto-capture, same dashboard — that installs through a userscript manager instead:
+
+- **iOS / iPadOS**: install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887) from the App Store, enable it under Settings → Safari → Extensions, then open the raw file [`mobile/hr-ledger.user.js`](mobile/hr-ledger.user.js) in Safari and follow its install prompt.
+- **Android**: install **Firefox**, then add **[Violentmonkey](https://addons.mozilla.org/en-US/android/addon/violentmonkey/)** (or Tampermonkey) from Mozilla's own Add-ons site — no developer-mode tricks needed — then open the same raw `mobile/hr-ledger.user.js` file and install it.
+
+Once installed, browse Horse Reality as normal — it captures data the same way the desktop extension does. Since there's no browser toolbar for it to live in, look for a small **"Ledger" button** in the bottom-right corner of the page instead (it badges the same "needs review" count the desktop toolbar icon shows); tap it to open the full dashboard as an overlay, and tap **✕ Close** to get back to the game.
+
+**One difference from desktop:** stallion/foal portrait images aren't captured on mobile (the desktop version routes image downloads through the extension's background worker to get around the image CDN's cross-origin restriction — userscripts don't have an equivalent background context, and reproducing it would risk hitting storage limits fast). Everything else — stud fees, breeding records, pedigree/passport data, pregnancy tracking, failed-covering detection — works the same as desktop; stallion cards just show without a picture.
+
+Since `mobile/hr-ledger.user.js` pulls in the shared `lib.js`/`content.js`/`dashboard.js` files from this repo remotely, an update to the mobile script only reaches installed copies when its own `@version` is bumped (userscript managers cache required files and only re-check on a version change) — reinstalling manually always picks up the latest.
+
 ## Known limitations
 
 - The stallion's own large portrait selector (`img[src*="horse-img.horsereality.com/large/"]`) was reverse-engineered from a sample page and may need adjusting if Horse Reality changes its markup.

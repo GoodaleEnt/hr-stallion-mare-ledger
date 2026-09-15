@@ -626,9 +626,46 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // A stud owner never gets the "covering has failed" notification for a
+  // CUSTOMER's mare — that notification only ever reaches the mare's own
+  // owner. Horse Reality resolves a covering within about 6 days, so a
+  // "Pending" record that old with no matching "Foal Born" record for the
+  // same mare almost certainly failed. Runs on every page load — it's pure
+  // computation over already-stored data, no scraping needed.
+  var STALE_PENDING_DAYS = 6;
+  function sweepStaleFailedCoverings(state) {
+    var todayMs = Date.now();
+    var marked = 0;
+    state.stallions.forEach(function (s) {
+      var list = state.breedings[s.id] || [];
+      list.forEach(function (b) {
+        if (b.status !== 'Pending' || !b.date) return;
+        var bdMs = new Date(b.date + 'T00:00:00').getTime();
+        if (isNaN(bdMs)) return;
+        if ((todayMs - bdMs) / 86400000 < STALE_PENDING_DAYS) return;
+        var hasFoal = list.some(function (other) {
+          return other !== b && other.mareLifeNumber && other.mareLifeNumber === b.mareLifeNumber && other.status === 'Foal Born';
+        });
+        if (!hasFoal) { b.status = 'Failed'; marked++; }
+      });
+    });
+    return marked;
+  }
+  function sweepAndPersistStaleFailures() {
+    HRStorage.getState(function (state) {
+      var marked = sweepStaleFailedCoverings(state);
+      if (marked) {
+        HRStorage.setState(state, function () {
+          showToast('HR Ledger: ' + marked + ' marked failed (no foal after ' + STALE_PENDING_DAYS + ' days)');
+        });
+      }
+    });
+  }
+
   function onPageReady() {
     watchForContent();
     fetchAndMergeHorseInfo();
+    sweepAndPersistStaleFailures();
   }
 
   onPageReady();

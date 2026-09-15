@@ -291,15 +291,32 @@
       pregnancy: buildPregnancyInfo(horse, passportRoot, relatedHorses)
     };
   }
+  // Recorded into state so a *screenshot of the dashboard* is enough to
+  // diagnose a failure on someone else's machine — asking a non-technical
+  // player to open DevTools and read the console isn't realistic.
   function fetchAndMergeHorseInfo() {
     var id = parseHorseIdFromUrl();
     if (!id) return;
+    var auth = getAuthData();
+    var hasToken = !!auth.hr_csrf;
+    var errors = [];
     Promise.all([
-      fetchHorseJson('/api/player/horse/' + id).catch(function (e) { console.warn('HR Ledger: horse API fetch failed —', e); return null; }),
-      fetchHorseJson('/api/player/horse/' + id + '/passport').catch(function (e) { console.warn('HR Ledger: passport API fetch failed —', e); return null; })
+      fetchHorseJson('/api/player/horse/' + id).catch(function (e) { errors.push('horse: ' + (e && e.message || e)); return null; }),
+      fetchHorseJson('/api/player/horse/' + id + '/passport').catch(function (e) { errors.push('passport: ' + (e && e.message || e)); return null; })
     ]).then(function (results) {
       var horseInfo = safeExtract(function () { return buildHorseInfoFromApi(id, results[0], results[1]); }, null);
       if (horseInfo) mergeHorseInfo(horseInfo);
+
+      HRStorage.getState(function (state) {
+        state.apiDiagnostics = {
+          lastCheckedAt: Date.now(),
+          lastHorseId: id,
+          csrfTokenFound: hasToken,
+          ok: hasToken && !errors.length && !!horseInfo,
+          errors: errors
+        };
+        HRStorage.setState(state);
+      });
     });
   }
 

@@ -180,12 +180,35 @@
       .slice(0, 8);
   }
 
+  // Surfaced here (not just in the collapsed debug panel) because a
+  // non-technical player can't be asked to open DevTools — a plain
+  // screenshot of the dashboard needs to be enough to diagnose a failure.
+  function apiWarningBannerHtml() {
+    var diag = state.apiDiagnostics;
+    if (!diag || diag.ok !== false) return '';
+    var reason;
+    if (!diag.csrfTokenFound) {
+      reason = 'Could not find the login token this extension needs to call Horse Reality\'s API (looked for the "hr_auth_production_access_payload" cookie). Try logging out and back in to Horse Reality, then reload the extension.';
+    } else if (diag.errors && diag.errors.length) {
+      reason = 'The request to Horse Reality\'s API failed: ' + diag.errors.join(' | ');
+    } else {
+      reason = 'The API response was missing expected data.';
+    }
+    return '<div class="empty" style="border-color:var(--danger);text-align:left;margin-bottom:16px;">' +
+      '<h3 style="color:var(--danger);">Genetics, pedigree, and pregnancy data isn\'t loading</h3>' +
+      '<p>' + L.esc(reason) + '</p>' +
+      '<p style="margin:0;">Basic tracking (stud fees, offspring) is unaffected. Last checked: ' + L.esc(new Date(diag.lastCheckedAt).toLocaleString()) + ' on horse #' + L.esc(diag.lastHorseId) + '.</p>' +
+    '</div>';
+  }
+
   function topHeaderHtml() {
     var results = horseSearchQuery ? searchHorseInfo(horseSearchQuery) : [];
     var html = '<header class="top"><div class="titles">' +
       '<h1>HR Stallion &amp; Mare Ledger</h1>' +
       '<p>Every covering, every mare, every fee — captured as you browse.</p>' +
       '</div></header>';
+
+    html += apiWarningBannerHtml();
 
     html += '<form class="search-row" data-action="submit-search">' +
       '<input type="text" name="query" placeholder="Look up any cached horse by name or life number…" value="' + L.esc(horseSearchQuery) + '">' +

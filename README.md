@@ -23,6 +23,7 @@ Click the toolbar icon to open the full dashboard — a proper tab, not a crampe
 - **Stallions** — roster, public/private fees per currency (HRC/DP/FT/WT), earnings, Sold/Retired status
 - **My Mares** — scoped to mares *you* own (set your username once in Settings so it can tell your mares apart from customers')
 - Manual add/edit for anything the auto-capture misses, plus a JSON import box for backfilling history
+- **Export Backup / Restore Backup** — save your entire ledger as a JSON file, and restore it later on this or another machine
 
 ## Installing
 
@@ -36,7 +37,13 @@ Click the toolbar icon to open the full dashboard — a proper tab, not a crampe
 
 ## Updating
 
-Pull the latest changes (or re-download), then click the reload icon (⟳) on the extension's card at `chrome://extensions`. If `manifest.json` permissions changed, remove and re-add the extension instead.
+**Your ledger data is safe across updates as long as you keep using the same folder.** Chrome ties an unpacked extension's stored data to the folder's location, not its contents — so:
+
+1. Extract the new ZIP **into the same folder** you originally installed to, overwriting the old files (don't extract to a new/different folder).
+2. Click the reload icon (⟳) on the extension's card at `chrome://extensions`.
+3. If Chrome shows a warning about new permissions, review and accept it — reloading never clears your stored data.
+
+**Never click "Remove" on the extension to update it** — removing an extension deletes its stored data permanently, even if you re-add it from the same folder afterward. If you ever want a safety net regardless, use **Export Backup** on the dashboard (Stallions tab) to save your full ledger as a JSON file, and **Restore Backup** to bring it back.
 
 ## Privacy
 

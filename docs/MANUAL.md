@@ -53,6 +53,8 @@ Each stallion card shows his public/private stud fee, how many breedings are log
 
 Studs that show up here only because they were needed to track one of *your mares'* breedings with someone else's stallion are kept off this grid — they still show up wherever that mare's history is displayed.
 
+**Export Backup / Restore Backup** (top of this tab) save or reload your *entire* ledger as a single JSON file — every stallion, mare, breeding record, and cached horse passport. Use it before doing anything risky (switching computers, clearing browser data), or just periodically for peace of mind. Restoring a backup replaces everything currently stored, so you'll be asked to confirm first.
+
 ## Looking up any horse
 
 The search box (top of every list view) looks up *any* horse the extension has ever cached a passport snapshot for — by name or life number — even if that horse isn't tied to a tracked stallion or a logged breeding yet.
@@ -109,7 +111,13 @@ You can also change any record's status by hand at any time using the dropdown i
 
 ## Updating
 
-Re-download the ZIP from the repository, extract it over the same folder, then click the reload icon (⟳) on the extension's card at `chrome://extensions`. If `manifest.json`'s permissions changed, remove and re-add the extension instead.
+**Your data is safe as long as you update in place.** Chrome ties an unpacked extension's stored data to the folder it's loaded from, not its contents:
+
+1. Re-download the ZIP and extract it **into the same folder**, overwriting the old files — never a new or different folder.
+2. Click the reload icon (⟳) on the extension's card at `chrome://extensions`.
+3. If Chrome shows a new-permissions warning, accept it — reloading never clears your data.
+
+**Never click "Remove"** to update — that permanently deletes the extension's stored data, even if you reload it from the same folder right after. If you want a safety net regardless, use **Export Backup** / **Restore Backup** on the dashboard (see below).
 
 ## Privacy
 

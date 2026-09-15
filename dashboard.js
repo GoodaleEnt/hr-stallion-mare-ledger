@@ -138,6 +138,44 @@
     render();
   }
 
+  // ---------- backup / restore ----------
+  // A safety net independent of "update the extension in the same folder"
+  // — Chrome ties an unpacked extension's storage to its folder location,
+  // so the wrong move (a new folder, or clicking Remove) can wipe it.
+  // This lets a player save/restore the whole ledger regardless.
+  function exportBackup() {
+    var json = JSON.stringify(state, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'hr-ledger-backup-' + L.todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function handleRestoreFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parsed;
+      try { parsed = JSON.parse(reader.result); }
+      catch (e) { alert('That file isn\'t valid JSON.'); return; }
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.stallions) || typeof parsed.breedings !== 'object') {
+        alert('That doesn\'t look like an HR Ledger backup file.');
+        return;
+      }
+      askConfirm('Restore this backup? This replaces ALL current stallions, mares, and breeding history with the backup\'s contents — this can\'t be undone.', function () {
+        state = parsed;
+        if (!state.horseInfo) state.horseInfo = {};
+        if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+        persist();
+      });
+    };
+    reader.readAsText(file);
+  }
+
   // ---------- render ----------
   function render() {
     var app = document.getElementById('app');
@@ -305,6 +343,9 @@
 
     html += '<div class="section-head"><h2>Your Stallions</h2>' +
       '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-sm" data-action="export-backup" title="Save your entire ledger as a JSON file">Export Backup</button>' +
+        '<button class="btn btn-sm" data-action="restore-backup" title="Replace your ledger with a previously exported backup">Restore Backup</button>' +
+        '<input type="file" id="restore-file-input" accept="application/json" style="display:none;">' +
         '<button class="btn btn-sm" data-action="toggle-import">' + (importingBreeding ? 'Close' : 'Import') + '</button>' +
         '<button class="btn btn-primary btn-sm" data-action="toggle-add-stallion">' + (addingStallion ? 'Close' : '+ Add Stallion') + '</button>' +
       '</div></div>';
@@ -749,6 +790,11 @@
       else if (action === 'toggle-add-breeding') { addingBreeding = !addingBreeding; render(); }
       else if (action === 'cancel-breeding-form') { addingBreeding = false; render(); }
       else if (action === 'toggle-import') { importingBreeding = !importingBreeding; importError = ''; render(); }
+      else if (action === 'export-backup') { exportBackup(); }
+      else if (action === 'restore-backup') {
+        var fileInput = document.getElementById('restore-file-input');
+        if (fileInput) fileInput.click();
+      }
       else if (action === 'cancel-import-form') { importingBreeding = false; importError = ''; render(); }
       else if (action === 'delete-stallion') {
         var sid = t.getAttribute('data-id');
@@ -881,6 +927,10 @@
     };
 
     app.onchange = function (e) {
+      if (e.target.id === 'restore-file-input') {
+        handleRestoreFile(e.target.files && e.target.files[0]);
+        return;
+      }
       var t = e.target.closest('[data-action]');
       if (!t) return;
       var action = t.getAttribute('data-action');

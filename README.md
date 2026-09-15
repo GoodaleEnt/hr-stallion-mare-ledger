@@ -4,6 +4,8 @@ A browser extension for [Horse Reality](https://www.horsereality.com) that autom
 
 Inspired by tools like HRToolKit and Realtools, built specifically around stud-fee tracking and breeding outcomes.
 
+📖 **[Full illustrated user manual](docs/MANUAL.md)** — installing, pinning the icon, and a screenshot tour of every feature.
+
 ## What it does
 
 While you browse Horse Reality normally, the extension watches for a few specific pages and quietly merges what it finds into your ledger:

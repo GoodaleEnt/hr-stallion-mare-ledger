@@ -36,7 +36,13 @@ Pull the latest changes (or re-download), then click the reload icon (⟳) on th
 
 ## Privacy
 
-All data lives in `chrome.storage.local` inside your own browser profile. Nothing is sent anywhere except the requests the extension makes to `horsereality.com` itself (to read pages you're already viewing, and to fetch horse portrait images for local display). There is no backend, no account, and no analytics.
+**What the extension reads.** While you browse `horsereality.com` and `v2.horsereality.com`, the extension reads page content and calls Horse Reality's own API (using your existing logged-in session — no separate login) to capture: your bank/stud-fee transactions, your stallions' offspring, horse genetics/pedigree/passport data, pregnancy status, and breeding-related notifications. This includes in-game text, horse portrait images, and profile hyperlinks (mare, stallion, and owner names/links) — it does not read anything on any other website.
+
+**What it does not read.** No real-world personal information (name, email, address), no passwords, no payment/financial data outside the game's own virtual currency, no browsing history outside horsereality.com, and no keystrokes, clicks, or mouse activity.
+
+**Where the data goes.** Everything captured is written to `chrome.storage.local` inside your own browser profile and never leaves your machine, except for the requests the extension itself makes to `horsereality.com`/`v2.horsereality.com` (the same site you're already using) to read pages and fetch horse portrait images. There is no backend server, no account, no analytics, and no third party ever receives this data — it is never sold, shared, or used for any purpose other than building your own breeding ledger.
+
+**Your control.** Since all data lives in your browser's local storage, uninstalling the extension or clearing its storage removes it completely. There is nothing to delete on a server because nothing is ever sent to one.
 
 ## Known limitations
 

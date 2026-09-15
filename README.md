@@ -24,11 +24,13 @@ Click the toolbar icon to open the full dashboard — a proper tab, not a crampe
 
 ## Installing
 
-1. Download or clone this repository.
-2. Open `chrome://extensions` in Chrome.
-3. Toggle **Developer mode** on (top right).
-4. Click **Load unpacked** and select this folder.
-5. Browse Horse Reality — the ledger fills in as you go. Click the extension's toolbar icon anytime to open the dashboard.
+1. On this repository's GitHub page, click the green **Code** button, then **Download ZIP**. (Or `git clone` it, if you'd rather.)
+2. Extract the ZIP somewhere you'll keep it — Chrome loads the extension directly from this folder, so don't delete or move it later.
+3. Open `chrome://extensions` in Chrome.
+4. Toggle **Developer mode** on (top right).
+5. Click **Load unpacked** and select the extracted folder (the one containing `manifest.json`).
+6. On the dashboard's Stallions tab, enter your Horse Reality username under "My Horse Reality username" — this is how it tells your own horses apart from other players'.
+7. Browse Horse Reality — the ledger fills in as you go. Click the extension's toolbar icon anytime to open the dashboard.
 
 ## Updating
 

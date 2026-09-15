@@ -10,6 +10,8 @@
   var activeTab = 'stallions';
   var selectedId = null;
   var selectedMareKey = null;
+  var selectedPassportLife = null;
+  var horseSearchQuery = '';
   var addingStallion = false;
   var editingStallion = false;
   var addingBreeding = false;
@@ -51,6 +53,22 @@
         }
         if (b.mareUrl) map[key].mareUrl = b.mareUrl;
         map[key].records.push(b);
+      });
+
+      // Also surface owned mares that haven't been bred yet — content.js
+      // caches every horse you view (regardless of ownership) into
+      // state.horseInfo, so any cached mare whose owner matches you shows
+      // up here immediately, with an empty ledger until her first breeding.
+      Object.keys(state.horseInfo || {}).forEach(function (lifeNumber) {
+        var info = state.horseInfo[lifeNumber];
+        if (!info || info.sex !== 'mare') return;
+        if ((info.ownerName || '').trim().toLowerCase() !== myName) return;
+        var key = 'life:' + lifeNumber;
+        if (!map[key]) {
+          map[key] = { key: key, mareName: info.name, mareUrl: 'https://www.horsereality.com/horses/' + lifeNumber + '/', mareLifeNumber: lifeNumber, records: [] };
+        } else if (!map[key].mareName) {
+          map[key].mareName = info.name;
+        }
       });
     }
     maresIndex = Object.keys(map).map(function (k) { return map[k]; });
@@ -124,7 +142,8 @@
   function render() {
     var app = document.getElementById('app');
     var html;
-    if (selectedId) html = renderDetail();
+    if (selectedPassportLife) html = renderPassportDetail();
+    else if (selectedId) html = renderDetail();
     else if (selectedMareKey) html = renderMareDetail();
     else if (activeTab === 'mares') html = renderMaresList();
     else html = renderStallionsList();
@@ -148,20 +167,103 @@
       '</div></div>';
   }
 
+  // Looks up any horse content.js has ever cached a passport snapshot for —
+  // not just ones tied to a tracked stallion or a bred mare — by name
+  // (substring) or exact life number.
+  function searchHorseInfo(query) {
+    query = (query || '').trim().toLowerCase();
+    if (!query) return [];
+    return Object.keys(state.horseInfo || {})
+      .map(function (life) { return Object.assign({ lifeNumber: life }, state.horseInfo[life]); })
+      .filter(function (h) { return (h.name || '').toLowerCase().indexOf(query) > -1 || h.lifeNumber.indexOf(query) > -1; })
+      .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); })
+      .slice(0, 8);
+  }
+
   function topHeaderHtml() {
-    return '<header class="top"><div class="titles">' +
+    var results = horseSearchQuery ? searchHorseInfo(horseSearchQuery) : [];
+    var html = '<header class="top"><div class="titles">' +
       '<h1>HR Stallion &amp; Mare Ledger</h1>' +
       '<p>Every covering, every mare, every fee — captured as you browse.</p>' +
-      '</div></header>' +
-      '<div class="tabs">' +
+      '</div></header>';
+
+    html += '<form class="search-row" data-action="submit-search">' +
+      '<input type="text" name="query" placeholder="Look up any cached horse by name or life number…" value="' + L.esc(horseSearchQuery) + '">' +
+      '<button type="submit" class="btn btn-sm">Search</button>' +
+      (horseSearchQuery ? '<button type="button" class="btn btn-sm btn-ghost" data-action="clear-search">Clear</button>' : '') +
+    '</form>';
+    if (horseSearchQuery) {
+      html += '<div class="search-results">';
+      if (results.length) {
+        results.forEach(function (h) {
+          html += '<button type="button" class="search-result" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
+            (h.imageUrl ? '<img src="' + L.esc(h.imageUrl) + '" alt="">' : '<span class="search-result-noimg"></span>') +
+            '<span>' + L.esc(h.name || 'Unnamed horse') + ' <span class="mono sub">#' + L.esc(h.lifeNumber) + '</span></span>' +
+          '</button>';
+        });
+      } else {
+        html += '<div class="search-empty">No cached horses match "' + L.esc(horseSearchQuery) + '" — visit that horse\'s page on Horse Reality first to cache it.</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
       '</div>';
+    return html;
+  }
+
+  function renderPassportDetail() {
+    var info = state.horseInfo[selectedPassportLife];
+    if (!info) { selectedPassportLife = null; return renderStallionsList(); }
+    var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
+    var html = '<button class="back-link" data-action="close-passport">← Back to search</button>';
+    html += '<div class="detail-head"><div class="name-row">' +
+      (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
+      '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
+      '<div class="tags">' +
+        '<span class="tag mono">#' + L.esc(selectedPassportLife) + '</span>' +
+        (info.breed ? '<span class="tag">' + L.esc(info.breed) + '</span>' : '') +
+        passportTagsHtml(info) +
+      '</div>' +
+      pregnancyLineHtml(info) +
+      pedigreeLineHtml(info) +
+      passportOwnerHtml(info) +
+      (href ? '<p class="notes-line"><a href="' + L.esc(href) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
+      '</div>' +
+    '</div>';
+    html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
+      '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
+      'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+    return html;
+  }
+
+  // Temporary debug aid — lets raw storage be inspected on the dashboard
+  // page itself (Ctrl+F for a life number or name) without needing to find
+  // the extension's service worker console.
+  function renderDebugPanel() {
+    var horseInfoCount = Object.keys(state.horseInfo || {}).length;
+    return '<details style="margin:16px 0;font-size:12px;color:var(--text-muted);">' +
+      '<summary style="cursor:pointer;">Debug: raw storage state (' + state.stallions.length + ' stallions, ' + horseInfoCount + ' cached passports)</summary>' +
+      '<pre style="white-space:pre-wrap;word-break:break-all;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:400px;overflow:auto;">' +
+        L.esc(JSON.stringify(state, null, 2)) +
+      '</pre></details>';
+  }
+
+  // Stallions created as a lightweight stub just to anchor a mare's
+  // breeding record (a covering with someone else's stud, or a free
+  // self-breeding with no bank transaction) are marked `owned: false` and
+  // kept out of your own roster — their history still shows via "My
+  // Mares" and the ledger tables, just not cluttering this grid.
+  function getOwnedStallions() {
+    return state.stallions.filter(function (s) { return s.owned !== false; });
   }
 
   function renderStallionsList() {
+    var ownedStallions = getOwnedStallions();
     var totalBreedings = 0, totalsAll = {};
-    state.stallions.forEach(function (s) {
+    ownedStallions.forEach(function (s) {
       var a = aggregates[s.id] || { count: 0, totals: {} };
       totalBreedings += a.count;
       L.CURRENCIES.forEach(function (c) { if (a.totals && a.totals[c]) totalsAll[c] = (totalsAll[c] || 0) + a.totals[c]; });
@@ -169,9 +271,10 @@
     var totalEarnedLine = L.moneyLine(totalsAll);
 
     var html = topHeaderHtml();
+    html += renderDebugPanel();
 
     html += '<div class="stats-bar">' +
-      '<div class="stat-tile"><div class="num mono">' + state.stallions.length + '</div><div class="label">Stallions</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + ownedStallions.length + '</div><div class="label">Stallions</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + uniqueMareCount + '</div><div class="label">Mares (all)</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + totalBreedings + '</div><div class="label">Breedings logged</div></div>' +
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
@@ -193,13 +296,13 @@
     if (importingBreeding) html += renderImportForm(null);
     if (addingStallion) html += renderStallionForm();
 
-    if (state.stallions.length === 0 && !addingStallion) {
+    if (ownedStallions.length === 0 && !addingStallion) {
       html += '<div class="empty"><h3>No stallions yet</h3>' +
         '<p>Browse to your bank page or a stallion\'s offspring page on Horse Reality and they\'ll appear here automatically — or add one by hand.</p>' +
         '<button class="btn btn-primary" data-action="toggle-add-stallion">+ Add Stallion</button></div>';
-    } else if (state.stallions.length) {
+    } else if (ownedStallions.length) {
       html += '<div class="stallion-grid">';
-      state.stallions.forEach(function (s) {
+      ownedStallions.forEach(function (s) {
         var a = aggregates[s.id] || { count: 0, totals: {} };
         var pubFee = L.feeObj(s, 'Public'), privFee = L.feeObj(s, 'Private');
         html += '<div class="card stallion-card" data-action="open-stallion" data-id="' + s.id + '">' +
@@ -377,13 +480,25 @@
     var m = maresIndex.find(function (x) { return x.key === selectedMareKey; });
     if (!m) { selectedMareKey = null; return renderMaresList(); }
     var mareHref = L.safeUrl(m.mareUrl);
+    var passportInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
 
-    var html = '<button class="back-link" data-action="back-to-mares">← My mares</button>';
+    var mareIdx = maresIndex.findIndex(function (x) { return x.key === selectedMareKey; });
+    var html = '<div class="detail-nav">' +
+      '<button class="back-link" data-action="back-to-mares">← My mares</button>' +
+      (maresIndex.length > 1 ? '<div class="detail-nav-btns">' +
+        '<button class="btn btn-sm" data-action="nav-mare" data-dir="prev">‹ Previous</button>' +
+        '<button class="btn btn-sm" data-action="nav-mare" data-dir="next">Next ›</button>' +
+      '</div>' : '') +
+    '</div>';
     html += '<div class="detail-head">' +
       '<div><h1>' + L.esc(m.mareName) + '</h1>' +
       '<div class="tags">' +
         (m.mareLifeNumber ? '<span class="tag mono">#' + L.esc(m.mareLifeNumber) + '</span>' : '') +
+        passportTagsHtml(passportInfo) +
       '</div>' +
+      pregnancyLineHtml(passportInfo) +
+      pedigreeLineHtml(passportInfo) +
+      passportOwnerHtml(passportInfo) +
       (mareHref ? '<p class="notes-line"><a href="' + L.esc(mareHref) + '" target="_blank" rel="noopener noreferrer">View mare on Horse Reality<span class="ext">↗</span></a></p>' : '') +
       '</div>' +
     '</div>';
@@ -396,19 +511,82 @@
       '</div>';
 
     html += '<div class="section-head"><h2>Breeding History</h2></div>';
-    html += '<div class="ledger">';
-    html += '<div class="ledger-head"><div>Date</div><div>Stallion</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
-    html += '<div class="card">';
-    m.records.forEach(function (b, i) { html += renderBreedingRow(b, i, 'mare'); });
-    html += '</div></div>';
+    if (!m.records.length) {
+      html += '<div class="empty"><h3>No breedings logged yet</h3>' +
+        '<p>' + L.esc(m.mareName) + ' hasn\'t been bred yet — once a covering shows up on your bank or notifications page, it\'ll appear here automatically.</p></div>';
+    } else {
+      html += '<div class="ledger">';
+      html += '<div class="ledger-head"><div>Date</div><div>Stallion</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
+      html += '<div class="card">';
+      m.records.forEach(function (b, i) { html += renderBreedingRow(b, i, 'mare'); });
+      html += '</div></div>';
+    }
 
     return html;
+  }
+
+  // ---------- passport (genetics/pedigree/pregnancy cache) rendering ----------
+  // state.horseInfo is keyed by life number and populated by content.js from
+  // ANY horse page viewed (not just owned stallions), so both a stallion's
+  // and a mare's detail view can pull the same richer snapshot by that key.
+  function passportTagsHtml(info) {
+    if (!info) return '';
+    var tags = [];
+    if (info.geneticPotential != null) tags.push('<span class="tag mono">GP ' + L.esc(info.geneticPotential) + '</span>');
+    if (info.conformation) tags.push('<span class="tag mono">' + L.esc(info.conformation) + '</span>');
+    if (info.testedColours) tags.push('<span class="tag mono">' + L.esc(info.testedColours) + '</span>');
+    if (info.training) tags.push('<span class="tag">' + L.esc(info.training) + '</span>');
+    if (info.predicates) tags.push('<span class="tag">' + L.esc(info.predicates) + '</span>');
+    if (info.height) tags.push('<span class="tag">' + L.esc(info.height) + '</span>');
+    if (info.location) tags.push('<span class="tag">' + L.esc(info.location) + '</span>');
+    if (info.dateOfBirth) tags.push('<span class="tag">Born ' + L.esc(info.dateOfBirth) + '</span>');
+    if (info.coiRaw) tags.push('<span class="tag mono">' + L.esc(info.coiRaw) + '</span>');
+    return tags.join('');
+  }
+  function ancestorHtml(a, label) {
+    if (!a) return label + ': Unknown';
+    var href = L.safeUrl(a.url);
+    var nameHtml = href
+      ? '<a href="' + L.esc(href) + '" target="_blank" rel="noopener noreferrer">' + L.esc(a.name || 'View') + '<span class="ext">↗</span></a>'
+      : L.esc(a.name || 'Unknown');
+    return label + ': ' + nameHtml + (a.scoreRaw ? ' <span class="mono">(' + L.esc(a.scoreRaw) + ')</span>' : '');
+  }
+  function pedigreeLineHtml(info) {
+    if (!info || (!info.sire && !info.dam)) return '';
+    return '<p class="notes-line">' + ancestorHtml(info.sire, 'Sire') + ' &nbsp;·&nbsp; ' + ancestorHtml(info.dam, 'Dam') + '</p>';
+  }
+  function passportOwnerHtml(info) {
+    if (!info) return '';
+    var lines = [];
+    if (info.ownerName) {
+      var oh = L.safeUrl(info.ownerUrl);
+      lines.push('Owner: ' + (oh ? '<a href="' + L.esc(oh) + '" target="_blank" rel="noopener noreferrer">' + L.esc(info.ownerName) + '<span class="ext">↗</span></a>' : L.esc(info.ownerName)) + (info.ownerStable ? ' · ' + L.esc(info.ownerStable) : ''));
+    }
+    if (info.horseBreederName && info.horseBreederName !== info.ownerName) {
+      var bh = L.safeUrl(info.horseBreederUrl);
+      lines.push('Breeder: ' + (bh ? '<a href="' + L.esc(bh) + '" target="_blank" rel="noopener noreferrer">' + L.esc(info.horseBreederName) + '<span class="ext">↗</span></a>' : L.esc(info.horseBreederName)) + (info.horseBreederStable ? ' · ' + L.esc(info.horseBreederStable) : ''));
+    }
+    return lines.length ? '<p class="notes-line">' + lines.join(' &nbsp;·&nbsp; ') + '</p>' : '';
+  }
+  function pregnancyLineHtml(info) {
+    if (!info || !info.pregnancy) return '';
+    var p = info.pregnancy;
+    if (!p.status && !p.dueText && !p.sireName) return '';
+    var sireHref = L.safeUrl(p.sireUrl);
+    var sireHtml = p.sireName
+      ? (sireHref ? '<a href="' + L.esc(sireHref) + '" target="_blank" rel="noopener noreferrer">' + L.esc(p.sireName) + '<span class="ext">↗</span></a>' : L.esc(p.sireName))
+      : '';
+    return '<p class="notes-line"><strong>' + L.esc(p.status || 'Pregnant') + '</strong>' +
+      (p.dueText ? ' — ' + L.esc(p.dueText) : '') +
+      (sireHtml ? ' — sire: ' + sireHtml : '') +
+      '</p>';
   }
 
   function renderDetail() {
     var s = state.stallions.find(function (x) { return x.id === selectedId; });
     if (!s) { selectedId = null; return renderStallionsList(); }
     var breedings = (state.breedings[selectedId] || []).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+    var passportInfo = (state.horseInfo && s.lifeNumber) ? state.horseInfo[s.lifeNumber] : null;
 
     var earnedTotals = {};
     breedings.forEach(function (b) {
@@ -420,7 +598,16 @@
     breedings.forEach(function (b) { if (b.mareName) mareKeysForStallion[L.mareKey(b)] = true; });
     var stallionMareCount = Object.keys(mareKeysForStallion).length;
 
-    var html = '<button class="back-link" data-action="back-to-list">← All stallions</button>';
+    var ownedList = getOwnedStallions();
+    var stallionIdx = ownedList.findIndex(function (x) { return x.id === selectedId; });
+
+    var html = '<div class="detail-nav">' +
+      '<button class="back-link" data-action="back-to-list">← All stallions</button>' +
+      (ownedList.length > 1 ? '<div class="detail-nav-btns">' +
+        '<button class="btn btn-sm" data-action="nav-stallion" data-dir="prev">‹ Previous</button>' +
+        '<button class="btn btn-sm" data-action="nav-stallion" data-dir="next">Next ›</button>' +
+      '</div>' : '') +
+    '</div>';
 
     if (editingStallion) {
       html += renderStallionForm(s);
@@ -429,13 +616,17 @@
         (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
         '<div><h1>' + L.esc(s.name) + '</h1>' +
         '<div class="tags">' +
+          (s.owned === false ? '<span class="tag">Not your stud — tracked for a mare\'s breeding history</span>' : '') +
           (s.lifeNumber ? '<span class="tag mono">#' + L.esc(s.lifeNumber) + '</span>' : '') +
           (s.breed ? '<span class="tag">' + L.esc(s.breed) + '</span>' : '') +
           (s.color ? '<span class="tag">' + L.esc(s.color) + '</span>' : '') +
           L.CURRENCIES.map(function (c) { return s['feePublic' + c] ? '<span class="tag mono">Public ' + L.fmtMoney(s['feePublic' + c]) + ' ' + c + '</span>' : ''; }).join('') +
           L.CURRENCIES.map(function (c) { return s['feePrivate' + c] ? '<span class="tag mono">Private ' + L.fmtMoney(s['feePrivate' + c]) + ' ' + c + '</span>' : ''; }).join('') +
+          passportTagsHtml(passportInfo) +
         '</div>' +
         (s.notes ? '<p class="notes-line">' + L.esc(s.notes) + '</p>' : '') +
+        pedigreeLineHtml(passportInfo) +
+        passportOwnerHtml(passportInfo) +
         '</div>' +
       '</div>' +
         '<div class="detail-actions">' +
@@ -507,6 +698,29 @@
       }
       else if (action === 'back-to-mares') { selectedMareKey = null; render(); }
       else if (action === 'back-to-list') { selectedId = null; editingStallion = false; addingBreeding = false; render(); }
+      else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
+      else if (action === 'close-passport') { selectedPassportLife = null; render(); }
+      else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
+      else if (action === 'nav-stallion') {
+        var ownedNav = getOwnedStallions();
+        var curIdx = ownedNav.findIndex(function (x) { return x.id === selectedId; });
+        if (curIdx > -1 && ownedNav.length > 1) {
+          var dir = t.getAttribute('data-dir') === 'prev' ? -1 : 1;
+          var nextIdx = (curIdx + dir + ownedNav.length) % ownedNav.length;
+          selectedId = ownedNav[nextIdx].id;
+          editingStallion = false; addingBreeding = false;
+          render();
+        }
+      }
+      else if (action === 'nav-mare') {
+        var curMareIdx = maresIndex.findIndex(function (x) { return x.key === selectedMareKey; });
+        if (curMareIdx > -1 && maresIndex.length > 1) {
+          var mareDir = t.getAttribute('data-dir') === 'prev' ? -1 : 1;
+          var nextMareIdx = (curMareIdx + mareDir + maresIndex.length) % maresIndex.length;
+          selectedMareKey = maresIndex[nextMareIdx].key;
+          render();
+        }
+      }
       else if (action === 'toggle-add-breeding') { addingBreeding = !addingBreeding; render(); }
       else if (action === 'cancel-breeding-form') { addingBreeding = false; render(); }
       else if (action === 'toggle-import') { importingBreeding = !importingBreeding; importError = ''; render(); }
@@ -541,7 +755,11 @@
       var action = t.getAttribute('data-action');
       var fd = new FormData(t);
 
-      if (action === 'submit-stallion') {
+      if (action === 'submit-search') {
+        horseSearchQuery = (fd.get('query') || '').trim();
+        render();
+      }
+      else if (action === 'submit-stallion') {
         var data = {
           name: (fd.get('name') || '').trim(),
           lifeNumber: (fd.get('lifeNumber') || '').trim(),
@@ -677,6 +895,7 @@
     if (area !== 'local' || !changes.hrLedger) return;
     state = changes.hrLedger.newValue || HRStorage.defaultState();
     if (!state.breedings) state.breedings = {};
+    if (!state.horseInfo) state.horseInfo = {};
     if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
     recompute();
     render();

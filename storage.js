@@ -4,13 +4,14 @@
   'use strict';
 
   function defaultState() {
-    return { stallions: [], breedings: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
+    return { stallions: [], breedings: {}, horseInfo: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
   }
 
   function getState(cb) {
     chrome.storage.local.get({ hrLedger: defaultState() }, function (res) {
       var state = res.hrLedger || defaultState();
       if (!state.breedings) state.breedings = {};
+      if (!state.horseInfo) state.horseInfo = {};
       if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
       if (state.settings.myUsername == null) state.settings.myUsername = '';
       cb(state);
@@ -58,12 +59,23 @@
     return 'added';
   }
 
+  // Caches a horse's passport snapshot (genetics, pedigree, pregnancy...) by
+  // life number. Unlike stallions/breedings, this is safe to write for ANY
+  // horse you merely view — it's read-only reference data, not a claim of
+  // ownership, so it doesn't need the "bank page proves it" gate that
+  // upsertStallionByMatch enforces.
+  function upsertHorseInfo(state, lifeNumber, data) {
+    if (!lifeNumber) return;
+    state.horseInfo[lifeNumber] = Object.assign({}, state.horseInfo[lifeNumber], data, { capturedAt: Date.now() });
+  }
+
   global.HRStorage = {
     defaultState: defaultState,
     getState: getState,
     setState: setState,
     allBreedingsFlat: allBreedingsFlat,
     upsertStallionByMatch: upsertStallionByMatch,
-    upsertBreeding: upsertBreeding
+    upsertBreeding: upsertBreeding,
+    upsertHorseInfo: upsertHorseInfo
   };
 })(typeof window !== 'undefined' ? window : this);

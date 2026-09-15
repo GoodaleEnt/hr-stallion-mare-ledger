@@ -10,7 +10,8 @@ While you browse Horse Reality normally, the extension watches for a few specifi
 
 - **Bank page** — every "used your stud service to breed..." transaction becomes a breeding record: mare, breeder, price, currency, date, and which stud. If that stud isn't in your ledger yet, it's created automatically (this is the one page that actually proves the stud is yours).
 - **A stallion's Offspring tab** — dam, breeder, resulting foal (with its portrait and genetic score), and outcome.
-- **A horse's Info/passport tab** — fills in breed and refreshes the stallion's name and portrait.
+- **A horse's Info/passport tab** — fills in breed and refreshes the stallion's name and portrait, and caches a fuller passport snapshot (genetic potential, conformation, tested colours, training, predicates, height, location, date of birth, owner/breeder, COI, and sire/dam) keyed by life number. This cache is populated for *any* horse you view — yours or not — since it's just reference data, not an ownership claim; the dashboard shows it on both a stallion's and a mare's detail page whenever it has a matching life number.
+- **A mare's Pregnancy card** — while she's carrying, her current status, due date, and covering sire are captured too and shown on her detail page.
 - **Notifications log** — "The covering between X and Y has failed, your mare is not pregnant" is the only source of confirmed failures, so the extension watches for it and marks the matching record.
 
 Nothing is ever auto-created just from *viewing* a horse — only the bank page (which proves ownership) creates new stallion entries. Visiting someone else's stud's Offspring or Info tab will never clutter your ledger with horses you don't own.

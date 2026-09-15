@@ -651,22 +651,9 @@
   // computation over already-stored data, no scraping needed.
   var STALE_PENDING_DAYS = 6;
   function sweepStaleFailedCoverings(state) {
-    var todayMs = Date.now();
-    var marked = 0;
-    state.stallions.forEach(function (s) {
-      var list = state.breedings[s.id] || [];
-      list.forEach(function (b) {
-        if (b.status !== 'Pending' || !b.date) return;
-        var bdMs = new Date(b.date + 'T00:00:00').getTime();
-        if (isNaN(bdMs)) return;
-        if ((todayMs - bdMs) / 86400000 < STALE_PENDING_DAYS) return;
-        var hasFoal = list.some(function (other) {
-          return other !== b && other.mareLifeNumber && other.mareLifeNumber === b.mareLifeNumber && other.status === 'Foal Born';
-        });
-        if (!hasFoal) { b.status = 'Failed'; marked++; }
-      });
-    });
-    return marked;
+    var candidates = HRLib.findReviewCandidates(state, STALE_PENDING_DAYS);
+    candidates.forEach(function (c) { c.breeding.status = 'Failed'; });
+    return candidates.length;
   }
   function sweepAndPersistStaleFailures() {
     HRStorage.getState(function (state) {

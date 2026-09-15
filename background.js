@@ -1,3 +1,41 @@
+importScripts('lib.js', 'storage.js');
+
+// Pending coverings this old have certainly resolved in-game one way or the
+// other, but the stud owner never gets the "covering has failed"
+// notification for a CUSTOMER's mare — only she does. So rather than wait
+// for the user to browse back to horsereality.com (which is when the
+// content-script sweep would silently mark it Failed), badge the toolbar
+// icon so there's a chance to click through to the mare's own page first.
+var REVIEW_DAYS = 6;
+
+function refreshReviewBadge() {
+  HRStorage.getState(function (state) {
+    var count = HRLib.findReviewCandidates(state, REVIEW_DAYS).length;
+    chrome.action.setBadgeText({ text: count ? String(count) : '' });
+    chrome.action.setBadgeBackgroundColor({ color: '#d97706' });
+    chrome.action.setTitle({
+      title: count
+        ? 'HR Stallion & Mare Ledger — ' + count + ' covering' + (count === 1 ? '' : 's') + ' ready to review'
+        : 'Open HR Stallion & Mare Ledger'
+    });
+  });
+}
+
+chrome.runtime.onStartup.addListener(refreshReviewBadge);
+chrome.runtime.onInstalled.addListener(refreshReviewBadge);
+// Storage changes (a new breeding scraped, a status edited) update the badge
+// right away; the hourly alarm catches the case where nothing changed but a
+// Pending covering has simply aged past the threshold since the service
+// worker last woke up.
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area === 'local' && changes.hrLedger) refreshReviewBadge();
+});
+chrome.alarms.create('hr-review-badge', { periodInMinutes: 60 });
+chrome.alarms.onAlarm.addListener(function (alarm) {
+  if (alarm.name === 'hr-review-badge') refreshReviewBadge();
+});
+refreshReviewBadge();
+
 chrome.action.onClicked.addListener(function () {
   var url = chrome.runtime.getURL('dashboard.html');
   chrome.tabs.query({ url: url }, function (tabs) {

@@ -86,6 +86,35 @@
     }
     return null;
   }
+  function daysSince(dateStr) {
+    if (!dateStr) return null;
+    var ms = new Date(dateStr + 'T00:00:00').getTime();
+    if (isNaN(ms)) return null;
+    return (Date.now() - ms) / 86400000;
+  }
+  // Pending breedings old enough that Horse Reality has certainly resolved
+  // the covering one way or the other, but which the ledger has no proof of
+  // either way yet (no matching "Foal Born" record for that mare). Shared by
+  // content.js (which auto-marks these Failed) and background.js (which
+  // badges them first, since the stud owner never gets the failure
+  // notification for a customer's mare — only she does).
+  function findReviewCandidates(state, minDays) {
+    var out = [];
+    (state.stallions || []).forEach(function (s) {
+      var list = (state.breedings && state.breedings[s.id]) || [];
+      list.forEach(function (b) {
+        if (b.status !== 'Pending' || !b.date) return;
+        var age = daysSince(b.date);
+        if (age == null || age < minDays) return;
+        var hasFoal = list.some(function (other) {
+          return other !== b && other.mareLifeNumber && other.mareLifeNumber === b.mareLifeNumber && other.status === 'Foal Born';
+        });
+        if (hasFoal) return;
+        out.push({ stallionId: s.id, stallionName: s.name, breeding: b, days: Math.floor(age) });
+      });
+    });
+    return out;
+  }
 
   global.HRLib = {
     CURRENCIES: CURRENCIES,
@@ -103,6 +132,8 @@
     safeUrl: safeUrl,
     mareKey: mareKey,
     breedingMatchKey: breedingMatchKey,
-    findStallionMatch: findStallionMatch
+    findStallionMatch: findStallionMatch,
+    daysSince: daysSince,
+    findReviewCandidates: findReviewCandidates
   };
 })(typeof window !== 'undefined' ? window : this);

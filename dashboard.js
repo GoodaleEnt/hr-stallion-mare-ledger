@@ -239,6 +239,37 @@
     '</div>';
   }
 
+  // Pending coverings old enough (6+ days) that Horse Reality has resolved
+  // them one way or another, but with no "Foal Born" record yet to prove it.
+  // The stud owner never gets the failure notification for a customer's
+  // mare — only she does — so this points at her page directly instead of
+  // silently trusting the auto-fail sweep that runs next time content.js
+  // sees a horsereality.com page.
+  var REVIEW_DAYS = 6;
+  function renderNeedsReviewHtml() {
+    var candidates = HRLib.findReviewCandidates(state, REVIEW_DAYS);
+    if (!candidates.length) return '';
+    candidates.sort(function (a, b) { return b.days - a.days; });
+    var html = '<div class="empty" style="border-color:#d97706;text-align:left;margin-bottom:16px;">' +
+      '<h3 style="color:#d97706;">' + candidates.length + ' covering' + (candidates.length === 1 ? '' : 's') + ' ready to review</h3>' +
+      '<p style="margin-top:0;">Still marked Pending ' + REVIEW_DAYS + '+ days after breeding with no foal recorded yet. Horse Reality only notifies the ' +
+      '<em>mare\'s</em> owner when a covering fails, so check her page directly before this gets auto-marked Failed.</p>';
+    html += '<div class="ledger">';
+    candidates.forEach(function (c) {
+      var b = c.breeding;
+      var mareHref = L.safeUrl(b.mareUrl);
+      html += '<div class="review-row">' +
+        '<div class="mono" data-label="Date">' + L.fmtDate(b.date) + '</div>' +
+        '<div data-label="Mare">' + L.esc(b.mareName || 'Unknown mare') + (b.mareLifeNumber ? ' <span class="mono sub">#' + L.esc(b.mareLifeNumber) + '</span>' : '') + '</div>' +
+        '<div data-label="Stallion"><button type="button" class="link-btn" data-action="open-stallion" data-id="' + L.esc(c.stallionId) + '">' + L.esc(c.stallionName) + '</button></div>' +
+        '<div data-label="Days pending">' + c.days + ' days</div>' +
+        '<div data-label="">' + (mareHref ? '<a href="' + L.esc(mareHref) + '" target="_blank" rel="noopener noreferrer">Check her page<span class="ext">↗</span></a>' : '<span class="sub">no link captured</span>') + '</div>' +
+      '</div>';
+    });
+    html += '</div></div>';
+    return html;
+  }
+
   function topHeaderHtml() {
     var results = horseSearchQuery ? searchHorseInfo(horseSearchQuery) : [];
     var html = '<header class="top"><div class="titles">' +
@@ -247,6 +278,7 @@
       '</div></header>';
 
     html += apiWarningBannerHtml();
+    html += renderNeedsReviewHtml();
 
     html += '<form class="search-row" data-action="submit-search">' +
       '<input type="text" name="query" placeholder="Look up any cached horse by name or life number…" value="' + L.esc(horseSearchQuery) + '">' +

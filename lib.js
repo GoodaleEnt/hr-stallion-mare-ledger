@@ -109,6 +109,20 @@
     var age = ageYears(dateOfBirth);
     return age != null && age < 3;
   }
+  // Horse Reality doesn't always give us a birthdate (a horse only gets one
+  // cached once you've viewed its own passport page), and even when it does,
+  // players sometimes want to correct or track age by hand. `manualAgeMonths`
+  // on a horseInfo record, once set, overrides the birthdate-derived age
+  // entirely — "aging up" a horse just bumps that number by 6 months.
+  function effectiveAgeYears(info) {
+    if (!info) return null;
+    if (info.manualAgeMonths != null) return info.manualAgeMonths / 12;
+    return ageYears(info.dateOfBirth);
+  }
+  function isYoungInfo(info) {
+    var age = effectiveAgeYears(info);
+    return age != null && age < 3;
+  }
 
   // Pending breedings old enough that Horse Reality has certainly resolved
   // the covering one way or the other, but which the ledger has no proof of
@@ -154,6 +168,8 @@
     daysSince: daysSince,
     ageYears: ageYears,
     isYoungHorse: isYoungHorse,
+    effectiveAgeYears: effectiveAgeYears,
+    isYoungInfo: isYoungInfo,
     findReviewCandidates: findReviewCandidates
   };
 })(typeof window !== 'undefined' ? window : this);

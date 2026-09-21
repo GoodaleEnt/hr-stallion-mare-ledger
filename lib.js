@@ -97,13 +97,19 @@
   // still enough for the JS Date parser to work with. Returns null when the
   // birthdate isn't known so callers can fall back to "assume adult" rather
   // than wrongly hiding a horse with no cached passport.
+  //
+  // Horse Reality ages horses on an accelerated in-game clock, not real
+  // calendar time: a horse gains 1 game month for roughly every 36 real
+  // hours since its birthdate (confirmed against real cached data — a horse
+  // barely 6 real weeks old already reads as several years old in-game).
+  var GAME_MS_PER_MONTH = 36 * 3600 * 1000;
   function ageYears(dateOfBirth) {
     if (!dateOfBirth) return null;
     var d = new Date(dateOfBirth);
     if (isNaN(d.getTime())) return null;
     var ms = Date.now() - d.getTime();
     if (ms < 0) return null;
-    return ms / (365.25 * 24 * 3600 * 1000);
+    return (ms / GAME_MS_PER_MONTH) / 12;
   }
   function isYoungHorse(dateOfBirth) {
     var age = ageYears(dateOfBirth);
@@ -119,9 +125,24 @@
     if (info.manualAgeMonths != null) return info.manualAgeMonths / 12;
     return ageYears(info.dateOfBirth);
   }
+  // Whole-months version of the above — avoids float rounding surprises
+  // right at the 3-year (36 month) boundary, and is what the "aged up"
+  // controls add/subtract/set against.
+  function effectiveAgeMonths(info) {
+    if (!info) return null;
+    if (info.manualAgeMonths != null) return info.manualAgeMonths;
+    var y = ageYears(info.dateOfBirth);
+    return y == null ? null : Math.round(y * 12);
+  }
+  function formatAgeMonths(months) {
+    if (months == null) return '';
+    var y = Math.floor(months / 12);
+    var m = months % 12;
+    return y + ' yr' + (y === 1 ? '' : 's') + (m ? ', ' + m + ' mo' : '');
+  }
   function isYoungInfo(info) {
-    var age = effectiveAgeYears(info);
-    return age != null && age < 3;
+    var months = effectiveAgeMonths(info);
+    return months != null && months < 36;
   }
 
   // Pending breedings old enough that Horse Reality has certainly resolved
@@ -169,6 +190,8 @@
     ageYears: ageYears,
     isYoungHorse: isYoungHorse,
     effectiveAgeYears: effectiveAgeYears,
+    effectiveAgeMonths: effectiveAgeMonths,
+    formatAgeMonths: formatAgeMonths,
     isYoungInfo: isYoungInfo,
     findReviewCandidates: findReviewCandidates
   };

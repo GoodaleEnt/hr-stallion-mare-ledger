@@ -355,9 +355,9 @@
   function isAdultHorse(lifeNumber) {
     var info = lifeNumber && state.horseInfo && state.horseInfo[lifeNumber];
     if (!info) return true;
-    var age = L.effectiveAgeYears(info);
-    if (age == null) return true;
-    return age >= 3;
+    var months = L.effectiveAgeMonths(info);
+    if (months == null) return true;
+    return months >= 36;
   }
   function getOwnedStallions() {
     return state.stallions.filter(function (s) { return s.owned !== false && isAdultHorse(s.lifeNumber); });
@@ -381,13 +381,15 @@
       .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
   }
 
-  // Manually "ages up" a cached horse by 6 months. The first click on a
-  // horse with no tracked age starts counting from its real cached
+  // Nudges a cached horse's tracked age by +/- 6 months. The first nudge on
+  // a horse with no tracked age yet starts counting from its real cached
   // birthdate (or 0 if HR never gave us one — i.e. treat it as a newborn),
-  // then every further click just adds another 6 months on top. Once the
-  // total crosses 3 years he/she drops out of Colts & Fillies and appears
-  // on the Stallions/My Mares tab automatically.
-  function ageUpHorse(lifeNumber) {
+  // then every further nudge just adds/subtracts another 6 months on top
+  // (never below 0 — an accidental extra click just gets retracted with the
+  // -6mo button rather than going negative). Once the total crosses 3 years
+  // he/she drops out of Colts & Fillies and appears on the Stallions/My
+  // Mares tab automatically, and vice versa if retracted back under 3.
+  function adjustAgeMonths(lifeNumber, deltaMonths) {
     if (!lifeNumber) return;
     if (!state.horseInfo) state.horseInfo = {};
     var info = state.horseInfo[lifeNumber];
@@ -395,19 +397,42 @@
     var baseMonths = info.manualAgeMonths != null
       ? info.manualAgeMonths
       : Math.round((L.ageYears(info.dateOfBirth) || 0) * 12);
-    info.manualAgeMonths = baseMonths + 6;
+    info.manualAgeMonths = Math.max(0, baseMonths + deltaMonths);
+    persist();
+  }
+  // Sets the tracked age directly from a "times aged up" count (each unit
+  // is 6 months) — lets a misclick be corrected in one go instead of
+  // clicking -6mo repeatedly, or the age set precisely from the start.
+  function setAgeTimes(lifeNumber, times) {
+    if (!lifeNumber) return;
+    if (!state.horseInfo) state.horseInfo = {};
+    var info = state.horseInfo[lifeNumber];
+    if (!info) { info = {}; state.horseInfo[lifeNumber] = info; }
+    var n = Math.max(0, Math.round(Number(times) || 0));
+    info.manualAgeMonths = n * 6;
     persist();
   }
 
-  // Small "age up" control, shown wherever a horse's age matters (young
-  // horse cards, stallion/mare detail pages). Needs a life number to have
-  // somewhere in state.horseInfo to store the tracked age against.
+  // Age control, shown wherever a horse's age matters (young horse cards,
+  // stallion/mare detail pages). Needs a life number to have somewhere in
+  // state.horseInfo to store the tracked age against.
   function renderAgeControlHtml(lifeNumber) {
     if (!lifeNumber) return '';
     var info = state.horseInfo && state.horseInfo[lifeNumber];
-    var age = info ? L.effectiveAgeYears(info) : null;
-    return '<div class="row"><span>' + (age != null ? age.toFixed(1) + ' yrs' : 'Age unknown') + '</span>' +
-      '<button type="button" class="btn btn-sm" data-action="age-up-horse" data-life="' + L.esc(lifeNumber) + '" title="Ages this horse up by 6 months">Aged up (+6mo)</button></div>';
+    var months = info ? L.effectiveAgeMonths(info) : null;
+    var times = months != null ? Math.round(months / 6) : 0;
+    return '<div class="row" style="align-items:center;flex-wrap:wrap;gap:8px;">' +
+      '<span>' + (months != null ? L.formatAgeMonths(months) : 'Age unknown') + '</span>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+        '<button type="button" class="btn btn-sm" data-action="age-down-horse" data-life="' + L.esc(lifeNumber) + '" title="Retract 6 months"' + (months && months > 0 ? '' : ' disabled') + '>&minus;6mo</button>' +
+        '<button type="button" class="btn btn-sm" data-action="age-up-horse" data-life="' + L.esc(lifeNumber) + '" title="Ages this horse up by 6 months">+6mo</button>' +
+      '</div>' +
+      '<form data-action="set-age-times" data-life="' + L.esc(lifeNumber) + '" style="display:flex;gap:6px;align-items:center;">' +
+        '<label style="font-size:11.5px;color:var(--text-muted);">&times; aged up</label>' +
+        '<input type="number" min="0" step="1" name="times" value="' + times + '" style="width:56px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:13px;color:var(--text);">' +
+        '<button type="submit" class="btn btn-sm">Set</button>' +
+      '</form>' +
+    '</div>';
   }
 
   function renderStallionsList() {
@@ -615,7 +640,9 @@
     } else {
       html += '<div class="stallion-grid">';
       maresIndex.forEach(function (m) {
+        var mareInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
         html += '<div class="card stallion-card" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+          (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
           '<div class="row"><span>Breedings</span><span class="v mono">' + m.records.length + '</span></div>' +
@@ -660,15 +687,13 @@
     function youngGrid(list) {
       var out = '<div class="stallion-grid">';
       list.forEach(function (h) {
-        var age = L.effectiveAgeYears(h);
         out += '<div class="card stallion-card" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
           (h.imageUrl ? '<img class="portrait" src="' + L.esc(h.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(h.name || 'Unnamed horse') + '</h3>' +
           '<div class="lifenum mono">#' + L.esc(h.lifeNumber) + '</div>' +
           '<div class="meta">' + L.esc([h.breed, h.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
           (h.dateOfBirth ? '<div class="row"><span>Born</span><span class="v mono">' + L.esc(h.dateOfBirth) + '</span></div>' : '') +
-          (age != null ? '<div class="row"><span>Age</span><span class="v mono">' + age.toFixed(1) + ' yrs' + (h.manualAgeMonths != null ? ' (tracked)' : '') + '</span></div>' : '') +
-          '<button type="button" class="btn btn-sm" style="width:100%;margin-top:8px;" data-action="age-up-horse" data-life="' + L.esc(h.lifeNumber) + '" title="Ages this horse up by 6 months">Aged up (+6mo)</button>' +
+          renderAgeControlHtml(h.lifeNumber) +
           '</div>';
       });
       out += '</div>';
@@ -899,7 +924,8 @@
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
       else if (action === 'mark-stallion-owned') { updateStallionRec(t.getAttribute('data-id'), { owned: true }); }
-      else if (action === 'age-up-horse') { ageUpHorse(t.getAttribute('data-life')); }
+      else if (action === 'age-up-horse') { adjustAgeMonths(t.getAttribute('data-life'), 6); }
+      else if (action === 'age-down-horse') { adjustAgeMonths(t.getAttribute('data-life'), -6); }
       else if (action === 'open-stallion') {
         selectedId = t.getAttribute('data-id');
         selectedMareKey = null;
@@ -978,6 +1004,9 @@
       if (action === 'submit-search') {
         horseSearchQuery = (fd.get('query') || '').trim();
         render();
+      }
+      else if (action === 'set-age-times') {
+        setAgeTimes(t.getAttribute('data-life'), fd.get('times'));
       }
       else if (action === 'submit-stallion') {
         var data = {

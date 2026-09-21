@@ -806,6 +806,7 @@
         '</div>' +
       '</div>' +
         '<div class="detail-actions">' +
+          (s.owned === false ? '<button class="btn btn-sm btn-primary" data-action="mark-stallion-owned" data-id="' + s.id + '" title="He was only tracked because a mare\'s breeding record named him — mark him as your own stallion to list him on the Stallions tab.">Mark as My Stallion</button>' : '') +
           '<select class="pill-select ' + L.stallionStatusClass(s.status || 'Active') + '" data-action="update-stallion-status" data-id="' + s.id + '">' +
             ['Active', 'Sold', 'Retired'].map(function (opt) { return '<option' + (opt === (s.status || 'Active') ? ' selected' : '') + '>' + opt + '</option>'; }).join('') +
           '</select>' +
@@ -861,6 +862,7 @@
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
+      else if (action === 'mark-stallion-owned') { updateStallionRec(t.getAttribute('data-id'), { owned: true }); }
       else if (action === 'open-stallion') {
         selectedId = t.getAttribute('data-id');
         selectedMareKey = null;

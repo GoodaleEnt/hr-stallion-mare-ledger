@@ -327,11 +327,24 @@
       pedigreeLineHtml(info) +
       passportOwnerHtml(info) +
       (href ? '<p class="notes-line"><a href="' + L.esc(href) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
+      renderAgeControlHtml(selectedPassportLife) +
       '</div>' +
     '</div>';
-    html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
-      '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
-      'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+
+    // A horse can already exist as a (possibly stub, owned:false) stallion
+    // record even though this raw passport cache doesn't know that — link
+    // through to his actual tracked record instead of just saying "not
+    // tied to a breeding record" so "Mark as My Stallion" is reachable.
+    var matchId = L.findStallionMatch(state.stallions, { stallionName: info.name, stallionLifeNumber: selectedPassportLife });
+    if (matchId) {
+      html += '<div class="empty"><h3>Already tracked</h3>' +
+        '<p>This horse has a stallion record in your ledger.</p>' +
+        '<button class="btn btn-primary" data-action="open-stallion" data-id="' + L.esc(matchId) + '">View his stallion record</button></div>';
+    } else {
+      html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
+        '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
+        'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+    }
     return html;
   }
 
@@ -419,10 +432,18 @@
   function renderAgeControlHtml(lifeNumber) {
     if (!lifeNumber) return '';
     var info = state.horseInfo && state.horseInfo[lifeNumber];
+    // Once Horse Reality's own age reading has been captured (from visiting
+    // this horse's page), it's ground truth and refreshes automatically on
+    // every visit — no manual controls needed, and showing them would just
+    // invite an override that gets silently ignored.
+    if (info && info.ageMonths != null) {
+      return '<div class="row"><span>' + L.esc(info.ageText || L.formatAgeMonths(info.ageMonths)) + '</span>' +
+        '<span class="sub" style="font-size:11px;">from Horse Reality</span></div>';
+    }
     var months = info ? L.effectiveAgeMonths(info) : null;
     var times = months != null ? Math.round(months / 6) : 0;
     return '<div class="row" style="align-items:center;flex-wrap:wrap;gap:8px;">' +
-      '<span>' + (months != null ? L.formatAgeMonths(months) : 'Age unknown') + '</span>' +
+      '<span>' + (months != null ? L.formatAgeMonths(months) + ' (estimated)' : 'Age unknown') + '</span>' +
       '<div style="display:flex;gap:6px;align-items:center;">' +
         '<button type="button" class="btn btn-sm" data-action="age-down-horse" data-life="' + L.esc(lifeNumber) + '" title="Retract 6 months"' + (months && months > 0 ? '' : ' disabled') + '>&minus;6mo</button>' +
         '<button type="button" class="btn btn-sm" data-action="age-up-horse" data-life="' + L.esc(lifeNumber) + '" title="Ages this horse up by 6 months">+6mo</button>' +
@@ -929,6 +950,7 @@
       else if (action === 'open-stallion') {
         selectedId = t.getAttribute('data-id');
         selectedMareKey = null;
+        selectedPassportLife = null;
         addingBreeding = false; editingStallion = false;
         render();
       }

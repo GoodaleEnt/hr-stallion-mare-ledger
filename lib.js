@@ -118,24 +118,24 @@
     var age = ageYears(dateOfBirth);
     return age != null && age < 3;
   }
-  // Horse Reality doesn't always give us a birthdate (a horse only gets one
-  // cached once you've viewed its own passport page), and even when it does,
-  // players sometimes want to correct or track age by hand. `manualAgeMonths`
-  // on a horseInfo record, once set, overrides the birthdate-derived age
-  // entirely — "aging up" a horse just bumps that number by 6 months.
-  function effectiveAgeYears(info) {
-    if (!info) return null;
-    if (info.manualAgeMonths != null) return info.manualAgeMonths / 12;
-    return ageYears(info.dateOfBirth);
-  }
-  // Whole-months version of the above — avoids float rounding surprises
-  // right at the 3-year (36 month) boundary, and is what the "aged up"
-  // controls add/subtract/set against.
+  // Three sources of age, in priority order:
+  //  1. `ageMonths` — scraped straight off Horse Reality's own horse page
+  //     (see parseAgeText below), which is ground truth: it already
+  //     accounts for aging boosts/Delta Points a birthdate calc can't see.
+  //  2. `manualAgeMonths` — a player's own correction/tracking, for a horse
+  //     whose own page hasn't been visited yet (so #1 isn't available).
+  //  3. A birthdate-derived estimate, only as a last resort — Horse Reality
+  //     ages horses on its own accelerated clock, so this is approximate.
   function effectiveAgeMonths(info) {
     if (!info) return null;
+    if (info.ageMonths != null) return info.ageMonths;
     if (info.manualAgeMonths != null) return info.manualAgeMonths;
     var y = ageYears(info.dateOfBirth);
     return y == null ? null : Math.round(y * 12);
+  }
+  function effectiveAgeYears(info) {
+    var months = effectiveAgeMonths(info);
+    return months == null ? null : months / 12;
   }
   function formatAgeMonths(months) {
     if (months == null) return '';
@@ -146,6 +146,18 @@
   function isYoungInfo(info) {
     var months = effectiveAgeMonths(info);
     return months != null && months < 36;
+  }
+  // Horse Reality's own horse page renders the true, authoritative age
+  // (e.g. "3 years 1 month" — it accounts for aging boosts/Delta Points
+  // that a birthdate-based estimate can't see) in a `#age` element that
+  // content.js scrapes directly rather than trying to compute it. Parses
+  // that text into whole months; returns null if it can't be read.
+  function parseAgeText(text) {
+    if (!text) return null;
+    var y = /(\d+)\s*year/i.exec(text);
+    var m = /(\d+)\s*month/i.exec(text);
+    if (!y && !m) return null;
+    return (y ? parseInt(y[1], 10) : 0) * 12 + (m ? parseInt(m[1], 10) : 0);
   }
 
   // Pending breedings old enough that Horse Reality has certainly resolved
@@ -194,6 +206,7 @@
     isYoungHorse: isYoungHorse,
     effectiveAgeYears: effectiveAgeYears,
     effectiveAgeMonths: effectiveAgeMonths,
+    parseAgeText: parseAgeText,
     formatAgeMonths: formatAgeMonths,
     isYoungInfo: isYoungInfo,
     findReviewCandidates: findReviewCandidates

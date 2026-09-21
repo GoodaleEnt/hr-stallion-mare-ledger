@@ -601,13 +601,24 @@
     });
   }
 
+  // Converts the horse's CDN image to a data URL and caches it — not just
+  // onto a tracked stallion record (if any), but onto its state.horseInfo
+  // entry too, so a horse's portrait renders reliably everywhere it's
+  // shown (My Mares, Colts & Fillies, search results), not only for owned
+  // stallions. Needed because the CDN blocks hotlinked/cross-origin loads.
   function attachHorseImage(stallionId, horseInfo) {
-    if (!stallionId || !horseInfo || !horseInfo.imageUrl) return;
+    if (!horseInfo || !horseInfo.lifeNumber || !horseInfo.imageUrl) return;
     fetchImageAsDataUrl(horseInfo.imageUrl).then(function (dataUrl) {
       if (!dataUrl) return;
       HRStorage.getState(function (state) {
-        var s = state.stallions.find(function (x) { return x.id === stallionId; });
-        if (s) { s.imageUrl = dataUrl; HRStorage.setState(state); }
+        var changed = false;
+        if (stallionId) {
+          var s = state.stallions.find(function (x) { return x.id === stallionId; });
+          if (s) { s.imageUrl = dataUrl; changed = true; }
+        }
+        var info = state.horseInfo[horseInfo.lifeNumber];
+        if (info) { info.imageUrl = dataUrl; changed = true; }
+        if (changed) HRStorage.setState(state);
       });
     });
   }
@@ -666,9 +677,46 @@
     });
   }
 
+  // Horse Reality's own age display (e.g. "3 years 1 month", in a `#age`
+  // element on the horse's own page) is ground truth — it already accounts
+  // for aging boosts/Delta Points that a birthdate-based estimate can't
+  // see, and matches what the player sees in-game exactly. Scraped
+  // straight from the DOM (like the bank/offspring tables) rather than the
+  // API, since the API's passport data only exposes a raw birthdate.
+  function scrapeAndMergeAgeText() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    function tryCapture() {
+      var el = document.querySelector('#age');
+      if (!el) return false;
+      var text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text) return false;
+      var months = HRLib.parseAgeText(text);
+      if (months == null) return false;
+      HRStorage.getState(function (state) {
+        if (!state.horseInfo) state.horseInfo = {};
+        var info = state.horseInfo[id];
+        if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
+        if (info.ageMonths === months && info.ageText === text) return;
+        info.ageMonths = months;
+        info.ageText = text;
+        info.capturedAt = Date.now();
+        HRStorage.setState(state);
+      });
+      return true;
+    }
+    if (tryCapture()) return;
+    var observer = new MutationObserver(function () {
+      if (tryCapture()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(function () { observer.disconnect(); }, 60000);
+  }
+
   function onPageReady() {
     watchForContent();
     fetchAndMergeHorseInfo();
+    scrapeAndMergeAgeText();
     sweepAndPersistStaleFailures();
   }
 

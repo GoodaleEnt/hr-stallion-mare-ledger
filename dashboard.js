@@ -274,9 +274,12 @@
 
   function topHeaderHtml() {
     var results = horseSearchQuery ? searchHorseInfo(horseSearchQuery) : [];
+    var version = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '';
     var html = '<header class="top"><div class="titles">' +
       '<h1>HR Stallion &amp; Mare Ledger</h1>' +
-      '<p>Every covering, every mare, every fee — captured as you browse.</p>' +
+      '<p>Every covering, every mare, every fee — captured as you browse.' +
+      (version ? ' <span class="mono" style="color:var(--text-muted);font-size:12px;">v' + L.esc(version) + '</span>' : '') +
+      '</p>' +
       '</div></header>';
 
     html += apiWarningBannerHtml();

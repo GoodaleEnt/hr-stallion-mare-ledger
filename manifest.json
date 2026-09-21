@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HR Stallion & Mare Ledger",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Automatically tracks your Horse Reality stallion earnings, mare breeding history, and foal outcomes — private, no account needed.",
   "permissions": ["storage", "tabs", "unlimitedStorage", "alarms"],
   "host_permissions": ["*://*.horsereality.com/*"],

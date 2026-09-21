@@ -92,6 +92,24 @@
     if (isNaN(ms)) return null;
     return (Date.now() - ms) / 86400000;
   }
+  // dateOfBirth is cached as a formatted string ("05 Mar 2023", see
+  // content.js's formatBirthdate) rather than a raw ISO value, but that's
+  // still enough for the JS Date parser to work with. Returns null when the
+  // birthdate isn't known so callers can fall back to "assume adult" rather
+  // than wrongly hiding a horse with no cached passport.
+  function ageYears(dateOfBirth) {
+    if (!dateOfBirth) return null;
+    var d = new Date(dateOfBirth);
+    if (isNaN(d.getTime())) return null;
+    var ms = Date.now() - d.getTime();
+    if (ms < 0) return null;
+    return ms / (365.25 * 24 * 3600 * 1000);
+  }
+  function isYoungHorse(dateOfBirth) {
+    var age = ageYears(dateOfBirth);
+    return age != null && age < 3;
+  }
+
   // Pending breedings old enough that Horse Reality has certainly resolved
   // the covering one way or the other, but which the ledger has no proof of
   // either way yet (no matching "Foal Born" record for that mare). Shared by
@@ -134,6 +152,8 @@
     breedingMatchKey: breedingMatchKey,
     findStallionMatch: findStallionMatch,
     daysSince: daysSince,
+    ageYears: ageYears,
+    isYoungHorse: isYoungHorse,
     findReviewCandidates: findReviewCandidates
   };
 })(typeof window !== 'undefined' ? window : this);

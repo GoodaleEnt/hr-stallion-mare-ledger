@@ -99,10 +99,13 @@
   // than wrongly hiding a horse with no cached passport.
   //
   // Horse Reality ages horses on an accelerated in-game clock, not real
-  // calendar time: a horse gains 1 game month for roughly every 36 real
-  // hours since its birthdate (confirmed against real cached data — a horse
-  // barely 6 real weeks old already reads as several years old in-game).
-  var GAME_MS_PER_MONTH = 36 * 3600 * 1000;
+  // calendar time: 1 game month per 32 real hours (1 game year per 16 real
+  // days), calculated from each horse's own birth timestamp — see
+  // https://horsereality.wiki/en/Horses/Basics/Life and
+  // https://horsereality.wiki/en/World/World-Basics/Automatic-Tasks.
+  // Players can also pay Delta Points to age a horse up early, which this
+  // formula can't see — that's what the manual aged-up override is for.
+  var GAME_MS_PER_MONTH = 32 * 3600 * 1000;
   function ageYears(dateOfBirth) {
     if (!dateOfBirth) return null;
     var d = new Date(dateOfBirth);

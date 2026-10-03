@@ -164,7 +164,7 @@
       var life = horseA ? lifeNumberFromUrl(horseA.href) : '';
       if (!life) return;
       var fallback = currencyFromCell(cells[1]);
-      var price = text.match(/ for ([\d\s ,.]+?)\s*([A-Za-z]{2,4})/);
+      var price = text.match(/ for ([\d\s ,.]+?)\s*([A-Za-z]{2,4})/);
       if (!price) return;
       var ship = text.match(/additional ([\d\s ,.]+?)\s*([A-Za-z]{2,4}) for transport/);
       var p = parseAmountAndCurrency(price, fallback);

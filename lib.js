@@ -116,7 +116,130 @@
     return out;
   }
 
+  // ---------- herd tracking (My Herd tab) ----------
+  var HERD_STATUSES = ['Active', 'Observation', 'Companion', 'For Sale', 'Sold', 'Retired', 'Deceased'];
+  var HERD_ROLES = ['Broodmare', 'Public Stud', 'Private Stud', 'Competition', 'Young Stock'];
+  var ARCHIVE_STATUSES = ['Sold', 'Retired', 'Deceased'];
+
+  function herdStatusClass(s) {
+    if (s === 'Sold') return 'pill-succeeded';
+    if (s === 'Retired' || s === 'Deceased') return 'pill-failed';
+    if (s === 'Observation' || s === 'For Sale') return 'pill-pending';
+    if (s === 'Companion') return 'pill-foal';
+    return 'pill-active';
+  }
+  function herdMeta(state, lifeNumber) {
+    var m = (state.horseMeta && state.horseMeta[lifeNumber]) || {};
+    return { status: m.status || 'Active', role: m.role || '', project: m.project || '' };
+  }
+  // Cached horses whose API-reported owner matches the username in Settings
+  // (same ownership rule the My Mares tab uses), with their herd tags attached.
+  function ownedHorses(state) {
+    var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    if (!myName) return [];
+    return Object.keys(state.horseInfo || {}).map(function (life) {
+      return { lifeNumber: life, info: state.horseInfo[life], meta: herdMeta(state, life) };
+    }).filter(function (h) {
+      return h.info && String(h.info.ownerName || '').trim().toLowerCase() === myName;
+    }).sort(function (a, b) { return String(a.info.name || '').localeCompare(String(b.info.name || '')); });
+  }
+  function isArchivedHorse(h) { return ARCHIVE_STATUSES.indexOf(h.meta.status) > -1; }
+  // Archived horses are left out of the headline numbers; foals born counts
+  // every owned mare, archived or not, since a foal is a permanent result.
+  function herdStats(horses, state) {
+    var active = horses.filter(function (h) { return !isArchivedHorse(h); });
+    var out = { total: active.length, mares: 0, stallions: 0, other: 0, pregnant: 0, breeds: 0, avgGp: null, foalsBorn: 0 };
+    var breeds = {}, gpSum = 0, gpCount = 0;
+    active.forEach(function (h) {
+      var info = h.info;
+      if (info.sex === 'mare') out.mares++;
+      else if (info.sex === 'stallion') out.stallions++;
+      else out.other++;
+      if (info.pregnancy && String(info.pregnancy.status || '').indexOf('Pregnant') === 0) out.pregnant++;
+      if (info.breed) breeds[info.breed] = true;
+      if (info.geneticPotential != null) { gpSum += Number(info.geneticPotential); gpCount++; }
+    });
+    out.breeds = Object.keys(breeds).length;
+    out.avgGp = gpCount ? Math.round(gpSum / gpCount) : null;
+    var ownedLives = {};
+    horses.forEach(function (h) { ownedLives[h.lifeNumber] = true; });
+    (state.stallions || []).forEach(function (s) {
+      ((state.breedings && state.breedings[s.id]) || []).forEach(function (b) {
+        if (b.status === 'Foal Born' && b.mareLifeNumber && ownedLives[b.mareLifeNumber]) out.foalsBorn++;
+      });
+    });
+    return out;
+  }
+
+  // ---------- foal calculator: pedigree + inbreeding ----------
+  // Ancestors of one horse, up to maxGen generations behind it (its parents
+  // are generation 1; the horse itself is generation 0 so a parent that is
+  // also an ancestor of the other parent is caught). Parents come from the
+  // horse's own captured pedigree tree when it has one, otherwise by
+  // chaining through other cached horses. `gaps` lists ancestors whose
+  // parents we couldn't look up at all (not cached) — distinct from a cached
+  // horse that simply has no recorded parents (a founder), which isn't a gap.
+  function ancestorMap(state, rootLife, maxGen) {
+    var horseInfo = (state && state.horseInfo) || {};
+    var found = {}, gaps = [], depth = 0;
+    function note(life, gen) {
+      (found[life] = found[life] || []).push(gen);
+      if (gen > depth) depth = gen;
+    }
+    function walk(life, node, gen) {
+      var cached = horseInfo[life];
+      node = node || (cached && cached.pedigreeTree) || null;
+      var sNode = node && node.s ? node.s : null, dNode = node && node.d ? node.d : null;
+      var sLife = sNode ? sNode.l : (cached && cached.sire && cached.sire.lifeNumber) || null;
+      var dLife = dNode ? dNode.l : (cached && cached.dam && cached.dam.lifeNumber) || null;
+      if (gen >= maxGen) return;
+      if (!sLife && !dLife && !cached && !node) { if (gen > 0) gaps.push({ life: life, gen: gen }); return; }
+      if (sLife) { note(sLife, gen + 1); walk(sLife, sNode, gen + 1); }
+      if (dLife) { note(dLife, gen + 1); walk(dLife, dNode, gen + 1); }
+    }
+    note(rootLife, 0);
+    walk(rootLife, null, 0);
+    return { found: found, gaps: gaps, depth: depth };
+  }
+  function commonAncestors(a, b) {
+    return Object.keys(a.found).filter(function (life) { return b.found[life]; }).map(function (life) {
+      return { life: life, gensA: a.found[life], gensB: b.found[life] };
+    }).sort(function (x, y) { return Math.min.apply(null, x.gensA.concat(x.gensB)) - Math.min.apply(null, y.gensA.concat(y.gensB)); });
+  }
+  // Wright's path formula, summed over every path pair through each common
+  // ancestor: (1/2)^(n1+n2+1). Ignores the ancestors' own inbreeding, so it
+  // is an estimate (lower bound), not Horse Reality's own COI figure.
+  function estimateCoi(common) {
+    var total = 0;
+    common.forEach(function (c) {
+      c.gensA.forEach(function (n1) { c.gensB.forEach(function (n2) { total += Math.pow(0.5, n1 + n2 + 1); }); });
+    });
+    return total * 100;
+  }
+  function ancestorName(state, life) {
+    var horseInfo = (state && state.horseInfo) || {};
+    if (horseInfo[life] && horseInfo[life].name) return horseInfo[life].name;
+    var keys = Object.keys(horseInfo);
+    for (var i = 0; i < keys.length; i++) {
+      var names = horseInfo[keys[i]].pedigreeNames;
+      if (names && names[life]) return names[life];
+    }
+    return '';
+  }
+
   global.HRLib = {
+    ancestorMap: ancestorMap,
+    commonAncestors: commonAncestors,
+    estimateCoi: estimateCoi,
+    ancestorName: ancestorName,
+    HERD_STATUSES: HERD_STATUSES,
+    HERD_ROLES: HERD_ROLES,
+    ARCHIVE_STATUSES: ARCHIVE_STATUSES,
+    herdStatusClass: herdStatusClass,
+    herdMeta: herdMeta,
+    ownedHorses: ownedHorses,
+    isArchivedHorse: isArchivedHorse,
+    herdStats: herdStats,
     CURRENCIES: CURRENCIES,
     STATUS_OPTIONS: STATUS_OPTIONS,
     esc: esc,

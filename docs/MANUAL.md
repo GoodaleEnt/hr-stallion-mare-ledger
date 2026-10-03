@@ -16,9 +16,11 @@ A visual walkthrough of installing and using the extension. For a quick technica
 8. [Bulk-importing breeding records](#bulk-importing-breeding-records)
 9. [My Mares](#my-mares)
 10. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
-11. [Understanding breeding statuses](#understanding-breeding-statuses)
-12. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
-13. [Updating](#updating)
+11. [My Herd](#my-herd)
+12. [Foal Calculator](#foal-calculator)
+13. [Understanding breeding statuses](#understanding-breeding-statuses)
+14. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
+15. [Updating](#updating)
 14. [Privacy](#privacy)
 15. [Troubleshooting](#troubleshooting)
 
@@ -105,6 +107,22 @@ Click any mare to see her full picture, including live pregnancy status if she's
 ![A mare's detail page showing pregnancy, genetics, and pedigree](images/06-mare-pregnancy.png)
 
 While she's pregnant, you'll see her due date and the covering sire (linked), pulled directly from her passport the moment you last viewed her page — no manual entry needed.
+
+## My Herd
+
+The **My Herd** tab lists every horse you own that the extension has seen (it uses the same username match as My Mares). For each one you can set:
+
+- **Role** — Broodmare, Public Stud, Private Stud, Competition or Young Stock
+- **Status** — Active, Observation, Companion, For Sale, Sold, Retired or Deceased
+- **Project** — a free-text group name for a breeding goal (e.g. "Leopard line"); use the filters above the list to view one role or project at a time
+
+Horses marked **Sold, Retired or Deceased** move out of the working list and the headline numbers into an archive — click **Show archive** to see them. The tiles at the top summarise your active herd: size, mares, stallions, mares in foal, foals born, number of breeds and average genetic potential. You can also set the same three tags from a horse's own page (click her name). These tags are separate from a tracked stallion's Active/Sold/Retired status on the Stallions tab.
+
+## Foal Calculator
+
+Pick a **mare** and a **stallion** from any horses whose pages you've visited and the **Foal Calculator** shows the average of their genetic potential and checks both pedigrees for shared ancestors up to three generations behind each parent. If any turn up, it lists them with how far back they sit on each side and gives an *estimated* inbreeding percentage (an estimate that ignores the ancestors' own inbreeding, so Horse Reality's figure can be higher).
+
+The check only knows what has been cached. If some ancestors haven't been visited it says **Pedigree incomplete** and lists them — open those horses' pages on Horse Reality to fill the gaps, rather than treating a missing result as "not inbred". Coat-colour prediction isn't included.
 
 ## Understanding breeding statuses
 

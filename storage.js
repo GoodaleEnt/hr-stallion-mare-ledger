@@ -4,7 +4,7 @@
   'use strict';
 
   function defaultState() {
-    return { stallions: [], breedings: {}, horseInfo: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
+    return { stallions: [], breedings: {}, horseInfo: {}, horseMeta: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
   }
 
   function getState(cb) {
@@ -12,6 +12,7 @@
       var state = res.hrLedger || defaultState();
       if (!state.breedings) state.breedings = {};
       if (!state.horseInfo) state.horseInfo = {};
+      if (!state.horseMeta) state.horseMeta = {};
       if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
       if (state.settings.myUsername == null) state.settings.myUsername = '';
       cb(state);

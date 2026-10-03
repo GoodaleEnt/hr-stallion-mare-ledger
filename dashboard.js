@@ -18,6 +18,11 @@
   var importingBreeding = false;
   var importError = '';
   var pendingConfirm = null;
+  var showArchive = false;
+  var herdRoleFilter = '';
+  var herdProjectFilter = '';
+  var calcMare = '';
+  var calcStallion = '';
 
   // ---------- derived data ----------
   function recompute() {
@@ -132,6 +137,12 @@
     persist();
   }
 
+  function setHorseMeta(lifeNumber, patch) {
+    if (!lifeNumber) return;
+    state.horseMeta[lifeNumber] = Object.assign({}, state.horseMeta[lifeNumber], patch);
+    persist();
+  }
+
   // ---------- confirm dialog ----------
   function askConfirm(message, onYes) {
     pendingConfirm = { message: message, onYes: onYes };
@@ -169,6 +180,7 @@
       askConfirm('Restore this backup? This replaces ALL current stallions, mares, and breeding history with the backup\'s contents — this can\'t be undone.', function () {
         state = parsed;
         if (!state.horseInfo) state.horseInfo = {};
+        if (!state.horseMeta) state.horseMeta = {};
         if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
         persist();
       });
@@ -184,6 +196,8 @@
     else if (selectedId) html = renderDetail();
     else if (selectedMareKey) html = renderMareDetail();
     else if (activeTab === 'mares') html = renderMaresList();
+    else if (activeTab === 'herd') html = renderHerdList();
+    else if (activeTab === 'calc') html = renderCalculator();
     else html = renderStallionsList();
     app.innerHTML = html;
     if (pendingConfirm) {
@@ -303,6 +317,8 @@
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
+        '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
+        '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
     return html;
   }
@@ -311,7 +327,7 @@
     var info = state.horseInfo[selectedPassportLife];
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
-    var html = '<button class="back-link" data-action="close-passport">← Back to search</button>';
+    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : '← Back to search') + '</button>';
     html += '<div class="detail-head"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
       '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
@@ -326,6 +342,7 @@
       (href ? '<p class="notes-line"><a href="' + L.esc(href) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
       '</div>' +
     '</div>';
+    html += herdControlsPanelHtml(selectedPassportLife);
     html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
       '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
       'she or he will also show up on the Stallions or My Mares tab.</p></div>';
@@ -621,6 +638,200 @@
     return html;
   }
 
+  // ---------- My Herd ----------
+  // Status / role / project tags live in state.horseMeta (keyed by life
+  // number), NOT on horseInfo — content.js rewrites horseInfo on every visit.
+  // They're independent of a tracked stallion's own Active/Sold/Retired
+  // status on the Stallions tab.
+  function optionsHtml(list, current, blankLabel) {
+    var html = blankLabel != null ? '<option value=""' + (current ? '' : ' selected') + '>' + L.esc(blankLabel) + '</option>' : '';
+    list.forEach(function (opt) { html += '<option' + (opt === current ? ' selected' : '') + '>' + L.esc(opt) + '</option>'; });
+    return html;
+  }
+
+  function herdRowHtml(h) {
+    var info = h.info, meta = h.meta;
+    var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : ''].filter(Boolean).join(' · ');
+    var life = L.esc(h.lifeNumber);
+    return '<div class="herd-row">' +
+      '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
+      '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + '</span></div>' +
+      '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
+      '<div data-label="Status"><select class="pill-select ' + L.herdStatusClass(meta.status) + '" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
+      '<div data-label="Project"><input type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
+    '</div>';
+  }
+
+  function herdListHtml(horses) {
+    var html = '<div class="ledger"><div class="herd-head"><div>Horse</div><div>Details</div><div>Role</div><div>Status</div><div>Project</div></div><div class="card">';
+    horses.forEach(function (h) { html += herdRowHtml(h); });
+    return html + '</div></div>';
+  }
+
+  // Same three tags, shown above a single horse's passport so they can be set
+  // from there too (only for horses the API says you own).
+  function herdControlsPanelHtml(lifeNumber) {
+    var mine = L.ownedHorses(state).find(function (h) { return h.lifeNumber === lifeNumber; });
+    if (!mine) return '';
+    var life = L.esc(lifeNumber), meta = mine.meta;
+    return '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">' +
+      '<div class="field"><label for="hm-status">Status</label><select id="hm-status" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
+      '<div class="field"><label for="hm-role">Role</label><select id="hm-role" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
+      '<div class="field"><label for="hm-project">Project</label><input id="hm-project" type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
+    '</div>';
+  }
+
+  function renderHerdList() {
+    var html = topHeaderHtml();
+    var myName = (state.settings.myUsername || '').trim();
+    if (!myName) {
+      html += '<div class="empty"><h3>Set your username first</h3>' +
+        '<p>Go to the Stallions tab and enter "My Horse Reality username" — that\'s how the ledger knows which cached horses are yours.</p></div>';
+      return html;
+    }
+
+    var horses = L.ownedHorses(state);
+    if (!horses.length) {
+      html += '<div class="empty"><h3>No horses of yours cached yet</h3>' +
+        '<p>Open your own horses\' pages on Horse Reality — each one you visit is added here automatically once the page shows "' + L.esc(myName) + '" as its owner.</p></div>';
+      return html;
+    }
+
+    var stats = L.herdStats(horses, state);
+    html += '<div class="stats-bar">' +
+      '<div class="stat-tile"><div class="num mono">' + stats.total + '</div><div class="label">Herd size</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + stats.mares + '</div><div class="label">Mares</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + stats.stallions + '</div><div class="label">Stallions</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + stats.pregnant + '</div><div class="label">In foal</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + stats.foalsBorn + '</div><div class="label">Foals born</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + stats.breeds + '</div><div class="label">Breeds</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + (stats.avgGp != null ? stats.avgGp : '—') + '</div><div class="label">Avg genetic potential</div></div>' +
+      '</div>';
+
+    var active = horses.filter(function (h) { return !L.isArchivedHorse(h); });
+    var archived = horses.filter(L.isArchivedHorse);
+    var projects = [];
+    horses.forEach(function (h) { if (h.meta.project && projects.indexOf(h.meta.project) === -1) projects.push(h.meta.project); });
+    projects.sort();
+    var visible = active.filter(function (h) {
+      return (!herdRoleFilter || h.meta.role === herdRoleFilter) && (!herdProjectFilter || h.meta.project === herdProjectFilter);
+    });
+
+    html += '<div class="section-head"><h2>My Herd</h2>' +
+      (archived.length ? '<button class="btn btn-sm" data-action="toggle-archive">' + (showArchive ? 'Hide archive' : 'Show archive (' + archived.length + ')') + '</button>' : '') +
+      '</div>';
+    html += '<div class="herd-filters">' +
+      '<label>Role <select data-action="herd-filter-role">' + optionsHtml(L.HERD_ROLES, herdRoleFilter, 'All roles') + '</select></label>' +
+      '<label>Project <select data-action="herd-filter-project">' + optionsHtml(projects, herdProjectFilter, 'All projects') + '</select></label>' +
+      '</div>';
+
+    if (visible.length) html += herdListHtml(visible);
+    else html += '<div class="empty"><h3>Nothing matches</h3><p>No active horses match that role/project filter.</p></div>';
+
+    if (showArchive && archived.length) {
+      html += '<div class="section-head"><h2>Archive</h2></div>';
+      html += herdListHtml(archived);
+    }
+    return html;
+  }
+
+  // ---------- Foal Calculator ----------
+  // Pure computation over horses already cached in state.horseInfo — no new
+  // network calls. Inbreeding is only as complete as the cached pedigree, so
+  // ancestors we couldn't look up are reported explicitly as gaps instead of
+  // being silently treated as "not inbred".
+  var CALC_GENERATIONS = 3;
+  function foalGenLabel(n) {
+    return ['', 'parent', 'grandparent', 'great-grandparent', 'great-great-grandparent'][n] || (n + 'th-generation ancestor');
+  }
+  function foalGensText(gens) {
+    return gens.map(function (g) { return foalGenLabel(g + 1); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(' & ');
+  }
+  function calcOptionsHtml(sex, selected) {
+    var mine = {};
+    L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
+    var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).map(function (life) {
+      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life] };
+    }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    function group(label, list) {
+      if (!list.length) return '';
+      return '<optgroup label="' + L.esc(label) + '">' + list.map(function (r) {
+        return '<option value="' + L.esc(r.life) + '"' + (r.life === selected ? ' selected' : '') + '>' + L.esc(r.name) + ' (#' + L.esc(r.life) + ')</option>';
+      }).join('') + '</optgroup>';
+    }
+    return '<option value="">Choose…</option>' +
+      group('Your horses', rows.filter(function (r) { return r.mine; })) +
+      group('Other cached horses', rows.filter(function (r) { return !r.mine; }));
+  }
+  function ancestorLabel(life) {
+    var name = L.ancestorName(state, life);
+    return (name ? L.esc(name) + ' ' : '') + '<span class="mono sub">#' + L.esc(life) + '</span>';
+  }
+  function parentLineHtml(label, life) {
+    var info = state.horseInfo[life] || {};
+    return '<p class="notes-line"><strong>' + label + ':</strong> ' + L.esc(info.name || ('#' + life)) +
+      (info.geneticPotential != null ? ' · GP ' + L.esc(info.geneticPotential) : '') +
+      (info.conformation ? ' · ' + L.esc(info.conformation) : '') +
+      (info.breed ? ' · ' + L.esc(info.breed) : '') + '</p>';
+  }
+
+  function renderCalculator() {
+    var html = topHeaderHtml();
+    html += '<div class="section-head"><h2>Foal Calculator</h2></div>';
+    html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">' +
+      '<div class="field"><label for="calc-mare">Mare</label><select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
+      '<div class="field"><label for="calc-stallion">Stallion</label><select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
+      '</div>';
+
+    if (!calcMare || !calcStallion || !state.horseInfo[calcMare] || !state.horseInfo[calcStallion]) {
+      html += '<div class="empty"><h3>Pick a mare and a stallion</h3>' +
+        '<p>Choose from horses whose pages you\'ve visited on Horse Reality — the calculator checks their cached pedigrees for shared ancestors up to ' + CALC_GENERATIONS + ' generations behind each parent.</p></div>';
+      return html;
+    }
+
+    var mareInfo = state.horseInfo[calcMare], studInfo = state.horseInfo[calcStallion];
+    var a = L.ancestorMap(state, calcStallion, CALC_GENERATIONS);
+    var b = L.ancestorMap(state, calcMare, CALC_GENERATIONS);
+    var common = L.commonAncestors(a, b);
+    var coi = L.estimateCoi(common);
+    var gaps = a.gaps.concat(b.gaps);
+    var gpA = studInfo.geneticPotential, gpB = mareInfo.geneticPotential;
+    var avgGp = (gpA != null && gpB != null) ? Math.round((Number(gpA) + Number(gpB)) / 2) : null;
+
+    html += '<div class="stats-bar">' +
+      '<div class="stat-tile"><div class="num mono">' + (avgGp != null ? avgGp : '—') + '</div><div class="label">Avg parent GP</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + common.length + '</div><div class="label">Shared ancestors</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + (common.length ? coi.toFixed(2) + '%' : '0%') + '</div><div class="label">Est. inbreeding</div></div>' +
+      '<div class="stat-tile"><div class="num mono multi">Stallion ' + a.depth + ' · Mare ' + b.depth + '</div><div class="label">Generations known</div></div>' +
+      '</div>';
+
+    html += parentLineHtml('Mare', calcMare) + parentLineHtml('Stallion', calcStallion);
+
+    if (common.length) {
+      html += '<div class="empty" style="border-color:var(--danger);text-align:left;margin:16px 0;">' +
+        '<h3 style="color:var(--danger);">Inbreeding found</h3>' +
+        '<p style="margin-top:0;">Shared ancestors within ' + CALC_GENERATIONS + ' generations behind each parent. The percentage is an estimate that ignores the ancestors\' own inbreeding, so Horse Reality\'s figure may be higher.</p>';
+      common.forEach(function (c) {
+        var self = c.life === calcStallion || c.life === calcMare;
+        html += '<p class="notes-line"><strong>' + ancestorLabel(c.life) + '</strong>' + (self ? ' (is one of the parents)' : '') +
+          ' — stallion\'s side: ' + L.esc(foalGensText(c.gensA)) + ' · mare\'s side: ' + L.esc(foalGensText(c.gensB)) + '</p>';
+      });
+      html += '</div>';
+    } else if (!gaps.length) {
+      html += '<div class="empty" style="border-color:var(--success);margin:16px 0;"><h3 style="color:var(--success);">No shared ancestors</h3>' +
+        '<p style="margin:0;">None found within ' + CALC_GENERATIONS + ' generations behind each parent.</p></div>';
+    }
+
+    if (gaps.length) {
+      var seen = {}, uniq = gaps.filter(function (g) { if (seen[g.life]) return false; seen[g.life] = true; return true; });
+      html += '<div class="empty" style="border-color:#d97706;text-align:left;margin:16px 0;">' +
+        '<h3 style="color:#d97706;">Pedigree incomplete</h3>' +
+        '<p style="margin-top:0;">' + uniq.length + ' ancestor' + (uniq.length === 1 ? '' : 's') + ' haven\'t been cached, so this check can\'t rule out inbreeding through them. Visit their pages on Horse Reality to fill the gap:</p>' +
+        '<p class="notes-line">' + uniq.map(function (g) { return ancestorLabel(g.life); }).join(' · ') + '</p></div>';
+    }
+    return html;
+  }
+
   // ---------- passport (genetics/pedigree/pregnancy cache) rendering ----------
   // state.horseInfo is keyed by life number and populated by content.js from
   // ANY horse page viewed (not just owned stallions), so both a stallion's
@@ -777,7 +988,7 @@
 
       if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
-        selectedMareKey = null; selectedId = null;
+        selectedMareKey = null; selectedId = null; selectedPassportLife = null;
         render();
       }
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
@@ -799,6 +1010,7 @@
       else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
       else if (action === 'close-passport') { selectedPassportLife = null; render(); }
       else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
+      else if (action === 'toggle-archive') { showArchive = !showArchive; render(); }
       else if (action === 'nav-stallion') {
         var ownedNav = getOwnedStallions();
         var curIdx = ownedNav.findIndex(function (x) { return x.id === selectedId; });
@@ -979,6 +1191,13 @@
           if (selectedId === sid3) selectedId = null;
         }
       }
+      else if (action === 'calc-mare') { calcMare = t.value; render(); }
+      else if (action === 'calc-stallion') { calcStallion = t.value; render(); }
+      else if (action === 'herd-status') { setHorseMeta(t.getAttribute('data-life'), { status: t.value }); }
+      else if (action === 'herd-role') { setHorseMeta(t.getAttribute('data-life'), { role: t.value }); }
+      else if (action === 'herd-project') { setHorseMeta(t.getAttribute('data-life'), { project: t.value.trim() }); }
+      else if (action === 'herd-filter-role') { herdRoleFilter = t.value; render(); }
+      else if (action === 'herd-filter-project') { herdProjectFilter = t.value; render(); }
       else if (action === 'toggle-auto-delete') {
         state.settings.autoDeleteRetired = t.checked;
         persist();
@@ -1003,6 +1222,7 @@
     state = changes.hrLedger.newValue || HRStorage.defaultState();
     if (!state.breedings) state.breedings = {};
     if (!state.horseInfo) state.horseInfo = {};
+    if (!state.horseMeta) state.horseMeta = {};
     if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
     recompute();
     render();

@@ -228,6 +228,26 @@
       estate: full && full.breeder ? (full.breeder.estateName || '') : ''
     };
   }
+  // The passport's pedigree is walked as deep as the API provides it (each
+  // ancestor node may carry its own sire/dam), keeping only life numbers —
+  // names come from the sibling `related.horses` list. Drives the dashboard's
+  // Foal Calculator; if the API only returns parents this is simply shallow.
+  function buildPedigreeTree(node, depthLeft) {
+    if (!node || !node.lifeNumber || depthLeft < 1) return null;
+    var out = { l: String(node.lifeNumber) };
+    var s = buildPedigreeTree(node.sire, depthLeft - 1);
+    var d = buildPedigreeTree(node.dam, depthLeft - 1);
+    if (s) out.s = s;
+    if (d) out.d = d;
+    return out;
+  }
+  function buildPedigreeNames(relatedHorses) {
+    var out = {};
+    (relatedHorses || []).forEach(function (h) {
+      if (h && h.lifeNumber) out[String(h.lifeNumber)] = parseHorseNameHeader(h.name);
+    });
+    return out;
+  }
   function foalSexLabel(sex) {
     if (sex === 'stallion') return 'Colt';
     if (sex === 'mare') return 'Filly';
@@ -288,7 +308,16 @@
       coiRaw: coiValue != null ? coiValue.toFixed(2) + '%' : '',
       sire: resolveAncestor(pedigree.sire, relatedHorses),
       dam: resolveAncestor(pedigree.dam, relatedHorses),
-      pregnancy: buildPregnancyInfo(horse, passportRoot, relatedHorses)
+      pregnancy: buildPregnancyInfo(horse, passportRoot, relatedHorses),
+      pedigreeTree: safeExtract(function () {
+        var s = buildPedigreeTree(pedigree.sire, 5), d = buildPedigreeTree(pedigree.dam, 5);
+        if (!s && !d) return null;
+        var root = { l: String(lifeNumber) };
+        if (s) root.s = s;
+        if (d) root.d = d;
+        return root;
+      }, null),
+      pedigreeNames: safeExtract(function () { return buildPedigreeNames(relatedHorses); }, {})
     };
   }
   // Recorded into state so a *screenshot of the dashboard* is enough to

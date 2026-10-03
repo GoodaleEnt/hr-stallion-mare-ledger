@@ -76,7 +76,8 @@
         }
       });
     }
-    maresIndex = Object.keys(map).map(function (k) { return map[k]; });
+    maresIndex = Object.keys(map).map(function (k) { return map[k]; })
+      .filter(function (m) { return isAdultHorse(m.mareLifeNumber); });
     maresIndex.forEach(function (m) {
       m.records.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
       var counts = { Pending: 0, Succeeded: 0, Failed: 0 };
@@ -196,6 +197,7 @@
     else if (selectedId) html = renderDetail();
     else if (selectedMareKey) html = renderMareDetail();
     else if (activeTab === 'mares') html = renderMaresList();
+    else if (activeTab === 'young') html = renderYoungList();
     else if (activeTab === 'herd') html = renderHerdList();
     else if (activeTab === 'calc') html = renderCalculator();
     else html = renderStallionsList();
@@ -286,9 +288,12 @@
 
   function topHeaderHtml() {
     var results = horseSearchQuery ? searchHorseInfo(horseSearchQuery) : [];
+    var version = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '';
     var html = '<header class="top"><div class="titles">' +
       '<h1>HR Stallion &amp; Mare Ledger</h1>' +
-      '<p>Every covering, every mare, every fee — captured as you browse.</p>' +
+      '<p>Every covering, every mare, every fee — captured as you browse.' +
+      (version ? ' <span class="mono" style="color:var(--text-muted);font-size:12px;">v' + L.esc(version) + '</span>' : '') +
+      '</p>' +
       '</div></header>';
 
     html += apiWarningBannerHtml();
@@ -317,6 +322,7 @@
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
+        '<button class="tab-btn' + (activeTab === 'young' ? ' active' : '') + '" data-action="show-tab" data-tab="young">Colts &amp; Fillies</button>' +
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
@@ -340,12 +346,25 @@
       pedigreeLineHtml(info) +
       passportOwnerHtml(info) +
       (href ? '<p class="notes-line"><a href="' + L.esc(href) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
+      renderAgeControlHtml(selectedPassportLife) +
       '</div>' +
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
-    html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
-      '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
-      'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+
+    // A horse can already exist as a (possibly stub, owned:false) stallion
+    // record even though this raw passport cache doesn't know that — link
+    // through to his actual tracked record instead of just saying "not
+    // tied to a breeding record" so "Mark as My Stallion" is reachable.
+    var matchId = L.findStallionMatch(state.stallions, { stallionName: info.name, stallionLifeNumber: selectedPassportLife });
+    if (matchId) {
+      html += '<div class="empty"><h3>Already tracked</h3>' +
+        '<p>This horse has a stallion record in your ledger.</p>' +
+        '<button class="btn btn-primary" data-action="open-stallion" data-id="' + L.esc(matchId) + '">View his stallion record</button></div>';
+    } else {
+      html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
+        '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
+        'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+    }
     return html;
   }
 
@@ -366,8 +385,95 @@
   // self-breeding with no bank transaction) are marked `owned: false` and
   // kept out of your own roster — their history still shows via "My
   // Mares" and the ledger tables, just not cluttering this grid.
+  function isAdultHorse(lifeNumber) {
+    var info = lifeNumber && state.horseInfo && state.horseInfo[lifeNumber];
+    if (!info) return true;
+    var months = L.effectiveAgeMonths(info);
+    if (months == null) return true;
+    return months >= 36;
+  }
   function getOwnedStallions() {
-    return state.stallions.filter(function (s) { return s.owned !== false; });
+    return state.stallions.filter(function (s) { return s.owned !== false && isAdultHorse(s.lifeNumber); });
+  }
+
+  // Cached passports (state.horseInfo) belonging to you, under 3 years old —
+  // shown separately from the Stallions/My Mares tabs, which are scoped to
+  // breeding-age (3yo+) horses. "Under 3" here is the effective age: a real
+  // cached birthdate, or a manually tracked age for a horse HR never gave us
+  // a passport birthdate for (see ageUpHorse).
+  function getYoungHorses() {
+    var myName = (state.settings.myUsername || '').trim().toLowerCase();
+    if (!myName) return [];
+    return Object.keys(state.horseInfo || {})
+      .map(function (life) { return Object.assign({ lifeNumber: life }, state.horseInfo[life]); })
+      .filter(function (h) {
+        if (h.sex !== 'stallion' && h.sex !== 'mare') return false;
+        if ((h.ownerName || '').trim().toLowerCase() !== myName) return false;
+        return L.isYoungInfo(h);
+      })
+      .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  }
+
+  // Nudges a cached horse's tracked age by +/- 6 months. The first nudge on
+  // a horse with no tracked age yet starts counting from its real cached
+  // birthdate (or 0 if HR never gave us one — i.e. treat it as a newborn),
+  // then every further nudge just adds/subtracts another 6 months on top
+  // (never below 0 — an accidental extra click just gets retracted with the
+  // -6mo button rather than going negative). Once the total crosses 3 years
+  // he/she drops out of Colts & Fillies and appears on the Stallions/My
+  // Mares tab automatically, and vice versa if retracted back under 3.
+  function adjustAgeMonths(lifeNumber, deltaMonths) {
+    if (!lifeNumber) return;
+    if (!state.horseInfo) state.horseInfo = {};
+    var info = state.horseInfo[lifeNumber];
+    if (!info) { info = {}; state.horseInfo[lifeNumber] = info; }
+    var baseMonths = info.manualAgeMonths != null
+      ? info.manualAgeMonths
+      : Math.round((L.ageYears(info.dateOfBirth) || 0) * 12);
+    info.manualAgeMonths = Math.max(0, baseMonths + deltaMonths);
+    persist();
+  }
+  // Sets the tracked age directly from a "times aged up" count (each unit
+  // is 6 months) — lets a misclick be corrected in one go instead of
+  // clicking -6mo repeatedly, or the age set precisely from the start.
+  function setAgeTimes(lifeNumber, times) {
+    if (!lifeNumber) return;
+    if (!state.horseInfo) state.horseInfo = {};
+    var info = state.horseInfo[lifeNumber];
+    if (!info) { info = {}; state.horseInfo[lifeNumber] = info; }
+    var n = Math.max(0, Math.round(Number(times) || 0));
+    info.manualAgeMonths = n * 6;
+    persist();
+  }
+
+  // Age control, shown wherever a horse's age matters (young horse cards,
+  // stallion/mare detail pages). Needs a life number to have somewhere in
+  // state.horseInfo to store the tracked age against.
+  function renderAgeControlHtml(lifeNumber) {
+    if (!lifeNumber) return '';
+    var info = state.horseInfo && state.horseInfo[lifeNumber];
+    // Once Horse Reality's own age reading has been captured (from visiting
+    // this horse's page), it's ground truth and refreshes automatically on
+    // every visit — no manual controls needed, and showing them would just
+    // invite an override that gets silently ignored.
+    if (info && info.ageMonths != null) {
+      return '<div class="row"><span>' + L.esc(info.ageText || L.formatAgeMonths(info.ageMonths)) + '</span>' +
+        '<span class="sub" style="font-size:11px;">from Horse Reality</span></div>';
+    }
+    var months = info ? L.effectiveAgeMonths(info) : null;
+    var times = months != null ? Math.round(months / 6) : 0;
+    return '<div class="row" style="align-items:center;flex-wrap:wrap;gap:8px;">' +
+      '<span>' + (months != null ? L.formatAgeMonths(months) + ' (estimated)' : 'Age unknown') + '</span>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+        '<button type="button" class="btn btn-sm" data-action="age-down-horse" data-life="' + L.esc(lifeNumber) + '" title="Retract 6 months"' + (months && months > 0 ? '' : ' disabled') + '>&minus;6mo</button>' +
+        '<button type="button" class="btn btn-sm" data-action="age-up-horse" data-life="' + L.esc(lifeNumber) + '" title="Ages this horse up by 6 months">+6mo</button>' +
+      '</div>' +
+      '<form data-action="set-age-times" data-life="' + L.esc(lifeNumber) + '" style="display:flex;gap:6px;align-items:center;">' +
+        '<label style="font-size:11.5px;color:var(--text-muted);">&times; aged up</label>' +
+        '<input type="number" min="0" step="1" name="times" value="' + times + '" style="width:56px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:13px;color:var(--text);">' +
+        '<button type="submit" class="btn btn-sm">Set</button>' +
+      '</form>' +
+    '</div>';
   }
 
   function renderStallionsList() {
@@ -575,7 +681,9 @@
     } else {
       html += '<div class="stallion-grid">';
       maresIndex.forEach(function (m) {
+        var mareInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
         html += '<div class="card stallion-card" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+          (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
           '<div class="row"><span>Breedings</span><span class="v mono">' + m.records.length + '</span></div>' +
@@ -585,6 +693,59 @@
         '</div>';
       });
       html += '</div>';
+    }
+    return html;
+  }
+
+  function renderYoungList() {
+    var html = topHeaderHtml();
+    var myName = (state.settings.myUsername || '').trim();
+
+    if (!myName) {
+      html += '<div class="empty"><h3>Set your username first</h3>' +
+        '<p>Go to the Stallions tab and enter "My Horse Reality username" — that\'s how the ledger knows which young horses are yours.</p></div>';
+      return html;
+    }
+
+    var young = getYoungHorses();
+    var colts = young.filter(function (h) { return h.sex === 'stallion'; });
+    var fillies = young.filter(function (h) { return h.sex === 'mare'; });
+
+    html += '<div class="stats-bar">' +
+      '<div class="stat-tile"><div class="num mono">' + young.length + '</div><div class="label">Under 3yo</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + colts.length + '</div><div class="label">Colts</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + fillies.length + '</div><div class="label">Fillies</div></div>' +
+      '</div>';
+
+    html += '<div class="section-head"><h2>Colts &amp; Fillies</h2></div>';
+
+    if (!young.length) {
+      html += '<div class="empty"><h3>No young horses cached yet</h3>' +
+        '<p>Once you view one of your under-3yo horses\' pages on Horse Reality, it\'ll show up here — split into colts and fillies until they turn 3 and move to the Stallions or My Mares tab.</p></div>';
+      return html;
+    }
+
+    function youngGrid(list) {
+      var out = '<div class="stallion-grid">';
+      list.forEach(function (h) {
+        out += '<div class="card stallion-card" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
+          (h.imageUrl ? '<img class="portrait" src="' + L.esc(h.imageUrl) + '" alt="">' : '') +
+          '<h3>' + L.esc(h.name || 'Unnamed horse') + '</h3>' +
+          '<div class="lifenum mono">#' + L.esc(h.lifeNumber) + '</div>' +
+          '<div class="meta">' + L.esc([h.breed, h.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
+          (h.dateOfBirth ? '<div class="row"><span>Born</span><span class="v mono">' + L.esc(h.dateOfBirth) + '</span></div>' : '') +
+          renderAgeControlHtml(h.lifeNumber) +
+          '</div>';
+      });
+      out += '</div>';
+      return out;
+    }
+
+    if (colts.length) {
+      html += '<h3 style="margin:20px 0 10px;">Colts</h3>' + youngGrid(colts);
+    }
+    if (fillies.length) {
+      html += '<h3 style="margin:20px 0 10px;">Fillies</h3>' + youngGrid(fillies);
     }
     return html;
   }
@@ -613,6 +774,7 @@
       pedigreeLineHtml(passportInfo) +
       passportOwnerHtml(passportInfo) +
       (mareHref ? '<p class="notes-line"><a href="' + L.esc(mareHref) + '" target="_blank" rel="noopener noreferrer">View mare on Horse Reality<span class="ext">↗</span></a></p>' : '') +
+      (m.mareLifeNumber ? renderAgeControlHtml(m.mareLifeNumber) : '') +
       '</div>' +
     '</div>';
 
@@ -936,9 +1098,11 @@
         pedigreeLineHtml(passportInfo) +
         passportOwnerHtml(passportInfo) +
         (stallionHref ? '<p class="notes-line"><a href="' + L.esc(stallionHref) + '" target="_blank" rel="noopener noreferrer">View on Horse Reality<span class="ext">↗</span></a></p>' : '') +
+        (s.lifeNumber ? renderAgeControlHtml(s.lifeNumber) : '') +
         '</div>' +
       '</div>' +
         '<div class="detail-actions">' +
+          (s.owned === false ? '<button class="btn btn-sm btn-primary" data-action="mark-stallion-owned" data-id="' + s.id + '" title="He was only tracked because a mare\'s breeding record named him — mark him as your own stallion to list him on the Stallions tab.">Mark as My Stallion</button>' : '') +
           '<select class="pill-select ' + L.stallionStatusClass(s.status || 'Active') + '" data-action="update-stallion-status" data-id="' + s.id + '">' +
             ['Active', 'Sold', 'Retired'].map(function (opt) { return '<option' + (opt === (s.status || 'Active') ? ' selected' : '') + '>' + opt + '</option>'; }).join('') +
           '</select>' +
@@ -994,9 +1158,13 @@
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
+      else if (action === 'mark-stallion-owned') { updateStallionRec(t.getAttribute('data-id'), { owned: true }); }
+      else if (action === 'age-up-horse') { adjustAgeMonths(t.getAttribute('data-life'), 6); }
+      else if (action === 'age-down-horse') { adjustAgeMonths(t.getAttribute('data-life'), -6); }
       else if (action === 'open-stallion') {
         selectedId = t.getAttribute('data-id');
         selectedMareKey = null;
+        selectedPassportLife = null;
         addingBreeding = false; editingStallion = false;
         render();
       }
@@ -1073,6 +1241,9 @@
       if (action === 'submit-search') {
         horseSearchQuery = (fd.get('query') || '').trim();
         render();
+      }
+      else if (action === 'set-age-times') {
+        setAgeTimes(t.getAttribute('data-life'), fd.get('times'));
       }
       else if (action === 'submit-stallion') {
         var data = {

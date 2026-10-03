@@ -941,7 +941,7 @@
       var life = L.esc(info.lifeNumber);
       var pic = horsePictureUrl(info.lifeNumber);
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
-      html += '<div class="herd-row">' +
+      html += '<div class="herd-row other-row">' +
         '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
         '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +

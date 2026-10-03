@@ -45,11 +45,12 @@ Not affiliated with or endorsed by Horse Reality.
 | Store Icon | 128×128 PNG | ✅ Ready | `icons/128.png` |
 | Screenshot 1 | 1280×800 | ✅ Ready | `store-screenshots/screenshot-1-stallions.png` |
 | Screenshot 2 | 1280×800 | ✅ Ready | `store-screenshots/screenshot-2-mare-pregnancy.png` |
-| Screenshot 3 | 1280×800 | ⬜ Not created | Other Horses tab / add-to-ledger box (UI added in 1.8.0) |
+| Screenshot 3 | 1280×800 | ✅ Ready | `store-screenshots/screenshot-3-other-horses.png` (sample data) |
+| Screenshot 4 | 1280×800 | ✅ Ready | `store-screenshots/screenshot-4-my-herd.png` (sample data) |
 | Small Promo Tile | 440×280 | ✅ Ready | `store-screenshots/promo-small-440x280.png` |
 | Marquee Promo Tile | 1400×560 | ✅ Ready | `store-screenshots/promo-marquee-1400x560.png` |
 
-Screenshots 1–2 predate My Herd, Foal Calculator and Other Horses; refresh if the UI looks noticeably different.
+Screenshots 1–2 predate the extra tabs (My Herd, Other Horses, Foal Calculator) so their tab bar looks shorter; screenshots 3–4 show the current UI. All use made-up sample horses.
 
 ## Permissions Justification
 
@@ -97,7 +98,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 ## Developer Info
 
-**Publisher Name** — ⬜ TODO
+**Publisher Name** — goodaleent
 **Contact Email** — ⬜ TODO (shown publicly)
 **Support URL** — https://github.com/GoodaleEnt/hr-stallion-mare-ledger/issues
 **Homepage URL** — https://github.com/GoodaleEnt/hr-stallion-mare-ledger
@@ -106,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Draft |
 | 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Draft |
 | 1.8.1 | 2026-10-03 | Docs for Other Horses tab | Draft |
 | 1.8.0 | 2026-10-03 | Add-to-ledger prompt for other people's horses; Other Horses tab | Draft |
@@ -119,8 +121,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 ### Before submitting
 - [x] `tabs` removed (1.8.2). Test: click the toolbar icon twice and confirm the existing dashboard tab is focused rather than duplicated.
 - [ ] Push so the privacy policy URL is live.
-- [ ] Fill in Publisher Name and Contact Email.
-- [ ] Add the Other Horses screenshot (and refresh older ones if needed).
+- [ ] Fill in Contact Email (publisher name is goodaleent).
 - [ ] Build the ZIP with `powershell -ExecutionPolicy Bypass -File package.ps1` (ships only the files the extension runs from).
 - [ ] Bump the version above the last published one in `manifest.json`.
 - [ ] Load unpacked and check the console for errors on horsereality.com and in the dashboard.

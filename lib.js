@@ -295,7 +295,26 @@
     return '';
   }
 
+  // Repairs stallions saved as `owned: false` stubs whose own cached passport
+  // already names you as owner (see content.js promoteStubStallion) — covers
+  // horses visited before that fix, without needing to revisit each page.
+  function promoteOwnedStubs(state) {
+    var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    if (!myName) return 0;
+    var n = 0;
+    (state.stallions || []).forEach(function (s) {
+      if (s.owned !== false) return;
+      var info = state.horseInfo && state.horseInfo[s.lifeNumber];
+      if (info && info.sex === 'stallion' && String(info.ownerName || '').trim().toLowerCase() === myName) {
+        s.owned = true;
+        n++;
+      }
+    });
+    return n;
+  }
+
   global.HRLib = {
+    promoteOwnedStubs: promoteOwnedStubs,
     ancestorMap: ancestorMap,
     commonAncestors: commonAncestors,
     estimateCoi: estimateCoi,

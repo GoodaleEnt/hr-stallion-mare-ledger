@@ -406,6 +406,18 @@
     });
   }
 
+  // A stallion can first be saved as a lightweight `owned: false` stub (a
+  // failed-covering notification or a mare's pregnancy named him). When a
+  // page later PROVES he's yours (a bank fee, or his own passport naming you
+  // as owner), the stub must be promoted — otherwise the match is found, no
+  // new stud is created, and he never appears on the Stallions tab.
+  function promoteStubStallion(state, stallionId) {
+    var rec = state.stallions.find(function (x) { return x.id === stallionId; });
+    if (!rec || rec.owned !== false) return false;
+    rec.owned = true;
+    return true;
+  }
+
   function mergeIntoLedger() {
     var offspring = scrapeOffspringRows();
     var bank = scrapeBankRows();
@@ -424,6 +436,8 @@
           var res = HRStorage.upsertStallionByMatch(state, { name: row.stallionName, lifeNumber: row.stallionLifeNumber });
           stallionId = res.id;
           if (res.created) newStuds++;
+        } else if (promoteStubStallion(state, stallionId)) {
+          newStuds++;
         }
         var result = HRStorage.upsertBreeding(state, stallionId, {
           mareName: row.mareName, mareLifeNumber: row.mareLifeNumber, mareUrl: row.mareUrl,
@@ -542,6 +556,10 @@
         });
         matchId = created.id;
         newStud = created.created;
+      }
+
+      if (matchId && horseInfo.sex === 'stallion' && myName && horseInfo.ownerName && horseInfo.ownerName.trim().toLowerCase() === myName && promoteStubStallion(state, matchId)) {
+        newStud = true;
       }
 
       if (matchId) {
@@ -742,7 +760,19 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  function healOwnedStubs() {
+    HRStorage.getState(function (state) {
+      var fixed = HRLib.promoteOwnedStubs(state);
+      if (fixed) {
+        HRStorage.setState(state, function () {
+          showToast('HR Ledger: ' + fixed + ' stallion' + (fixed === 1 ? '' : 's') + ' of yours moved to the Stallions tab');
+        });
+      }
+    });
+  }
+
   function onPageReady() {
+    healOwnedStubs();
     watchForContent();
     fetchAndMergeHorseInfo();
     scrapeAndMergeAgeText();

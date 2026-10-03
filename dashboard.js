@@ -1383,6 +1383,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
+    if (L.promoteOwnedStubs(state)) { persist(); return; }
     recompute();
     render();
   });

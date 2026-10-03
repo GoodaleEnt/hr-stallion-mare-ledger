@@ -99,7 +99,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 ## Developer Info
 
 **Publisher Name** — goodaleent
-**Contact Email** — ⬜ TODO (shown publicly)
+**Contact Email** — goodaleent@gmail.com (shown publicly)
 **Support URL** — https://github.com/GoodaleEnt/hr-stallion-mare-ledger/issues
 **Homepage URL** — https://github.com/GoodaleEnt/hr-stallion-mare-ledger
 
@@ -121,7 +121,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 ### Before submitting
 - [x] `tabs` removed (1.8.2). Test: click the toolbar icon twice and confirm the existing dashboard tab is focused rather than duplicated.
 - [ ] Push so the privacy policy URL is live.
-- [ ] Fill in Contact Email (publisher name is goodaleent).
+- [x] Publisher name and contact email filled in.
 - [ ] Build the ZIP with `powershell -ExecutionPolicy Bypass -File package.ps1` (ships only the files the extension runs from).
 - [ ] Bump the version above the last published one in `manifest.json`.
 - [ ] Load unpacked and check the console for errors on horsereality.com and in the dashboard.

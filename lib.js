@@ -186,7 +186,7 @@
 
   // ---------- herd tracking (My Herd tab) ----------
   var HERD_STATUSES = ['Active', 'Observation', 'Companion', 'For Sale', 'Sold', 'Retired', 'Deceased'];
-  var HERD_ROLES = ['Broodmare', 'Public Stud', 'Private Stud', 'Competition', 'Young Stock'];
+  var HERD_ROLES = ['Broodmare', 'Public Stud', 'Private Stud', 'Public & Private Stud', 'Competition', 'Young Stock'];
   var ARCHIVE_STATUSES = ['Sold', 'Retired', 'Deceased'];
 
   function herdStatusClass(s) {
@@ -198,8 +198,18 @@
   }
   function herdMeta(state, lifeNumber) {
     var m = (state.horseMeta && state.horseMeta[lifeNumber]) || {};
-    return { status: m.status || 'Active', role: m.role || '', project: m.project || '' };
+    return { status: m.status || 'Active', role: m.role || '', project: m.project || '', confScores: Array.isArray(m.confScores) ? m.confScores : [], confBest: Number(m.confBest) || 0 };
   }
+  // Highest conformation show score: the all-time best captured from the
+  // horse's stats page (only ever raised, so it outlives the 25-show list)
+  // or the highest hand-entered score, whichever is greater.
+  function bestConformation(meta) {
+    var scores = (meta && meta.confScores) || [];
+    var typed = scores.length ? Math.max.apply(null, scores) : 0;
+    var captured = Number(meta && meta.confBest) || 0;
+    return { best: Math.max(typed, captured), fromPage: captured >= typed && captured > 0, shows: scores.length };
+  }
+
   // Cached horses whose API-reported owner matches the username in Settings
   // (same ownership rule the My Mares tab uses), with their herd tags attached.
   function ownedHorses(state) {
@@ -210,6 +220,16 @@
     }).filter(function (h) {
       return h.info && String(h.info.ownerName || '').trim().toLowerCase() === myName;
     }).sort(function (a, b) { return String(a.info.name || '').localeCompare(String(b.info.name || '')); });
+  }
+  // Horses you chose to add from the "add to ledger?" prompt that the API
+  // says someone else owns — kept apart from your own herd.
+  function trackedOtherHorses(state) {
+    var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    return Object.keys(state.horseMeta || {}).filter(function (life) {
+      var info = state.horseInfo && state.horseInfo[life];
+      return state.horseMeta[life].tracked && info && String(info.ownerName || '').trim().toLowerCase() !== myName;
+    }).map(function (life) { return Object.assign({ lifeNumber: life }, state.horseInfo[life]); })
+      .sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
   }
   function isArchivedHorse(h) { return ARCHIVE_STATUSES.indexOf(h.meta.status) > -1; }
   // Archived horses are left out of the headline numbers; foals born counts
@@ -295,26 +315,294 @@
     return '';
   }
 
-  // Repairs stallions saved as `owned: false` stubs whose own cached passport
-  // already names you as owner (see content.js promoteStubStallion) — covers
-  // horses visited before that fix, without needing to revisit each page.
-  function promoteOwnedStubs(state) {
+  // Makes sure every cached stallion whose passport names you as owner has a
+  // proper (owned) stallion record. Needed because content.js only creates one
+  // at the moment you view his page: a horse cached BEFORE you set your
+  // username (or saved as an owned:false stub first) would otherwise never
+  // reach the Stallions tab. Returns how many records were added or promoted.
+  function adoptOwnedStallions(state) {
     var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     if (!myName) return 0;
     var n = 0;
-    (state.stallions || []).forEach(function (s) {
-      if (s.owned !== false) return;
-      var info = state.horseInfo && state.horseInfo[s.lifeNumber];
-      if (info && info.sex === 'stallion' && String(info.ownerName || '').trim().toLowerCase() === myName) {
-        s.owned = true;
-        n++;
+    Object.keys(state.horseInfo || {}).forEach(function (life) {
+      var info = state.horseInfo[life];
+      if (!info || info.sex !== 'stallion' || String(info.ownerName || '').trim().toLowerCase() !== myName) return;
+      var matchId = findStallionMatch(state.stallions || [], { stallionName: info.name, stallionLifeNumber: life });
+      var rec = matchId ? state.stallions.find(function (x) { return x.id === matchId; }) : null;
+      if (rec) {
+        if (rec.owned === false) { rec.owned = true; n++; }
+        return;
       }
+      var id = uid();
+      state.stallions.push({ id: id, createdAt: Date.now(), status: 'Active', name: info.name || ('#' + life), lifeNumber: life, breed: info.breed || '', imageUrl: info.imageUrl || '' });
+      if (!state.breedings) state.breedings = {};
+      state.breedings[id] = [];
+      n++;
     });
     return n;
   }
 
+  // ---------- coat colour odds ----------
+  // Horse Reality's "tested colours" text is a run of two-allele genotypes,
+  // e.g. "Ee Aa gg Dnd2 LPLP PATN1patn1". Each parent passes one allele per
+  // gene with equal chance, genes assumed inherited independently. Only genes
+  // tested in BOTH parents are calculated — an untested gene is unknown, not
+  // assumed absent.
+  var COLOUR_LOCI = [
+    { id: 'E', name: 'Extension (E)', alleles: ['E', 'e'] },
+    { id: 'A', name: 'Agouti (A)', alleles: ['A', 'a'] },
+    { id: 'CR', name: 'Cream (CR)', alleles: ['CR', 'n'] },
+    { id: 'D', name: 'Dun (D)', alleles: ['D', 'nd1', 'nd2'] },
+    { id: 'G', name: 'Grey (G)', alleles: ['G', 'g'] },
+    { id: 'LP', name: 'Leopard complex (LP)', alleles: ['LP', 'lp'] },
+    { id: 'PATN1', name: 'Pattern-1 (PATN1)', alleles: ['PATN1', 'patn1'] },
+    { id: 'SW1', name: 'Splashed white (SW1)', alleles: ['SW1', 'n'] },
+    { id: 'W20', name: 'White spotting (W20)', alleles: ['W20', 'n'] }
+  ];
+  // Genes Horse Reality's tested-colours text doesn't report, entered by hand
+  // per horse (stored in state.horseMeta[life].genes) — and parsed from the
+  // text too if it ever does list them. `only` limits where a modifier shows.
+  // Modelled as simple dominant (or, for Flaxen, recessive) genes; real-world
+  // interactions beyond that are not simulated.
+  var EXTRA_LOCI = [
+    { id: 'STY', name: 'Sooty (Sty)', alleles: ['Sty', 'sty'], absent: ['sty', 'sty'], label: 'Sooty' },
+    { id: 'FL', name: 'Flaxen (Fl)', alleles: ['Fl', 'fl'], absent: ['Fl', 'Fl'], recessive: true, label: 'Flaxen', only: 'chestnut' },
+    { id: 'Z', name: 'Silver (Z)', alleles: ['Z', 'n'], absent: ['n', 'n'], label: 'Silver', only: 'blackBased' },
+    { id: 'CH', name: 'Champagne (Ch)', alleles: ['Ch', 'n'], absent: ['n', 'n'], label: 'Champagne' },
+    { id: 'RN', name: 'Roan (Rn)', alleles: ['Rn', 'rn'], absent: ['rn', 'rn'], label: 'Roan' },
+    { id: 'TO', name: 'Tobiano (TO)', alleles: ['TO', 'to'], absent: ['to', 'to'], label: 'Tobiano' },
+    { id: 'SB1', name: 'Sabino 1 (SB1)', alleles: ['SB1', 'n'], absent: ['n', 'n'], label: 'Sabino' }
+  ];
+  var ALL_LOCI = COLOUR_LOCI.concat(EXTRA_LOCI);
+  function extraGenotypeOptions(locus) {
+    var a = locus.alleles;
+    return [a[0] + '/' + a[0], a[0] + '/' + a[1], a[1] + '/' + a[1]];
+  }
+  // Hand-entered genotypes for one horse, validated against the gene table.
+  function manualGenes(state, lifeNumber) {
+    var saved = (state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].genes) || {};
+    var out = {};
+    EXTRA_LOCI.forEach(function (l) {
+      var parts = String(saved[l.id] || '').split('/');
+      if (parts.length === 2 && l.alleles.indexOf(parts[0]) > -1 && l.alleles.indexOf(parts[1]) > -1) out[l.id] = parts;
+    });
+    return out;
+  }
+  function splitAlleles(token, alleles) {
+    var sorted = alleles.slice().sort(function (a, b) { return b.length - a.length; });
+    var out = [], rest = token;
+    while (rest && out.length < 2) {
+      var hit = sorted.find(function (a) { return rest.indexOf(a) === 0; });
+      if (!hit) return null;
+      out.push(hit);
+      rest = rest.slice(hit.length);
+    }
+    return (out.length === 2 && !rest) ? out : null;
+  }
+  function parseColourGenes(text) {
+    var out = {};
+    String(text || '').split(/\s+/).filter(Boolean).forEach(function (tok) {
+      for (var i = 0; i < ALL_LOCI.length; i++) {
+        var al = splitAlleles(tok, ALL_LOCI[i].alleles);
+        if (al) { out[ALL_LOCI[i].id] = al; return; }
+      }
+    });
+    return out;
+  }
+  function foalDistribution(locus, sire, dam) {
+    var d = {};
+    sire.forEach(function (s) {
+      dam.forEach(function (m) {
+        var key = [s, m].sort(function (a, b) { return locus.alleles.indexOf(a) - locus.alleles.indexOf(b); }).join('/');
+        d[key] = (d[key] || 0) + 0.25;
+      });
+    });
+    return Object.keys(d).map(function (k) { return { genotype: k, alleles: k.split('/'), p: d[k] }; })
+      .sort(function (a, b) { return b.p - a.p; });
+  }
+  function copies(alleles, a) { return alleles.filter(function (x) { return x === a; }).length; }
+  function geneEffect(id, al) {
+    var c;
+    if (id === 'E') return al.indexOf('E') > -1 ? 'black-based' : 'red (chestnut) base';
+    if (id === 'A') return al.indexOf('A') > -1 ? 'agouti (bay if black-based)' : 'no agouti (black if black-based)';
+    if (id === 'CR') { c = copies(al, 'CR'); return c === 0 ? 'no cream' : (c === 1 ? 'one cream copy' : 'double cream'); }
+    if (id === 'D') return al.indexOf('D') > -1 ? 'dun' : (al.indexOf('nd1') > -1 ? 'non-dun, primitive markings' : 'non-dun');
+    if (id === 'G') return al.indexOf('G') > -1 ? 'grey' : 'not grey';
+    if (id === 'LP') { c = copies(al, 'LP'); return c === 0 ? 'no leopard complex' : (c === 1 ? 'one LP copy' : 'two LP copies'); }
+    if (id === 'PATN1') { c = copies(al, 'PATN1'); return c === 0 ? 'no PATN1' : (c === 1 ? 'one PATN1 copy' : 'two PATN1 copies'); }
+    var extra = EXTRA_LOCI.find(function (l) { return l.id === id; });
+    if (extra) {
+      var shown = extra.recessive ? copies(al, extra.alleles[1]) === 2 : al.indexOf(extra.alleles[0]) > -1;
+      return shown ? extra.label.toLowerCase() : 'no ' + extra.label.toLowerCase();
+    }
+    c = copies(al, id);
+    return c === 0 ? 'none' : (c === 1 ? 'one copy' : 'two copies');
+  }
+  // Used when Extension (E) isn't known on both parents: the base colour can't
+  // be named, but the other known genes can still be combined and reported.
+  function modifiersOnlyLabel(g) {
+    var parts = [];
+    if (g.CR && copies(g.CR, 'CR')) parts.push(copies(g.CR, 'CR') === 1 ? 'one cream copy' : 'double cream');
+    if (g.D && g.D.indexOf('D') > -1) parts.push('Dun');
+    EXTRA_LOCI.forEach(function (l) {
+      var al = g[l.id];
+      if (!al || l.only) return;
+      var expressed = l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1;
+      if (expressed) parts.push(l.label);
+    });
+    var name = 'Base colour unknown' + (parts.length ? ' + ' + parts.join(' + ') : '');
+    if (g.G && g.G.indexOf('G') > -1) name = 'Grey (born ' + name + ')';
+    return name;
+  }
+  function baseColourLabel(g) {
+    if (!g.E) return modifiersOnlyLabel(g);
+    var names = {
+      chestnut: ['Chestnut', 'Palomino', 'Cremello'],
+      bay: ['Bay', 'Buckskin', 'Perlino'],
+      black: ['Black', 'Smoky Black', 'Smoky Cream'],
+      blackBased: ['Bay or Black', 'Buckskin or Smoky Black', 'Perlino or Smoky Cream']
+    };
+    var base = g.E.indexOf('E') === -1 ? 'chestnut' : (!g.A ? 'blackBased' : (g.A.indexOf('A') > -1 ? 'bay' : 'black'));
+    var name = names[base][g.CR ? copies(g.CR, 'CR') : 0];
+    if (g.D && g.D.indexOf('D') > -1) name += ' Dun';
+    var blackBased = g.E.indexOf('E') > -1;
+    EXTRA_LOCI.forEach(function (l) {
+      var al = g[l.id];
+      if (!al) return;
+      var expressed = l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1;
+      if (!expressed) return;
+      if (l.only === 'chestnut' && blackBased) return;
+      if (l.only === 'blackBased' && !blackBased) return;
+      name += ' ' + l.label;
+    });
+    if (g.G && g.G.indexOf('G') > -1) name = 'Grey (born ' + name + ')';
+    return name;
+  }
+  function patternLabel(g) {
+    var lp = copies(g.LP, 'LP');
+    if (lp === 0) return 'No Appaloosa pattern (no LP)';
+    if (!g.PATN1) return lp === 1 ? 'Appaloosa pattern possible (one LP copy; PATN1 untested)' : 'Appaloosa pattern possible (two LP copies; PATN1 untested)';
+    var patn = copies(g.PATN1, 'PATN1');
+    if (patn === 0) return 'LP without PATN1 (varnish roan / minimal pattern)';
+    if (lp === 2 && patn === 2) return 'Few-spot / no-spot (LP and PATN1 both homozygous)';
+    return 'Leopard spotting (LP + PATN1)';
+  }
+  function enumerateOutcomes(dist, ids, labelFn) {
+    var results = {};
+    (function rec(i, p, genos) {
+      if (i === ids.length) { var label = labelFn(genos); results[label] = (results[label] || 0) + p; return; }
+      dist[ids[i]].forEach(function (o) {
+        var next = Object.assign({}, genos);
+        next[ids[i]] = o.alleles;
+        rec(i + 1, p * o.p, next);
+      });
+    })(0, 1, {});
+    return Object.keys(results).map(function (k) { return { label: k, pct: results[k] * 100 }; })
+      .sort(function (a, b) { return b.pct - a.pct; });
+  }
+  // Odds for a foal of sire x dam, from their "tested colours" strings.
+  function colourOutcomes(sireText, damText, sireManual, damManual) {
+    // Horse Reality's own tested result wins over a hand-entered one.
+    // An extra gene nobody has set counts as NOT present on that parent.
+    var sM = sireManual || {}, dM = damManual || {}, sP = parseColourGenes(sireText), dP = parseColourGenes(damText);
+    var absent = {}, touched = {};
+    EXTRA_LOCI.forEach(function (l) {
+      absent[l.id] = l.absent.slice();
+      touched[l.id] = !!(sM[l.id] || dM[l.id] || sP[l.id] || dP[l.id]);
+    });
+    var s = Object.assign({}, absent, sM, sP);
+    var d = Object.assign({}, absent, dM, dP);
+    var dist = {}, untested = [];
+    ALL_LOCI.forEach(function (l) {
+      if (s[l.id] && d[l.id]) dist[l.id] = foalDistribution(l, s[l.id], d[l.id]);
+      else if (!l.label) untested.push(l.name);
+    });
+    var genes = ALL_LOCI.filter(function (l) { return dist[l.id] && (!l.label || touched[l.id]); }).map(function (l) {
+      return { id: l.id, name: l.name, outcomes: dist[l.id].map(function (o) {
+        return { genotype: o.alleles.join(' / '), pct: o.p * 100, effect: geneEffect(l.id, o.alleles) };
+      }) };
+    });
+    // Chance the foal actually shows each extra gene (a dominant one needs a
+    // single copy; a recessive one — Flaxen — needs two), listed on its own so
+    // it's visible even when the combined colour list can't be built.
+    var extras = EXTRA_LOCI.filter(function (l) { return dist[l.id] && touched[l.id]; }).map(function (l) {
+      var shown = 0;
+      dist[l.id].forEach(function (o) {
+        var expressed = l.recessive ? copies(o.alleles, l.alleles[1]) === 2 : o.alleles.indexOf(l.alleles[0]) > -1;
+        if (expressed) shown += o.p;
+      });
+      return {
+        id: l.id, name: l.name, label: l.label, pct: shown * 100,
+        note: l.only === 'chestnut' ? 'shows on chestnut coats only' : (l.only === 'blackBased' ? 'shows on black-based coats only' : ''),
+        outcomes: dist[l.id].map(function (o) { return { genotype: o.alleles.join(' / '), pct: o.p * 100 }; })
+      };
+    });
+    var colourIds = ['E', 'A', 'CR', 'D', 'G'].concat(EXTRA_LOCI.map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
+    // Modifiers usable without a base colour (not A, not the base-dependent extras).
+    var noBaseIds = ['CR', 'D', 'G'].concat(EXTRA_LOCI.filter(function (l) { return !l.only; }).map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
+    var patternIds = ['LP', 'PATN1'].filter(function (id) { return dist[id]; });
+    return {
+      genes: genes,
+      extras: extras,
+      untested: untested,
+      colours: dist.E ? enumerateOutcomes(dist, colourIds, baseColourLabel) : (noBaseIds.length ? enumerateOutcomes(dist, noBaseIds, baseColourLabel) : null),
+      baseKnown: !!dist.E,
+      patterns: dist.LP ? enumerateOutcomes(dist, patternIds, patternLabel) : null
+    };
+  }
+
+  // A horse's pedigree as a nested tree, `depth` generations deep, using the
+  // same sources as ancestorMap (its captured pedigree tree, else chaining
+  // through other cached horses). Each node: { life, name, cached, s?, d? }.
+  function pedigreeTreeOf(state, life, depth, hintNode, hintName) {
+    var horseInfo = (state && state.horseInfo) || {};
+    var cached = horseInfo[life];
+    var node = hintNode || (cached && cached.pedigreeTree) || null;
+    var name = (cached && cached.name) || hintName || ancestorName(state, life) || '';
+    if (name === String(life)) name = '';
+    var out = { life: life, name: name, cached: !!cached };
+    if (depth < 1) return out;
+    var sNode = node && node.s ? node.s : null, dNode = node && node.d ? node.d : null;
+    var sLife = sNode ? sNode.l : (cached && cached.sire && cached.sire.lifeNumber) || null;
+    var dLife = dNode ? dNode.l : (cached && cached.dam && cached.dam.lifeNumber) || null;
+    if (sLife) out.s = pedigreeTreeOf(state, sLife, depth - 1, sNode, cached && cached.sire && cached.sire.lifeNumber === sLife ? cached.sire.name : '');
+    if (dLife) out.d = pedigreeTreeOf(state, dLife, depth - 1, dNode, cached && cached.dam && cached.dam.lifeNumber === dLife ? cached.dam.name : '');
+    return out;
+  }
+
+  // Horse Reality's conformation summary, e.g. "2G 7A 3BA": how many of the
+  // horse's traits are rated Good, Average and Below average.
+  function parseConformation(text) {
+    var out = { G: 0, A: 0, BA: 0, total: 0, ok: false };
+    String(text || '').replace(/(\d+)\s*(BA|G|A)\b/g, function (m, n, code) {
+      out[code] += parseInt(n, 10);
+      out.ok = true;
+      return m;
+    });
+    out.total = out.G + out.A + out.BA;
+    return out;
+  }
+
+  // What was paid for a horse (and shipping), recorded in
+  // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.
+  function purchaseOf(state, lifeNumber) {
+    var p = state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].purchase;
+    if (!p) return null;
+    var price = Number(p.price) || 0, shipping = Number(p.shipping) || 0;
+    if (!price && !shipping) return null;
+    return { price: price, currency: p.currency || 'HRC', shipping: shipping, shippingCurrency: p.shippingCurrency || 'HRC' };
+  }
+
   global.HRLib = {
-    promoteOwnedStubs: promoteOwnedStubs,
+    purchaseOf: purchaseOf,
+    parseConformation: parseConformation,
+    pedigreeTreeOf: pedigreeTreeOf,
+    parseColourGenes: parseColourGenes,
+    colourOutcomes: colourOutcomes,
+    EXTRA_LOCI: EXTRA_LOCI,
+    extraGenotypeOptions: extraGenotypeOptions,
+    manualGenes: manualGenes,
+    adoptOwnedStallions: adoptOwnedStallions,
     ancestorMap: ancestorMap,
     commonAncestors: commonAncestors,
     estimateCoi: estimateCoi,
@@ -324,7 +612,9 @@
     ARCHIVE_STATUSES: ARCHIVE_STATUSES,
     herdStatusClass: herdStatusClass,
     herdMeta: herdMeta,
+    bestConformation: bestConformation,
     ownedHorses: ownedHorses,
+    trackedOtherHorses: trackedOtherHorses,
     isArchivedHorse: isArchivedHorse,
     herdStats: herdStats,
     CURRENCIES: CURRENCIES,

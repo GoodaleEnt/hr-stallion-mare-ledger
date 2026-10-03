@@ -7,19 +7,43 @@
     return { stallions: [], breedings: {}, horseInfo: {}, horseMeta: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
   }
 
-  function getState(cb) {
-    chrome.storage.local.get({ hrLedger: defaultState() }, function (res) {
-      var state = res.hrLedger || defaultState();
-      if (!state.breedings) state.breedings = {};
-      if (!state.horseInfo) state.horseInfo = {};
-      if (!state.horseMeta) state.horseMeta = {};
-      if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
-      if (state.settings.myUsername == null) state.settings.myUsername = '';
-      cb(state);
+  // content.js fires several independent read-modify-write cycles at once
+  // (passport merge, diagnostics note, stale-covering sweep, image attach...).
+  // Each used to read its own copy of the ledger straight from storage, so a
+  // slow writer could silently overwrite a faster one's changes — the horse
+  // was reported "added" and then vanished. getState() callbacks now run one
+  // at a time, in call order, against the newest state this context has
+  // written (kept in `cache` for a short burst, then re-read from storage so
+  // writes made by another context — the dashboard, another tab — are picked up).
+  var CACHE_MS = 2000;
+  var cache = null, cacheAt = 0, gate = Promise.resolve();
+  function clone(o) { return typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)); }
+  function readFromStorage() {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get({ hrLedger: defaultState() }, function (res) { resolve(normalize(res.hrLedger)); });
     });
+  }
+  function normalize(state) {
+    state = state || defaultState();
+    if (!state.breedings) state.breedings = {};
+    if (!state.horseInfo) state.horseInfo = {};
+    if (!state.horseMeta) state.horseMeta = {};
+    if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+    if (state.settings.myUsername == null) state.settings.myUsername = '';
+    return state;
+  }
+  function getState(cb) {
+    gate = gate.then(function () {
+      if (cache && Date.now() - cacheAt < CACHE_MS) { cacheAt = Date.now(); return cache; }
+      return readFromStorage().then(function (s) { cache = s; cacheAt = Date.now(); return s; });
+    }).then(function (s) {
+      try { cb(clone(s)); } catch (e) { console.error('HR Ledger:', e); }
+    }).catch(function (e) { console.error('HR Ledger storage error:', e); });
   }
 
   function setState(state, cb) {
+    cache = clone(state);
+    cacheAt = Date.now();
     chrome.storage.local.set({ hrLedger: state }, cb || function () {});
   }
 

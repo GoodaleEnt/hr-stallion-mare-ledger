@@ -523,6 +523,10 @@
   // The horse-info API fetch runs on its own schedule (triggered by URL,
   // not DOM readiness), so it merges into storage independently of the
   // synchronous bank/offspring/notifications flow above.
+  // Without a username the extension can't tell your horses from anyone
+  // else's, and caching a horse page is otherwise silent — so a fresh
+  // install would look dead. Nudge once per page load.
+  var usernameNudged = false;
   function mergeHorseInfo(horseInfo) {
     HRStorage.getState(function (state) {
       var infoRefreshed = false, passportCached = false, newStud = false;
@@ -549,6 +553,10 @@
       // Only stallions get auto-tracked here; mares surface via "My Mares"
       // once a breeding record exists for them.
       var myName = (state.settings.myUsername || '').trim().toLowerCase();
+      if (!myName && !usernameNudged) {
+        usernameNudged = true;
+        setTimeout(function () { showToast('HR Ledger: set your Horse Reality username in the dashboard so it can track your horses'); }, 4500);
+      }
       if (!matchId && horseInfo.sex === 'stallion' && myName && horseInfo.ownerName && horseInfo.ownerName.trim().toLowerCase() === myName) {
         var created = HRStorage.upsertStallionByMatch(state, {
           name: horseInfo.name, lifeNumber: horseInfo.lifeNumber,
@@ -607,6 +615,8 @@
             mergeIntoLedger();
           } else if (pregnancyMarked) {
             showToast('HR Ledger: ' + horseInfo.name + ' marked in foal');
+          } else if (passportCached && !existing) {
+            showToast('HR Ledger: saved ' + (horseInfo.name || 'horse') + ' to your ledger');
           } else if (infoRefreshed) {
             // A bare passport-cache refresh (no ledger change) stays silent —
             // showing a toast on every single horse page you browse would be noise.
@@ -616,6 +626,69 @@
       }
 
       attachHorseImage(infoStallionId, horseInfo);
+
+      // Not yours (and not already tracked or dismissed): offer to add it.
+      var ownedByMe = myName && horseInfo.ownerName && horseInfo.ownerName.trim().toLowerCase() === myName;
+      var meta = state.horseMeta[horseInfo.lifeNumber] || {};
+      var s2 = matchId ? state.stallions.find(function (x) { return x.id === matchId; }) : null;
+      var alreadyTracked = meta.tracked || (s2 && s2.owned !== false);
+      if (myName && !ownedByMe && !alreadyTracked && !meta.declined && !offeredFor[horseInfo.lifeNumber]) {
+        offeredFor[horseInfo.lifeNumber] = true;
+        showAddPrompt(horseInfo);
+      }
+    });
+  }
+
+  var offeredFor = {};
+  function showAddPrompt(horseInfo) {
+    var old = document.getElementById('hr-ledger-add-prompt');
+    if (old) old.remove();
+    var box = document.createElement('div');
+    box.id = 'hr-ledger-add-prompt';
+    box.style.cssText = [
+      'position:fixed', 'bottom:16px', 'right:16px', 'max-width:320px', 'background:#fff', 'color:#222',
+      'padding:14px 16px', 'border-radius:8px', 'border:2px solid #46592C', 'font:14px system-ui,sans-serif',
+      'z-index:2147483647', 'box-shadow:0 4px 14px rgba(0,0,0,.3)'
+    ].join(';');
+    var msg = document.createElement('div');
+    msg.style.cssText = 'margin-bottom:10px;line-height:1.4';
+    var strong = document.createElement('strong');
+    strong.textContent = horseInfo.name || ('#' + horseInfo.lifeNumber);
+    msg.appendChild(strong);
+    msg.appendChild(document.createTextNode(' isn’t one of your horses. Add to your ledger?'));
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+    function btn(label, primary) {
+      var b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'cursor:pointer;border-radius:6px;padding:6px 12px;font:inherit;border:1px solid #46592C;' +
+        (primary ? 'background:#46592C;color:#fff' : 'background:#fff;color:#46592C');
+      return b;
+    }
+    var no = btn('No thanks', false), yes = btn('Add to ledger', true);
+    no.onclick = function () { box.remove(); markHorse(horseInfo, false); };
+    yes.onclick = function () { box.remove(); markHorse(horseInfo, true); };
+    row.appendChild(no);
+    row.appendChild(yes);
+    box.appendChild(msg);
+    box.appendChild(row);
+    document.body.appendChild(box);
+  }
+
+  function markHorse(horseInfo, add) {
+    HRStorage.getState(function (state) {
+      var life = horseInfo.lifeNumber;
+      var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+      if (!add) {
+        meta.declined = true;
+        HRStorage.setState(state);
+        return;
+      }
+      meta.tracked = true;
+      delete meta.declined;
+      HRStorage.setState(state, function () {
+        showToast('HR Ledger: added ' + (horseInfo.name || 'horse') + ' to Other Horses');
+      });
     });
   }
 
@@ -760,12 +833,118 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // A horse's stats page lists only its latest 25 shows. The best conformation
+  // score is kept in the ledger and only ever raised, so it survives once that
+  // score drops off the list. Two sources, both feeding the same maximum:
+  //  1. Horse Reality's own "Latest 25 show results" rows (.row_460), points in
+  //     the third column — breed-type (BT) categories are skipped.
+  //  2. If the HRToolkit extension is also installed, its injected "All-time
+  //     Confo" / "Current Confo" summary rows — its all-time figure can reach
+  //     further back than the 25 listed shows.
+  function readConfoHighs() {
+    var highs = [];
+    function number(text) {
+      var m = /\d+(?:\.\d+)?/.exec(String(text || '').replace(/,/g, ''));
+      return m ? parseFloat(m[0]) : NaN;
+    }
+    document.querySelectorAll('.half_block').forEach(function (block) {
+      var top = block.querySelector('.top');
+      if (!top || !/show results/i.test(top.textContent || '')) return;
+      block.querySelectorAll('.row_460').forEach(function (row) {
+        var cols = row.querySelectorAll(':scope > div');
+        if (cols.length < 3) return;
+        var category = (cols[1].textContent || '').replace(/\s+/g, ' ').trim();
+        if (/\bBT\b|breed\s*type/i.test(category)) return;
+        var value = number(cols[2].textContent);
+        if (isFinite(value) && value > 0) highs.push(value);
+      });
+    });
+    document.querySelectorAll('tr').forEach(function (tr) {
+      var cells = tr.querySelectorAll('th, td');
+      if (cells.length < 2) return;
+      var label = (cells[0].textContent || '').replace(/\s+/g, ' ').trim();
+      if (!/^(all-time|current) confo$/i.test(label)) return;
+      var value = number(cells[1].textContent);
+      if (isFinite(value) && value > 0) highs.push(value);
+    });
+    return highs;
+  }
+  function scrapeConfoStats() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    function tryCapture() {
+      var highs = readConfoHighs();
+      if (!highs.length) return false;
+      var best = Math.max.apply(null, highs);
+      HRStorage.getState(function (state) {
+        if (!state.horseMeta) state.horseMeta = {};
+        var meta = Object.assign({}, state.horseMeta[id]);
+        if (best <= (Number(meta.confBest) || 0)) return;
+        meta.confBest = best;
+        meta.confBestAt = Date.now();
+        state.horseMeta[id] = meta;
+        var name = (state.horseInfo[id] && state.horseInfo[id].name) || 'this horse';
+        HRStorage.setState(state, function () {
+          showToast('HR Ledger: best conformation score ' + best + ' saved for ' + name);
+        });
+      });
+      return true;
+    }
+    if (tryCapture()) return;
+    var observer = new MutationObserver(function () {
+      if (tryCapture()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(function () { observer.disconnect(); }, 60000);
+  }
+
+  // Per-trait conformation ratings from the horse page's genetics table
+  // (.genetic_table_row: a trait name element, then its rating element —
+  // Good / Average / Below average). Saved as horseInfo[id].confTraits.
+  var CONF_TRAIT_NAMES = ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters', 'Socks'];
+  function readConfTraits() {
+    var out = {};
+    document.querySelectorAll('.genetic_table_row').forEach(function (row) {
+      row.querySelectorAll('.genetic_potential').forEach(function (label) {
+        var name = (label.textContent || '').replace(/\s+/g, ' ').trim();
+        if (CONF_TRAIT_NAMES.indexOf(name) === -1) return;
+        var value = label.nextElementSibling;
+        if (!value || !value.classList.contains('genetic_stats')) return;
+        var rating = (value.textContent || '').replace(/\s+/g, ' ').trim();
+        if (rating) out[name] = rating;
+      });
+    });
+    return Object.keys(out).length >= 8 ? out : null;
+  }
+  function scrapeConformationTraits() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    function tryCapture() {
+      var traits = readConfTraits();
+      if (!traits) return false;
+      HRStorage.getState(function (state) {
+        var info = state.horseInfo[id];
+        if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
+        if (JSON.stringify(info.confTraits || null) === JSON.stringify(traits)) return;
+        info.confTraits = traits;
+        HRStorage.setState(state);
+      });
+      return true;
+    }
+    if (tryCapture()) return;
+    var observer = new MutationObserver(function () {
+      if (tryCapture()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(function () { observer.disconnect(); }, 60000);
+  }
+
   function healOwnedStubs() {
     HRStorage.getState(function (state) {
-      var fixed = HRLib.promoteOwnedStubs(state);
+      var fixed = HRLib.adoptOwnedStallions(state);
       if (fixed) {
         HRStorage.setState(state, function () {
-          showToast('HR Ledger: ' + fixed + ' stallion' + (fixed === 1 ? '' : 's') + ' of yours moved to the Stallions tab');
+          showToast('HR Ledger: ' + fixed + ' stallion' + (fixed === 1 ? '' : 's') + ' of yours added to the Stallions tab');
         });
       }
     });
@@ -773,6 +952,8 @@
 
   function onPageReady() {
     healOwnedStubs();
+    scrapeConfoStats();
+    scrapeConformationTraits();
     watchForContent();
     fetchAndMergeHorseInfo();
     scrapeAndMergeAgeText();

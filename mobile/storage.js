@@ -9,16 +9,36 @@
     return { stallions: [], breedings: {}, horseInfo: {}, horseMeta: {}, settings: { autoDeleteRetired: false, myUsername: '' } };
   }
 
+  // content.js fires several independent read-modify-write cycles at once
+  // (passport merge, diagnostics note, stale-covering sweep, image attach...).
+  // Each used to read its own copy of the ledger straight from storage, so a
+  // slow writer could silently overwrite a faster one's changes — the horse
+  // was reported "added" and then vanished. getState() callbacks now run one
+  // at a time, in call order, against the newest state this context has
+  // written (kept in `cache` for a short burst, then re-read from storage so
+  // writes made by another context — the dashboard, another tab — are picked up).
+  var CACHE_MS = 2000;
+  var cache = null, cacheAt = 0, gate = Promise.resolve();
+  function clone(o) { return typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)); }
+  function readFromStorage() {
+    return GM.getValue('hrLedger', defaultState()).then(normalize);
+  }
+  function normalize(state) {
+    state = state || defaultState();
+    if (!state.breedings) state.breedings = {};
+    if (!state.horseInfo) state.horseInfo = {};
+    if (!state.horseMeta) state.horseMeta = {};
+    if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+    if (state.settings.myUsername == null) state.settings.myUsername = '';
+    return state;
+  }
   function getState(cb) {
-    GM.getValue('hrLedger', defaultState()).then(function (res) {
-      var state = res || defaultState();
-      if (!state.breedings) state.breedings = {};
-      if (!state.horseInfo) state.horseInfo = {};
-      if (!state.horseMeta) state.horseMeta = {};
-      if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
-      if (state.settings.myUsername == null) state.settings.myUsername = '';
-      cb(state);
-    });
+    gate = gate.then(function () {
+      if (cache && Date.now() - cacheAt < CACHE_MS) { cacheAt = Date.now(); return cache; }
+      return readFromStorage().then(function (s) { cache = s; cacheAt = Date.now(); return s; });
+    }).then(function (s) {
+      try { cb(clone(s)); } catch (e) { console.error('HR Ledger:', e); }
+    }).catch(function (e) { console.error('HR Ledger storage error:', e); });
   }
 
   // dashboard.js listens via chrome.storage.onChanged for live refresh (e.g.
@@ -27,6 +47,8 @@
   // no-op specifically so this can notify it, matching what
   // chrome.storage.local.set would do for real in the extension.
   function setState(state, cb) {
+    cache = clone(state);
+    cacheAt = Date.now();
     GM.setValue('hrLedger', state).then(function () {
       var onChanged = window.chrome && window.chrome.storage && window.chrome.storage.onChanged;
       if (onChanged && onChanged._listeners) {

@@ -138,6 +138,13 @@
     persist();
   }
 
+  function setHorseGene(lifeNumber, locus, value) {
+    if (!lifeNumber || !locus) return;
+    var meta = state.horseMeta[lifeNumber] = Object.assign({}, state.horseMeta[lifeNumber]);
+    meta.genes = Object.assign({}, meta.genes);
+    if (value) meta.genes[locus] = value; else delete meta.genes[locus];
+    persist();
+  }
   function setHorseMeta(lifeNumber, patch) {
     if (!lifeNumber) return;
     state.horseMeta[lifeNumber] = Object.assign({}, state.horseMeta[lifeNumber], patch);
@@ -199,6 +206,7 @@
     else if (activeTab === 'mares') html = renderMaresList();
     else if (activeTab === 'young') html = renderYoungList();
     else if (activeTab === 'herd') html = renderHerdList();
+    else if (activeTab === 'others') html = renderOthersList();
     else if (activeTab === 'calc') html = renderCalculator();
     else html = renderStallionsList();
     app.innerHTML = html;
@@ -310,7 +318,7 @@
         results.forEach(function (h) {
           html += '<button type="button" class="search-result" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
             (h.imageUrl ? '<img src="' + L.esc(h.imageUrl) + '" alt="">' : '<span class="search-result-noimg"></span>') +
-            '<span>' + L.esc(h.name || 'Unnamed horse') + ' <span class="mono sub">#' + L.esc(h.lifeNumber) + '</span></span>' +
+            '<span>' + L.esc(h.name || 'Unnamed horse') + ' <span class="mono sub">#' + L.esc(h.lifeNumber) + '</span>' + (state.horseMeta[h.lifeNumber] && state.horseMeta[h.lifeNumber].tracked ? ' <span class="tag">Other Horses</span>' : '') + '</span>' +
           '</button>';
         });
       } else {
@@ -324,6 +332,7 @@
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
         '<button class="tab-btn' + (activeTab === 'young' ? ' active' : '') + '" data-action="show-tab" data-tab="young">Colts &amp; Fillies</button>' +
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
+        '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
     return html;
@@ -333,7 +342,7 @@
     var info = state.horseInfo[selectedPassportLife];
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
-    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : '← Back to search') + '</button>';
+    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : '← Back to search') + '</button>';
     html += '<div class="detail-head"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
       '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
@@ -350,6 +359,8 @@
       '</div>' +
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
+    html += geneDetailsHtml(selectedPassportLife);
+    html += purchaseDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
     // record even though this raw passport cache doesn't know that — link
@@ -534,6 +545,7 @@
           (L.hasAny(privFee) ? '<div class="row"><span>Private fee</span><span class="v fee mono">' + L.moneyLine(privFee) + '</span></div>' : '') +
           '<div class="row"><span>Breedings</span><span class="v mono">' + a.count + '</span></div>' +
           '<div class="row"><span>Total earned</span><span class="v mono">' + L.moneyLine(a.totals) + '</span></div>' +
+          purchaseRowsHtml(s.lifeNumber) +
           '</div>';
       });
       html += '</div>';
@@ -690,6 +702,7 @@
           '<div class="row"><span>Succeeded</span><span class="v mono">' + (m.counts.Succeeded || 0) + '</span></div>' +
           '<div class="row"><span>Failed</span><span class="v mono">' + (m.counts.Failed || 0) + '</span></div>' +
           '<div class="row"><span>Foals born</span><span class="v mono">' + (m.counts['Foal Born'] || 0) + '</span></div>' +
+          purchaseRowsHtml(m.mareLifeNumber) +
         '</div>';
       });
       html += '</div>';
@@ -778,6 +791,9 @@
       '</div>' +
     '</div>';
 
+    html += geneDetailsHtml(m.mareLifeNumber);
+    html += purchaseDetailsHtml(m.mareLifeNumber);
+
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + m.records.length + '</div><div class="label">Breedings</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + (m.counts.Succeeded || 0) + '</div><div class="label">Succeeded</div></div>' +
@@ -811,21 +827,33 @@
     return html;
   }
 
+  function parseScores(text) {
+    return String(text || '').split(/[\s,;]+/).map(parseFloat).filter(function (n) { return isFinite(n) && n > 0; });
+  }
+  function bestScoreHtml(meta) {
+    var b = L.bestConformation(meta);
+    if (!b.best) return '';
+    var best = Math.round(b.best * 1000) / 1000;
+    return '<div class="sub" title="' + (b.fromPage ? 'Highest conformation score read from the horse\'s stats page' : 'Highest score you entered') + '">Best <strong>' + L.esc(best) + '</strong>' + (b.shows ? ' \u00b7 ' + b.shows + ' typed' : '') + (b.fromPage ? ' \u00b7 from stats page' : '') + '</div>';
+  }
   function herdRowHtml(h) {
     var info = h.info, meta = h.meta;
     var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : ''].filter(Boolean).join(' · ');
     var life = L.esc(h.lifeNumber);
+    var pic = horsePictureUrl(h.lifeNumber);
     return '<div class="herd-row">' +
-      '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
-      '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + '</span></div>' +
+      '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+      '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span></div>' +
+      '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
       '<div data-label="Status"><select class="pill-select ' + L.herdStatusClass(meta.status) + '" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
       '<div data-label="Project"><input type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
+      '<div data-label="Show scores"><span><input type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5" title="Conformation show scores, separated by commas">' + bestScoreHtml(meta) + '</span></div>' +
     '</div>';
   }
 
   function herdListHtml(horses) {
-    var html = '<div class="ledger"><div class="herd-head"><div>Horse</div><div>Details</div><div>Role</div><div>Status</div><div>Project</div></div><div class="card">';
+    var html = '<div class="ledger"><div class="herd-head"><div></div><div>Horse</div><div>Details</div><div>Role</div><div>Status</div><div>Project</div><div>Show scores</div></div><div class="card">';
     horses.forEach(function (h) { html += herdRowHtml(h); });
     return html + '</div></div>';
   }
@@ -839,6 +867,7 @@
     return '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">' +
       '<div class="field"><label for="hm-status">Status</label><select id="hm-status" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
       '<div class="field"><label for="hm-role">Role</label><select id="hm-role" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
+      '<div class="field"><label for="hm-scores">Conformation scores (typed — the stats page is read automatically)</label><input id="hm-scores" type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5">' + bestScoreHtml(meta) + '</div>' +
       '<div class="field"><label for="hm-project">Project</label><input id="hm-project" type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
     '</div>';
   }
@@ -897,6 +926,31 @@
     return html;
   }
 
+  // ---------- Other Horses ----------
+  // Horses added from the on-page prompt that someone else owns. They stay
+  // out of My Herd; the search box above also finds them.
+  function renderOthersList() {
+    var html = topHeaderHtml();
+    var horses = L.trackedOtherHorses(state);
+    html += '<div class="section-head"><h2>Other Horses</h2></div>';
+    if (!horses.length) {
+      return html + '<div class="empty"><h3>No other horses yet</h3><p>Open a horse that isn\'t yours on Horse Reality and choose "Add to ledger" in the box that appears.</p></div>';
+    }
+    html += '<div class="card">';
+    horses.forEach(function (info) {
+      var life = L.esc(info.lifeNumber);
+      var pic = horsePictureUrl(info.lifeNumber);
+      var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
+      html += '<div class="herd-row">' +
+        '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
+        '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
+        '<div><button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button></div>' +
+      '</div>';
+    });
+    return html + '</div>';
+  }
+
   // ---------- Foal Calculator ----------
   // Pure computation over horses already cached in state.horseInfo — no new
   // network calls. Inbreeding is only as complete as the cached pedigree, so
@@ -913,7 +967,7 @@
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
     var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).map(function (life) {
-      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life] };
+      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]) };
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });
     function group(label, list) {
       if (!list.length) return '';
@@ -922,19 +976,192 @@
       }).join('') + '</optgroup>';
     }
     return '<option value="">Choose…</option>' +
-      group('Your horses', rows.filter(function (r) { return r.mine; })) +
-      group('Other cached horses', rows.filter(function (r) { return !r.mine; }));
+      group('Your horses · 3 and older', rows.filter(function (r) { return r.mine && !r.young; })) +
+      group('Other horses · 3 and older', rows.filter(function (r) { return !r.mine && !r.young; })) +
+      group('Your horses · Under 3', rows.filter(function (r) { return r.mine && r.young; })) +
+      group('Other horses · Under 3', rows.filter(function (r) { return !r.mine && r.young; }));
   }
   function ancestorLabel(life) {
     var name = L.ancestorName(state, life);
     return (name ? L.esc(name) + ' ' : '') + '<span class="mono sub">#' + L.esc(life) + '</span>';
   }
-  function parentLineHtml(label, life) {
+  // Saved picture for a horse: the passport cache first, else the tracked
+  // stallion record's own copy. The image server serves plain <img> loads.
+  function horsePictureUrl(life) {
     var info = state.horseInfo[life] || {};
-    return '<p class="notes-line"><strong>' + label + ':</strong> ' + L.esc(info.name || ('#' + life)) +
-      (info.geneticPotential != null ? ' · GP ' + L.esc(info.geneticPotential) : '') +
-      (info.conformation ? ' · ' + L.esc(info.conformation) : '') +
-      (info.breed ? ' · ' + L.esc(info.breed) : '') + '</p>';
+    if (info.imageUrl) return info.imageUrl;
+    var rec = state.stallions.find(function (x) { return String(x.lifeNumber) === String(life); });
+    return (rec && rec.imageUrl) || '';
+  }
+  function parentCardHtml(label, life) {
+    var info = state.horseInfo[life] || {};
+    var pic = horsePictureUrl(life);
+    var facts = [];
+    if (info.breed) facts.push(L.esc(info.breed));
+    if (info.geneticPotential != null) facts.push('GP ' + L.esc(info.geneticPotential));
+    if (info.conformation) facts.push(L.esc(info.conformation));
+    var genes = savedGenesText(life);
+    return '<div class="card" style="padding:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+      (pic ? '<img src="' + L.esc(pic) + '" alt="" referrerpolicy="no-referrer" style="width:150px;max-width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:9px;background:var(--surface-2);flex-shrink:0;">'
+           : '<div style="width:150px;max-width:100%;aspect-ratio:4/3;border-radius:9px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;flex-shrink:0;">No picture yet</div>') +
+      '<div style="min-width:0;flex:1;">' +
+        '<div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">' + label + '</div>' +
+        '<h3 style="margin:2px 0 4px;font-size:19px;">' + L.esc(info.name || ('#' + life)) + '</h3>' +
+        '<div class="mono sub" style="color:var(--text-muted);font-size:12px;">#' + L.esc(life) + '</div>' +
+        (facts.length ? '<div style="font-size:13px;margin-top:6px;">' + facts.join(' · ') + '</div>' : '') +
+        ((info.testedColours || genes) ? '<div class="mono" style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + L.esc([info.testedColours, genes].filter(Boolean).join(' · ')) + '</div>' : '') +
+      '</div></div>';
+  }
+
+  // Side-by-side stats for the two parents. Rows where the parents differ are
+  // highlighted, and where a higher or lower value is clearly better the
+  // stronger parent is marked. Only values both horses have are compared.
+  function statNumber(text) {
+    var m = /-?\d+(?:\.\d+)?/.exec(String(text == null ? '' : text));
+    return m ? parseFloat(m[0]) : null;
+  }
+  function statsCompareHtml(mareLife, studLife) {
+    var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
+    var mareConf = L.parseConformation(mare.conformation), studConf = L.parseConformation(stud.conformation);
+    function confText(c, raw) {
+      return c.ok ? L.esc(raw) + '<div class="sub" style="color:var(--text-muted);font-size:12px;">' + c.G + ' good \u00b7 ' + c.A + ' average \u00b7 ' + c.BA + ' below average</div>' : '';
+    }
+    function age(info) { var m = L.effectiveAgeMonths(info); return m == null ? null : m; }
+    var rows = [
+      { label: 'Genetic potential', a: mare.geneticPotential, b: stud.geneticPotential, num: true, better: 'high' },
+      { label: 'Conformation', aHtml: confText(mareConf, mare.conformation), bHtml: confText(studConf, stud.conformation),
+        aKey: mareConf.ok ? mare.conformation : null, bKey: studConf.ok ? stud.conformation : null,
+        aScore: mareConf.G - mareConf.BA, bScore: studConf.G - studConf.BA, better: 'high' },
+      { label: 'Best conformation show score', a: L.bestConformation(L.herdMeta(state, mareLife)).best || null, b: L.bestConformation(L.herdMeta(state, studLife)).best || null, num: true, better: 'high' },
+      { label: 'Inbreeding (COI)', a: mare.coi, b: stud.coi, num: true, better: 'low', fmt: function (v, info) { return info.coiRaw || (v + '%'); } },
+      { label: 'Height', a: statNumber(mare.height), b: statNumber(stud.height), num: true, fmt: function (v, info) { return info.height || (v + ' cm'); } },
+      { label: 'Age', a: age(mare), b: age(stud), num: true, fmt: function (v) { return L.formatAgeMonths(v); } },
+      { label: 'Breed', a: mare.breed, b: stud.breed },
+      { label: 'Location', a: mare.location, b: stud.location },
+      { label: 'Training', a: mare.training, b: stud.training },
+      { label: 'Predicates', a: mare.predicates, b: stud.predicates }
+    ];
+    var html = '';
+    var diffs = 0;
+    rows.forEach(function (r) {
+      var aVal = r.aKey !== undefined ? r.aKey : r.a, bVal = r.bKey !== undefined ? r.bKey : r.b;
+      var hasA = aVal != null && aVal !== '', hasB = bVal != null && bVal !== '';
+      if (!hasA && !hasB) return;
+      var different = hasA && hasB && String(aVal).trim().toLowerCase() !== String(bVal).trim().toLowerCase();
+      var aBetter = false, bBetter = false;
+      if (different && r.better) {
+        var sa = r.aScore != null ? r.aScore : Number(aVal), sb = r.bScore != null ? r.bScore : Number(bVal);
+        if (isFinite(sa) && isFinite(sb) && sa !== sb) {
+          var highWins = r.better === 'high';
+          aBetter = highWins ? sa > sb : sa < sb;
+          bBetter = !aBetter;
+        }
+      }
+      if (different) diffs++;
+      function cell(has, val, rawVal, htmlOverride, better, info) {
+        var shown = !has ? '<span style="color:var(--text-muted);">\u2014</span>'
+          : (htmlOverride ? htmlOverride : L.esc(r.fmt ? r.fmt(rawVal, info) : (r.num ? Math.round(Number(val) * 1000) / 1000 : val)));
+        return '<div style="' + (better ? 'font-weight:700;' : '') + '">' + shown + (better ? ' <span title="Stronger parent for this stat" style="color:var(--success);font-size:12px;">\u25b2</span>' : '') + '</div>';
+      }
+      html += '<div style="display:grid;grid-template-columns:minmax(120px,1fr) 1.3fr 1.3fr;gap:12px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--border);font-size:13.5px;' +
+        (different ? 'background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn);' : '') + '">' +
+        '<div style="color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;">' + L.esc(r.label) + (different ? ' <span title="The parents differ here" style="color:var(--warn);">\u2260</span>' : '') + '</div>' +
+        cell(hasA, r.a, r.a, r.aHtml, aBetter, mare) + cell(hasB, r.b, r.b, r.bHtml, bBetter, stud) + '</div>';
+    });
+    if (!html) return '';
+    return '<div class="section-head"><h2>Parent stats</h2></div>' +
+      '<div class="card" style="overflow:hidden;margin-bottom:8px;"><div style="display:grid;grid-template-columns:minmax(120px,1fr) 1.3fr 1.3fr;gap:12px;padding:10px 14px;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">' +
+        '<div></div><div>' + L.esc(mare.name || 'Mare') + '</div><div>' + L.esc(stud.name || 'Stallion') + '</div></div>' + html + '</div>' +
+      '<p class="notes-line" style="margin-bottom:16px;">' + (diffs ? diffs + ' stat' + (diffs === 1 ? '' : 's') + ' differ (highlighted \u2260). ' : 'No differences found. ') +
+      '\u25b2 marks the stronger parent where higher or lower is clearly better.</p>';
+  }
+
+  // Trait-by-trait conformation comparison (Good / Average / Below average),
+  // captured from each horse's own page. Differing traits are highlighted.
+  var CONF_TRAITS = ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters', 'Socks'];
+  function ratingRank(text) {
+    var t = String(text || '').toLowerCase();
+    if (/below|poor|bad/.test(t)) return 1;
+    if (/average/.test(t)) return 2;
+    if (/good/.test(t)) return 3;
+    if (/excellent|great|superb/.test(t)) return 4;
+    return null;
+  }
+  function ratingChipHtml(text) {
+    var rank = ratingRank(text);
+    var colour = rank === 3 || rank === 4 ? ['var(--success-bg)', 'var(--success)'] : (rank === 1 ? ['var(--danger-bg)', 'var(--danger)'] : ['var(--warn-bg)', 'var(--warn)']);
+    return '<span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:' + colour[0] + ';color:' + colour[1] + ';">' + L.esc(text) + '</span>';
+  }
+  function traitsCompareHtml(mareLife, studLife) {
+    var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
+    var mt = mare.confTraits || null, st = stud.confTraits || null;
+    var html = '<div class="section-head"><h2>Conformation traits</h2></div>';
+    if (!mt && !st) {
+      return html + '<div class="empty" style="text-align:left;margin-bottom:16px;"><p style="margin:0;">Trait ratings are read from each horse\'s own page on Horse Reality (the conformation table). Open both horses\' pages once and they\'ll appear here.</p></div>';
+    }
+    var names = CONF_TRAITS.filter(function (n) { return (mt && mt[n]) || (st && st[n]); });
+    [mt, st].forEach(function (t) { Object.keys(t || {}).forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); }); });
+    var diffs = 0;
+    var head = '<div style="display:grid;grid-template-columns:minmax(110px,1fr) 1.3fr 1.3fr;gap:12px;padding:10px 14px;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">' +
+      '<div></div><div>' + L.esc(mare.name || 'Mare') + '</div><div>' + L.esc(stud.name || 'Stallion') + '</div></div>';
+    var rowsHtml = names.map(function (n) {
+      var a = mt && mt[n], b = st && st[n];
+      var different = !!(a && b && String(a).trim().toLowerCase() !== String(b).trim().toLowerCase());
+      var ra = ratingRank(a), rb = ratingRank(b);
+      var aBetter = different && ra != null && rb != null && ra > rb, bBetter = different && ra != null && rb != null && rb > ra;
+      if (different) diffs++;
+      function cell(v, better) {
+        return '<div>' + (v ? ratingChipHtml(v) : '<span style="color:var(--text-muted);">\u2014</span>') +
+          (better ? ' <span title="Stronger parent for this trait" style="color:var(--success);font-size:12px;">\u25b2</span>' : '') + '</div>';
+      }
+      return '<div style="display:grid;grid-template-columns:minmax(110px,1fr) 1.3fr 1.3fr;gap:12px;align-items:center;padding:7px 14px;border-top:1px solid var(--border);font-size:13.5px;' +
+        (different ? 'background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn);' : '') + '">' +
+        '<div style="font-weight:600;">' + L.esc(n) + (different ? ' <span title="The parents differ here" style="color:var(--warn);">\u2260</span>' : '') + '</div>' +
+        cell(a, aBetter) + cell(b, bBetter) + '</div>';
+    }).join('');
+    var missing = [];
+    if (!mt) missing.push(mare.name || 'the mare');
+    if (!st) missing.push(stud.name || 'the stallion');
+    return html + '<div class="card" style="overflow:hidden;margin-bottom:8px;">' + head + rowsHtml + '</div>' +
+      '<p class="notes-line" style="margin-bottom:16px;">' + (diffs ? diffs + ' of ' + names.length + ' traits differ (highlighted \u2260). ' : 'No differing traits. ') +
+      '\u25b2 marks the stronger parent.' + (missing.length ? ' Not captured yet for ' + L.esc(missing.join(' and ')) + ' \u2014 open that horse\'s page on Horse Reality.' : '') + '</p>';
+  }
+
+  // The foal's pedigree: sire on top, dam below, each side expanded as far
+  // back as the cached pedigrees reach. Ancestors that appear on BOTH sides
+  // (the inbreeding check's shared ancestors) are outlined in red.
+  function pedBoxHtml(n, shared) {
+    var isShared = shared[n.life];
+    var label = n.name ? L.esc(n.name) : '<span style="color:var(--text-muted);">#' + L.esc(n.life) + '</span>';
+    return '<div style="border:1px solid ' + (isShared ? 'var(--danger)' : 'var(--border)') + ';background:' + (isShared ? 'var(--danger-bg)' : 'var(--surface)') +
+      ';border-radius:8px;padding:5px 8px;font-size:12.5px;line-height:1.25;width:150px;box-sizing:border-box;">' + label +
+      (n.name ? '<div class="mono" style="font-size:10.5px;color:var(--text-muted);">#' + L.esc(n.life) + (n.cached ? '' : ' · not cached') + '</div>' : '') + '</div>';
+  }
+  function pedNodeHtml(n, shared) {
+    var kids = [];
+    if (n.s) kids.push(pedNodeHtml(n.s, shared));
+    if (n.d) kids.push(pedNodeHtml(n.d, shared));
+    return '<div style="display:flex;align-items:stretch;">' +
+      '<div style="display:flex;align-items:center;padding:3px 10px 3px 0;">' + pedBoxHtml(n, shared) + '</div>' +
+      (kids.length ? '<div style="display:flex;flex-direction:column;justify-content:space-around;">' + kids.join('') + '</div>' : '') +
+    '</div>';
+  }
+  function foalPedigreeHtml(studLife, mareLife, common) {
+    var shared = {};
+    common.forEach(function (c) { shared[c.life] = true; });
+    var tree = {
+      life: 'foal', name: 'Foal', cached: true,
+      s: L.pedigreeTreeOf(state, studLife, CALC_GENERATIONS),
+      d: L.pedigreeTreeOf(state, mareLife, CALC_GENERATIONS)
+    };
+    var rootBox = '<div style="border:1px dashed var(--border-strong);background:var(--surface-2);border-radius:8px;padding:5px 8px;font-size:12.5px;width:110px;box-sizing:border-box;">' +
+      '<strong>Foal</strong><div style="font-size:10.5px;color:var(--text-muted);">' + L.esc(L.ancestorName(state, mareLife) || 'Mare') + ' × ' + L.esc(L.ancestorName(state, studLife) || 'Stallion') + '</div></div>';
+    var inner = '<div style="display:flex;flex-direction:column;justify-content:space-around;">' + pedNodeHtml(tree.s, shared) + pedNodeHtml(tree.d, shared) + '</div>';
+    return '<div class="section-head"><h2>Foal pedigree</h2></div>' +
+      '<div class="card" style="padding:14px;overflow-x:auto;margin-bottom:16px;"><div style="display:flex;align-items:stretch;min-width:max-content;">' +
+        '<div style="display:flex;align-items:center;padding-right:10px;">' + rootBox + '</div>' + inner +
+      '</div></div>' +
+      '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet — visit their pages to fill them in.</p>';
   }
 
   function renderCalculator() {
@@ -967,7 +1194,11 @@
       '<div class="stat-tile"><div class="num mono multi">Stallion ' + a.depth + ' · Mare ' + b.depth + '</div><div class="label">Generations known</div></div>' +
       '</div>';
 
-    html += parentLineHtml('Mare', calcMare) + parentLineHtml('Stallion', calcStallion);
+    html += '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px;">' +
+      parentCardHtml('Mare', calcMare) + parentCardHtml('Stallion', calcStallion) + '</div>';
+    html += statsCompareHtml(calcMare, calcStallion);
+    html += traitsCompareHtml(calcMare, calcStallion);
+    html += foalPedigreeHtml(calcStallion, calcMare, common);
 
     if (common.length) {
       html += '<div class="empty" style="border-color:var(--danger);text-align:left;margin:16px 0;">' +
@@ -991,6 +1222,171 @@
         '<p style="margin-top:0;">' + uniq.length + ' ancestor' + (uniq.length === 1 ? '' : 's') + ' haven\'t been cached, so this check can\'t rule out inbreeding through them. Visit their pages on Horse Reality to fill the gap:</p>' +
         '<p class="notes-line">' + uniq.map(function (g) { return ancestorLabel(g.life); }).join(' · ') + '</p></div>';
     }
+
+    html += colourSectionHtml(calcStallion, calcMare);
+    return html;
+  }
+
+  // ---------- Foal Calculator: colour odds ----------
+  function pctText(p) { return (Math.round(p * 10) / 10) + '%'; }
+  function oddsRowHtml(label, pct, sub) {
+    return '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:7px 12px;border-top:1px solid var(--border);' +
+      'background:linear-gradient(to right,var(--accent-soft) ' + Math.min(100, pct) + '%,transparent ' + Math.min(100, pct) + '%);">' +
+      '<span>' + L.esc(label) + (sub ? ' <span class="sub" style="color:var(--text-muted);font-size:12px;">' + L.esc(sub) + '</span>' : '') + '</span>' +
+      '<span class="mono" style="font-weight:600;">' + pctText(pct) + '</span></div>';
+  }
+  function oddsCardHtml(title, rowsHtml) {
+    return '<div style="margin-bottom:16px;"><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">' + L.esc(title) + '</div>' +
+      '<div class="card" style="overflow:hidden;">' + rowsHtml + '</div></div>';
+  }
+  // Select per hand-entered gene for one horse. A gene Horse Reality itself
+  // reports for that horse is shown read-only instead.
+  function geneEditorHtml(lifeNumber, title) {
+    var info = state.horseInfo[lifeNumber] || {};
+    var tested = L.parseColourGenes(info.testedColours);
+    var manual = L.manualGenes(state, lifeNumber);
+    var life = L.esc(lifeNumber);
+    var html = '<div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">' + L.esc(title) + ' — ' + L.esc(info.name || ('#' + lifeNumber)) + '</div>' +
+      '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">';
+    L.EXTRA_LOCI.forEach(function (l) {
+      var id = 'gene-' + life + '-' + l.id;
+      html += '<div class="field"><label for="' + id + '">' + L.esc(l.name) + '</label>';
+      if (tested[l.id]) {
+        html += '<select id="' + id + '" disabled><option>' + L.esc(tested[l.id].join(' / ')) + ' (from Horse Reality)</option></select>';
+      } else {
+        var cur = manual[l.id] ? manual[l.id].join('/') : '';
+        html += '<select id="' + id + '" data-action="horse-gene" data-life="' + life + '" data-locus="' + L.esc(l.id) + '">' +
+          '<option value=""' + (cur ? '' : ' selected') + '>Not present (default)</option>' +
+          L.extraGenotypeOptions(l).map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') +
+        '</select>';
+      }
+      html += '</div>';
+    });
+    return html + '</div></div>';
+  }
+
+  // ---------- purchase price & shipping ----------
+  function purchaseParts(lifeNumber) {
+    var p = L.purchaseOf(state, lifeNumber);
+    if (!p) return null;
+    var parts = { paid: p.price ? L.fmtMoney(p.price) + ' ' + p.currency : '', ship: p.shipping ? L.fmtMoney(p.shipping) + ' ' + p.shippingCurrency : '', total: '' };
+    if (p.price && p.shipping && p.currency === p.shippingCurrency) parts.total = L.fmtMoney(p.price + p.shipping) + ' ' + p.currency;
+    return parts;
+  }
+  // tags for a horse's page header
+  function purchaseTagsHtml(lifeNumber) {
+    var p = purchaseParts(lifeNumber);
+    if (!p) return '';
+    return (p.paid ? '<span class="tag mono" title="What you paid for this horse">Paid ' + L.esc(p.paid) + '</span>' : '') +
+      (p.ship ? '<span class="tag mono" title="Shipping fee">Shipping ' + L.esc(p.ship) + '</span>' : '') +
+      (p.total ? '<span class="tag mono" title="Price plus shipping">Total ' + L.esc(p.total) + '</span>' : '');
+  }
+  // rows for the stallion / mare cards
+  function purchaseRowsHtml(lifeNumber) {
+    var p = purchaseParts(lifeNumber);
+    if (!p) return '';
+    return (p.paid ? '<div class="row"><span>Paid</span><span class="v fee mono">' + L.esc(p.paid) + '</span></div>' : '') +
+      (p.ship ? '<div class="row"><span>Shipping</span><span class="v fee mono">' + L.esc(p.ship) + '</span></div>' : '');
+  }
+  // one small line under a horse's name in My Herd
+  function purchaseSubHtml(lifeNumber) {
+    var p = purchaseParts(lifeNumber);
+    if (!p) return '';
+    return '<div class="sub" style="color:var(--text-muted);">' + (p.paid ? 'Paid ' + L.esc(p.paid) : '') + (p.ship ? (p.paid ? ' + ' : '') + L.esc(p.ship) + ' shipping' : '') + '</div>';
+  }
+  function setHorsePurchase(lifeNumber, field, value) {
+    if (!lifeNumber || !field) return;
+    var meta = state.horseMeta[lifeNumber] = Object.assign({}, state.horseMeta[lifeNumber]);
+    meta.purchase = Object.assign({}, meta.purchase);
+    if (field === 'price' || field === 'shipping') {
+      var n = parseFloat(value);
+      if (isFinite(n) && n > 0) meta.purchase[field] = n; else delete meta.purchase[field];
+    } else {
+      meta.purchase[field] = value;
+    }
+    persist();
+  }
+  function purchaseDetailsHtml(lifeNumber) {
+    if (!lifeNumber) return '';
+    var meta = (state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].purchase) || {};
+    var parts = purchaseParts(lifeNumber);
+    var life = L.esc(lifeNumber);
+    function money(label, field, curField, curValue) {
+      var id = 'buy-' + life + '-' + field;
+      return '<div class="field"><label for="' + id + '">' + label + '</label>' +
+        '<div style="display:flex;gap:8px;"><input id="' + id + '" type="number" min="0" step="any" data-action="horse-purchase" data-life="' + life + '" data-field="' + field + '" value="' + (meta[field] ? L.esc(meta[field]) : '') + '" placeholder="0" style="flex:1;min-width:0;">' +
+        '<select data-action="horse-purchase" data-life="' + life + '" data-field="' + curField + '" aria-label="' + label + ' currency">' +
+          L.CURRENCIES.map(function (c) { return '<option' + (c === (curValue || 'HRC') ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
+        '</select></div></div>';
+    }
+    return '<details style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Purchase price &amp; shipping — ' +
+      (parts ? L.esc([parts.paid ? 'paid ' + parts.paid : '', parts.ship ? parts.ship + ' shipping' : ''].filter(Boolean).join(' + ')) : 'not recorded') + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">' +
+        money('Price paid', 'price', 'currency', meta.currency) +
+        money('Shipping fee', 'shipping', 'shippingCurrency', meta.shippingCurrency) +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Leave both empty for a horse you bred or weren\'t charged for.</p>' +
+      '</div></details>';
+  }
+
+  // Short text of the hand-entered genes saved on a horse, e.g. "Sooty Sty / sty".
+  function savedGenesText(lifeNumber) {
+    var manual = L.manualGenes(state, lifeNumber);
+    return L.EXTRA_LOCI.filter(function (l) { return manual[l.id]; }).map(function (l) {
+      return l.name.replace(/ \(.*\)$/, '') + ' ' + manual[l.id].join(' / ');
+    }).join(', ');
+  }
+  // The same editor the calculator uses, tucked under a horse's own page so
+  // genes are set once on the horse and reused for every pairing.
+  function geneDetailsHtml(lifeNumber) {
+    if (!lifeNumber || !state.horseInfo[lifeNumber]) return '';
+    var saved = savedGenesText(lifeNumber);
+    return '<details style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen…) — ' +
+      (saved ? L.esc(saved) : 'none entered yet') + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;">' +
+      geneEditorHtml(lifeNumber, 'Saved on this horse') +
+      '<p class="notes-line" style="margin:0;">Saved once here and used automatically by the Foal Calculator whenever this horse is a parent.</p>' +
+      '</div></details>';
+  }
+
+  function colourSectionHtml(studLife, mareLife) {
+    var studInfo = state.horseInfo[studLife], mareInfo = state.horseInfo[mareLife];
+    var c = L.colourOutcomes(studInfo.testedColours, mareInfo.testedColours, L.manualGenes(state, studLife), L.manualGenes(state, mareLife));
+    var html = '<div class="section-head"><h2>Colour possibilities</h2></div>';
+    html += '<details style="margin-bottom:14px;"' + (c.genes.length ? '' : ' open') + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Enter extra genes by hand (Sooty, Silver, Flaxen, Champagne, Roan, Tobiano, Sabino)</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:16px;">' +
+      geneEditorHtml(mareLife, 'Mare') + geneEditorHtml(studLife, 'Stallion') +
+      '<p class="notes-line" style="margin:0;">Horse Reality doesn\'t list these genes, so set them for each parent if you know them. Anything you leave unset counts as not present. Saved per horse and included in backups.</p>' +
+      '</div></details>';
+    if (!c.genes.length) {
+      return html + '<div class="empty"><h3>No shared colour tests</h3>' +
+        '<p>Colour odds need genes that are tested on <em>both</em> parents. Visit both horses\' pages on Horse Reality so their tested colours are cached.</p></div>';
+    }
+    if (c.colours) {
+      html += oddsCardHtml('Coat colour', c.colours.map(function (o) { return oddsRowHtml(o.label, o.pct); }).join(''));
+      if (!c.baseKnown) {
+        html += '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">The base colour can\'t be named because the Extension (E) gene isn\'t tested on both parents, so only the other known genes are combined.</p>';
+      }
+    } else {
+      html += '<div class="empty" style="text-align:left;margin-bottom:16px;"><p style="margin:0;">Base coat colour needs the Extension (E) gene tested on both parents.</p></div>';
+    }
+    if (c.patterns) {
+      html += oddsCardHtml('Appaloosa pattern', c.patterns.map(function (o) { return oddsRowHtml(o.label, o.pct); }).join(''));
+    }
+    if (c.extras.length) {
+      html += oddsCardHtml('Extra genes — chance the foal shows each', c.extras.map(function (g) {
+        var split = g.outcomes.map(function (o) { return o.genotype + ' ' + pctText(o.pct); }).join(' · ');
+        return oddsRowHtml(g.label, g.pct, split + (g.note ? ' — ' + g.note : ''));
+      }).join(''));
+    }
+    html += '<details style="margin-bottom:12px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Gene-by-gene odds</summary>';
+    c.genes.forEach(function (g) {
+      html += oddsCardHtml(g.name, g.outcomes.map(function (o) { return oddsRowHtml(o.genotype, o.pct, o.effect); }).join(''));
+    });
+    html += '</details>';
+    if (c.untested.length) {
+      html += '<p class="notes-line">Not known on both parents, so left out: ' + L.esc(c.untested.join(', ')) + '.</p>';
+    }
+    html += '<p class="notes-line">Assumes each gene is passed on independently, 50% from each parent. Extra genes you haven\'t set count as not present. Colour names follow standard equine genetics; Horse Reality may label some combinations differently.</p>';
     return html;
   }
 
@@ -1004,6 +1400,10 @@
     if (info.geneticPotential != null) tags.push('<span class="tag mono">GP ' + L.esc(info.geneticPotential) + '</span>');
     if (info.conformation) tags.push('<span class="tag mono">' + L.esc(info.conformation) + '</span>');
     if (info.testedColours) tags.push('<span class="tag mono">' + L.esc(info.testedColours) + '</span>');
+    var extraGenes = info.lifeNumber ? savedGenesText(info.lifeNumber) : '';
+    if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');
+    var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
+    if (paidTags) tags.push(paidTags);
     if (info.training) tags.push('<span class="tag">' + L.esc(info.training) + '</span>');
     if (info.predicates) tags.push('<span class="tag">' + L.esc(info.predicates) + '</span>');
     if (info.height) tags.push('<span class="tag">' + L.esc(info.height) + '</span>');
@@ -1112,6 +1512,9 @@
       '</div>';
     }
 
+    html += geneDetailsHtml(s.lifeNumber);
+    html += purchaseDetailsHtml(s.lifeNumber);
+
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + breedings.length + '</div><div class="label">Breedings</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + stallionMareCount + '</div><div class="label">Mares</div></div>' +
@@ -1178,6 +1581,7 @@
       else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
       else if (action === 'close-passport') { selectedPassportLife = null; render(); }
       else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
+      else if (action === 'untrack-horse') { setHorseMeta(t.getAttribute('data-life'), { tracked: false }); }
       else if (action === 'toggle-archive') { showArchive = !showArchive; render(); }
       else if (action === 'nav-stallion') {
         var ownedNav = getOwnedStallions();
@@ -1364,7 +1768,10 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; render(); }
+      else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }
       else if (action === 'herd-status') { setHorseMeta(t.getAttribute('data-life'), { status: t.value }); }
+      else if (action === 'herd-scores') { setHorseMeta(t.getAttribute('data-life'), { confScores: parseScores(t.value) }); }
       else if (action === 'herd-role') { setHorseMeta(t.getAttribute('data-life'), { role: t.value }); }
       else if (action === 'herd-project') { setHorseMeta(t.getAttribute('data-life'), { project: t.value.trim() }); }
       else if (action === 'herd-filter-role') { herdRoleFilter = t.value; render(); }
@@ -1375,6 +1782,7 @@
       }
       else if (action === 'update-username') {
         state.settings.myUsername = t.value.trim();
+        L.adoptOwnedStallions(state);
         persist();
       }
     };
@@ -1383,7 +1791,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    if (L.promoteOwnedStubs(state)) { persist(); return; }
+    if (L.adoptOwnedStallions(state)) { persist(); return; }
     recompute();
     render();
   });

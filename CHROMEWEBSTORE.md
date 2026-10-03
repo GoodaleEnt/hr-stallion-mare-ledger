@@ -120,7 +120,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 - A mobile userscript build lives in `mobile/` and is not part of the store package.
 
 ### Before submitting
-- [ ] Test: with the dashboard open, click the toolbar icon from another tab — it must focus the existing dashboard, not open a second (1.8.4 uses runtime.getContexts, no `tabs` permission). If it fails, restore `tabs`.
+- [x] Tested: with the dashboard open, the toolbar icon focuses it (1.8.4, runtime.getContexts, no `tabs` permission).
 - [ ] Push so the privacy policy URL is live.
 - [x] Publisher name and contact email filled in.
 - [ ] Build the ZIP with `powershell -ExecutionPolicy Bypass -File package.ps1` (ships only the files the extension runs from).

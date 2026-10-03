@@ -144,6 +144,36 @@
     return out;
   }
 
+  // Purchases show up on the bank page as OUTgoing rows: "You have bought
+  // <horse> from <seller> for 50 000 HRC and paid an additional 500 HRC for
+  // transport." Only the horse link, price and (optional) transport fee are
+  // needed. Amounts use spaces/NBSP as thousands separators.
+  function parseAmountAndCurrency(m, fallback) {
+    var amount = parseInt(m[1].replace(/\D/g, ''), 10);
+    var cur = (m[2] || '').toUpperCase();
+    return { amount: isNaN(amount) ? 0 : amount, currency: (HRLib.CURRENCIES || []).indexOf(cur) > -1 ? cur : fallback };
+  }
+  function scrapePurchases() {
+    var out = [];
+    document.querySelectorAll('tr.bank-table').forEach(function (row) {
+      var cells = row.querySelectorAll('td');
+      if (cells.length < 4 || cleanText(cells[0]) !== 'OUT') return;
+      var text = cleanText(cells[2]);
+      if (text.indexOf('You have bought') === -1) return;
+      var horseA = cells[2].querySelector('a');
+      var life = horseA ? lifeNumberFromUrl(horseA.href) : '';
+      if (!life) return;
+      var fallback = currencyFromCell(cells[1]);
+      var price = text.match(/ for ([\d\s ,.]+?)\s*([A-Za-z]{2,4})/);
+      if (!price) return;
+      var ship = text.match(/additional ([\d\s ,.]+?)\s*([A-Za-z]{2,4}) for transport/);
+      var p = parseAmountAndCurrency(price, fallback);
+      var sh = ship ? parseAmountAndCurrency(ship, fallback) : { amount: 0, currency: fallback };
+      out.push({ lifeNumber: life, name: parseHorseLabel(horseA), price: p.amount, currency: p.currency, shipping: sh.amount, shippingCurrency: sh.currency });
+    });
+    return out;
+  }
+
   // --- Source 3: Horse Reality's own horse-detail JSON API ---
   // Names look like "!ↆMonte Cristo|f?" in both the API and the rendered
   // page — the display name is always the first "|"-separated segment once
@@ -422,10 +452,11 @@
     var offspring = scrapeOffspringRows();
     var bank = scrapeBankRows();
     var failedCoverings = scrapeFailedCoverings();
-    if (!offspring.length && !bank.length && !failedCoverings.length) return;
+    var purchases = scrapePurchases();
+    if (!offspring.length && !bank.length && !failedCoverings.length && !purchases.length) return;
 
     HRStorage.getState(function (state) {
-      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0;
+      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0, purchasesSaved = 0;
       var offspringStallionId = null;
 
       // Bank transactions are the one page that PROVES the stud is yours
@@ -503,13 +534,25 @@
         failuresMarked++;
       });
 
-      if (added || updated || newStuds || failuresMarked) {
+      // What you paid for a horse. Never overwrites a figure you typed in
+      // yourself — only fills in a price/shipping that isn't recorded yet.
+      purchases.forEach(function (pu) {
+        var meta = state.horseMeta[pu.lifeNumber] = Object.assign({}, state.horseMeta[pu.lifeNumber]);
+        var rec = meta.purchase = Object.assign({}, meta.purchase);
+        var changed = false;
+        if (pu.price && !rec.price) { rec.price = pu.price; rec.currency = pu.currency; changed = true; }
+        if (pu.shipping && !rec.shipping) { rec.shipping = pu.shipping; rec.shippingCurrency = pu.shippingCurrency; changed = true; }
+        if (changed) purchasesSaved++;
+      });
+
+      if (added || updated || newStuds || failuresMarked || purchasesSaved) {
         HRStorage.setState(state, function () {
           var parts = [];
           if (added) parts.push(added + ' new');
           if (updated) parts.push(updated + ' updated');
           if (newStuds) parts.push(newStuds + ' new stud' + (newStuds === 1 ? '' : 's'));
           if (failuresMarked) parts.push(failuresMarked + ' marked failed');
+          if (purchasesSaved) parts.push(purchasesSaved + ' purchase' + (purchasesSaved === 1 ? '' : 's') + ' recorded');
           if (parts.length) showToast('HR Ledger: ' + parts.join(', '));
         });
       }

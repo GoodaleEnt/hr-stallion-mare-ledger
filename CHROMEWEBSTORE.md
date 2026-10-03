@@ -107,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Draft |
 | 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Draft |
 | 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Draft |
 | 1.8.1 | 2026-10-03 | Docs for Other Horses tab | Draft |
@@ -119,7 +120,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 - A mobile userscript build lives in `mobile/` and is not part of the store package.
 
 ### Before submitting
-- [x] `tabs` removed (1.8.2). Test: click the toolbar icon twice and confirm the existing dashboard tab is focused rather than duplicated.
+- [ ] Test: with the dashboard open, click the toolbar icon from another tab — it must focus the existing dashboard, not open a second (1.8.4 uses runtime.getContexts, no `tabs` permission). If it fails, restore `tabs`.
 - [ ] Push so the privacy policy URL is live.
 - [x] Publisher name and contact email filled in.
 - [ ] Build the ZIP with `powershell -ExecutionPolicy Bypass -File package.ps1` (ships only the files the extension runs from).

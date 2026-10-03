@@ -36,16 +36,22 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
 });
 refreshReviewBadge();
 
-chrome.action.onClicked.addListener(function () {
+// Focuses the dashboard if it's already open instead of opening a second
+// copy. chrome.tabs.query({ url }) can't see a tab's URL without the "tabs"
+// permission, so ask the runtime which pages of THIS extension are open
+// (runtime.getContexts needs no permission and reports tabId/windowId).
+chrome.action.onClicked.addListener(async function () {
   var url = chrome.runtime.getURL('dashboard.html');
-  chrome.tabs.query({ url: url }, function (tabs) {
-    if (tabs && tabs.length) {
-      chrome.tabs.update(tabs[0].id, { active: true });
-      chrome.windows.update(tabs[0].windowId, { focused: true });
-    } else {
-      chrome.tabs.create({ url: url });
+  try {
+    var contexts = await chrome.runtime.getContexts({ contextTypes: ['TAB'] });
+    var open = contexts.find(function (c) { return c.documentUrl === url && c.tabId >= 0; });
+    if (open) {
+      await chrome.tabs.update(open.tabId, { active: true });
+      await chrome.windows.update(open.windowId, { focused: true });
+      return;
     }
-  });
+  } catch (e) { /* fall through and open a new tab */ }
+  chrome.tabs.create({ url: url });
 });
 
 // Content scripts' own fetch() is still bound by the page's CORS policy, so

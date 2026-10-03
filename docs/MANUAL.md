@@ -17,12 +17,13 @@ A visual walkthrough of installing and using the extension. For a quick technica
 9. [My Mares](#my-mares)
 10. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
 11. [My Herd](#my-herd)
-12. [Foal Calculator](#foal-calculator)
-13. [Understanding breeding statuses](#understanding-breeding-statuses)
-14. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
-15. [Updating](#updating)
-14. [Privacy](#privacy)
-15. [Troubleshooting](#troubleshooting)
+12. [Other Horses](#other-horses)
+13. [Foal Calculator](#foal-calculator)
+14. [Understanding breeding statuses](#understanding-breeding-statuses)
+15. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
+16. [Updating](#updating)
+17. [Privacy](#privacy)
+18. [Troubleshooting](#troubleshooting)
 
 ## Installing
 
@@ -122,6 +123,15 @@ For a horse you bought, open "Purchase price & shipping" on its page and enter w
 Each horse also has a **200 × 200 picture** beside it (a "No picture yet" tile until one has been saved).
 
 Horses marked **Sold, Retired or Deceased** move out of the working list and the headline numbers into an archive — click **Show archive** to see them. The tiles at the top summarise your active herd: size, mares, stallions, mares in foal, foals born, number of breeds and average genetic potential. You can also set the same three tags from a horse's own page (click her name). These tags are separate from a tracked stallion's Active/Sold/Retired status on the Stallions tab.
+
+## Other Horses
+
+When you open a horse on Horse Reality that **isn't yours**, a small box appears in the bottom-right corner asking whether to add it to your ledger (this needs your username set in Settings, so the extension can tell your horses from other people's).
+
+- **Add to ledger** puts the horse on the **Other Horses** tab. It stays out of My Herd, My Mares and the Stallions tab, so your own numbers aren't affected.
+- **No thanks** remembers your answer, and the box won't ask about that horse again.
+
+The Other Horses tab shows each added horse with its picture, breed, sex and owner. Click a name to open its passport, or search for it in the box at the top of any tab (added horses are tagged "Other Horses" in the results). **Remove** takes a horse off the tab but keeps it searchable; the box may appear again the next time you open its page.
 
 ## Foal Calculator
 

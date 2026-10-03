@@ -52,6 +52,10 @@
       allBreedingsFlat.forEach(function (b) {
         if (!b.mareName) return;
         if ((b.breederName || '').trim().toLowerCase() !== myName) return;
+        // Older versions recorded any pregnant mare you viewed as yours; trust
+        // the owner Horse Reality reports for her when we have it.
+        var mareInfo = b.mareLifeNumber && state.horseInfo && state.horseInfo[b.mareLifeNumber];
+        if (mareInfo && mareInfo.ownerName && mareInfo.ownerName.trim().toLowerCase() !== myName) return;
         var key = L.mareKey(b);
         if (!map[key]) {
           map[key] = { key: key, mareName: b.mareName, mareUrl: b.mareUrl, mareLifeNumber: b.mareLifeNumber, records: [] };

@@ -598,7 +598,9 @@
         } else {
           HRStorage.upsertBreeding(state, sireId, {
             mareName: horseInfo.name, mareLifeNumber: horseInfo.lifeNumber, mareUrl: horseProfileUrl(horseInfo.lifeNumber),
-            breederName: state.settings.myUsername || '', breederUrl: '',
+            // The mare's real owner, not you — otherwise any pregnant mare you
+            // merely look at would be listed under My Mares.
+            breederName: horseInfo.ownerName || '', breederUrl: '',
             price: null, currency: 'HRC', feeType: 'Public',
             date: '', status: 'Succeeded'
           });

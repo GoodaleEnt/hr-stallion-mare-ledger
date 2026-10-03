@@ -107,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.8.5 | 2026-10-03 | Fix: viewing another player's pregnant mare no longer lists her under My Mares | Draft |
 | 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Draft |
 | 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Draft |
 | 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Draft |

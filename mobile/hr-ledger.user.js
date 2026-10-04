@@ -1,7 +1,7 @@
-//undefined==UuundefineddefundefinednedundefinedundefinedScript==
-//undefinedundefinednameundefinedundefinedundefinedundefined     HR Stalliundefinedn & Mare Ledger (Mobile)
-// @namespace    https://githubundefinedcom/GoodaleEnt/hr-stallion-mare-ledger
-// @undefinedersion      undefinedundefinedundefinedundefined.undefinedundefined
+// ==UserScript==
+// @name         HR Stallion & Mare Ledger (Mobile)
+// @namespace    https://github.com/GoodaleEnt/hr-stallion-mare-ledger
+// @version      1.18.18
 // @description  Mobile port of HR Stallion & Mare Ledger — auto-tracks Horse Reality stud earnings and breeding history via a userscript manager (Userscripts on iOS, Tampermonkey/Violentmonkey on Firefox Android). Private, no account needed.
 // @author       GoodaleEnt
 // @match        *://*.horsereality.com/*

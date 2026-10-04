@@ -26,6 +26,8 @@
   var calcStallion = '';
   var listFilterText = '';
   var compareA = '', compareB = '';
+  function defaultCompareFilter() { return { adult: true, young: true, mine: true, other: true, mares: true, stallions: true, sugg: false }; }
+  var compareFilter = { a: defaultCompareFilter(), b: defaultCompareFilter() };
   var UI_KEY = 'hrLedgerUi';
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
@@ -1505,12 +1507,52 @@
   }
   function compareCardHtml() {
     var lives = Object.keys(state.horseInfo || {}).sort(function (a, b) { return String(state.horseInfo[a].name || '').localeCompare(String(state.horseInfo[b].name || '')); });
-    function sel(id, action, cur) {
-      return '<select id="' + id + '" data-action="' + action + '"><option value="">Choose a horse\u2026</option>' + lives.map(function (l) {
-        return '<option value="' + L.esc(l) + '"' + (l === cur ? ' selected' : '') + '>' + L.esc(state.horseInfo[l].name || ('#' + l)) + ' (#' + L.esc(l) + ')</option>';
-      }).join('') + '</select>';
+    var mineSet = {};
+    L.ownedHorses(state).forEach(function (h) { mineSet[h.lifeNumber] = true; });
+    // Suggestions on one side = the partners suggested for the horse picked on the other side.
+    function suggestedFor(other) {
+      if (!other || !state.horseInfo[other]) return null;
+      var r = L.pairIdeas(state, other, 10), set = {};
+      r.mine.concat(r.other).forEach(function (x) { set[x.life] = true; });
+      return set;
     }
-    var html = '<div class="an-card" style="margin-top:18px;"><h3>Compare two horses</h3><div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:10px;">' + sel('compare-a', 'compare-a', compareA) + sel('compare-b', 'compare-b', compareB) + '</div>';
+    function filterBoxes(side) {
+      var f = compareFilter[side], other = side === 'a' ? compareB : compareA;
+      var all = f.adult && f.young && f.mine && f.other && f.mares && f.stallions && !f.sugg;
+      function box(key, label, checked, title) {
+        return '<label title="' + L.esc(title || '') + '" style="display:inline-flex;align-items:center;gap:4px;margin:0 12px 4px 0;font-size:12.5px;font-weight:400;cursor:pointer;"><input type="checkbox" data-action="compare-filter" data-side="' + side + '" data-key="' + key + '"' + (checked ? ' checked' : '') + '> ' + label + '</label>';
+      }
+      return '<div style="margin:2px 0 6px;">' + box('all', 'All', all) + box('adult', '3+', f.adult) + box('young', 'Under 3', f.young) + box('mine', 'My horses', f.mine) + box('other', 'Other horses', f.other) +
+        box('mares', 'Mares', f.mares) + box('stallions', 'Stallions', f.stallions) + box('sugg', 'Suggestions', f.sugg, other ? 'Only the horses suggested as partners for the horse picked on the other side' : 'Pick a horse on the other side first') + '</div>' +
+        (f.sugg && !suggestedFor(other) ? '<div class="notes-line" style="margin:0 0 6px;">Pick a horse on the other side first and this shows the partners suggested for it.</div>' : '');
+    }
+    function sel(id, action, cur, side) {
+      var f = compareFilter[side], sugg = f.sugg ? suggestedFor(side === 'a' ? compareB : compareA) : null;
+      var rows = lives.filter(function (l) {
+        if (l === cur) return true;
+        var info = state.horseInfo[l];
+        if (info.sex === 'mare' ? !f.mares : info.sex === 'stallion' ? !f.stallions : false) return false;
+        if (L.isYoungInfo(info) ? !f.young : !f.adult) return false;
+        if (mineSet[l] ? !f.mine : !f.other) return false;
+        if (sugg && !sugg[l]) return false;
+        return true;
+      });
+      function opt(l) {
+        var info = state.horseInfo[l];
+        return '<option value="' + L.esc(l) + '"' + (l === cur ? ' selected' : '') + '>' + L.esc(info.name || ('#' + l)) + ' (#' + L.esc(l) + ')' + (info.sex ? ' \u00b7 ' + L.esc(info.sex) : '') + '</option>';
+      }
+      function group(label, test) {
+        var g = rows.filter(test);
+        return g.length ? '<optgroup label="' + L.esc(label) + '">' + g.map(opt).join('') + '</optgroup>' : '';
+      }
+      var young = function (l) { return L.isYoungInfo(state.horseInfo[l]); };
+      return '<div>' + filterBoxes(side) + '<select id="' + id + '" data-action="' + action + '" style="width:100%;"><option value="">Choose a horse\u2026</option>' +
+        group('Your horses \u00b7 3 and older', function (l) { return mineSet[l] && !young(l); }) +
+        group('Other horses \u00b7 3 and older', function (l) { return !mineSet[l] && !young(l); }) +
+        group('Your horses \u00b7 Under 3', function (l) { return mineSet[l] && young(l); }) +
+        group('Other horses \u00b7 Under 3', function (l) { return !mineSet[l] && young(l); }) + '</select></div>';
+    }
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Compare two horses</h3><div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:10px;">' + sel('compare-a', 'compare-a', compareA, 'a') + sel('compare-b', 'compare-b', compareB, 'b') + '</div>';
     if (compareA && compareB && state.horseInfo[compareA] && state.horseInfo[compareB]) {
       html += statsCompareHtml(compareA, compareB).replace('Parent stats', 'Side by side') + traitsCompareHtml(compareA, compareB);
       var ga = savedGenesText(compareA), gb = savedGenesText(compareB);
@@ -2973,6 +3015,12 @@
       else if (action === 'goalset-load') {
         var gl = (state.settings.goalSets || {})[t.value];
         if (gl) { state.settings.goals = Object.assign({}, gl); state.settings.goalsUpdatedAt = Date.now(); goalsOpen = true; persist(); }
+      }
+      else if (action === 'compare-filter') {
+        var cfs = t.getAttribute('data-side'), cfk = t.getAttribute('data-key');
+        if (cfk === 'all') compareFilter[cfs] = Object.assign(defaultCompareFilter(), t.checked ? {} : { adult: false, young: false, mine: false, other: false, mares: false, stallions: false });
+        else compareFilter[cfs][cfk] = t.checked;
+        render();
       }
       else if (action === 'compare-a') { compareA = t.value; render(); }
       else if (action === 'compare-b') { compareB = t.value; render(); }

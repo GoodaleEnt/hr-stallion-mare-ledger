@@ -149,6 +149,10 @@ Below the inbreeding check, the calculator shows the odds for the foal's **coat 
 - **Enter extra genes by hand:** set Sooty, Silver, Flaxen, Champagne, Roan, Tobiano or Sabino for a horse if you know them, either under "Extra genes" on the horse's own page (a stallion's page, a mare's page or any cached horse) or in the calculator itself. Genes are saved on the horse, so you enter them once and every future pairing uses them automatically. They also appear with the horse's other genetics (next to its tested colours) on its page and in the calculator's parent cards. They're also included in backups. If Horse Reality itself ever reports one of these genes for a horse, its value is used and the box is locked.
 - Extra genes are part of the **Coat colour** list (for example "Bay Sooty 42.2%"). Any extra gene you haven't set counts as **not present** on that parent (the "Not present (default)" option), so you only need to enter genes a horse actually carries. If the base colour gene (E) isn't tested on both parents, the list still combines the other known genes under "Base colour unknown". An **Extra genes** card lists the chance the foal shows each hand-entered gene (for example Sooty 75%) with the genotype split beneath it; it appears even when the combined coat-colour list can't be built. Colour names follow standard equine genetics (for example Silver only shows on black-based coats and Flaxen only on chestnuts); Horse Reality may label some combinations differently.
 
+## Breeding dates
+
+When you breed a mare on Horse Reality's **Breed** page and the site confirms "Your mare was successfully covered", the ledger records the covering with today's date (shown as **Date bred**) and the status *Pending*. Nothing is saved if the covering isn't confirmed. The foal's **Date born** is filled in from the foal's passport once it's born.
+
 ## Understanding breeding statuses
 
 | Status | Meaning |

@@ -1067,6 +1067,56 @@
     });
   }
 
+  // The Breed page (/breed/<stallion life number>/) has a mare dropdown and a
+  // "Breed" button. Clicking it makes Horse Reality show "Your mare was
+  // successfully covered"; when that appears, record the covering with
+  // today's date. Nothing is saved if the covering isn't confirmed.
+  function setupBreedCapture() {
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('button.breedmare') : null;
+      if (!btn) return;
+      var select = document.getElementById('secondhorse');
+      var mareLife = select ? select.value : '';
+      if (!mareLife) return;
+      var opt = select.options[select.selectedIndex];
+      var urlMatch = location.pathname.split('/').filter(Boolean);
+      var stallionLife = btn.getAttribute('lang') || (urlMatch[0] === 'breed' ? urlMatch[1] : '');
+      if (!stallionLife) return;
+      var stallionTop = document.querySelector('#first_horseinfo .top');
+      var covering = {
+        mareLife: mareLife,
+        mareName: parseHorseNameHeader(opt ? opt.textContent : ''),
+        stallionLife: stallionLife,
+        stallionName: parseHorseNameHeader(stallionTop ? stallionTop.textContent : '')
+      };
+      var done = false;
+      var observer = new MutationObserver(function () {
+        if (done || !/successfully covered/i.test(document.body.textContent || '')) return;
+        done = true;
+        observer.disconnect();
+        recordCovering(covering);
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      setTimeout(function () { observer.disconnect(); }, 20000);
+    }, true);
+  }
+  function recordCovering(c) {
+    HRStorage.getState(function (state) {
+      var sid = HRLib.findStallionMatch(state.stallions, { stallionLifeNumber: c.stallionLife, stallionName: c.stallionName });
+      if (!sid) sid = HRStorage.upsertStallionByMatch(state, { name: c.stallionName, lifeNumber: c.stallionLife, owned: false }).id;
+      HRStorage.upsertBreeding(state, sid, {
+        mareName: c.mareName, mareLifeNumber: c.mareLife, mareUrl: horseProfileUrl(c.mareLife),
+        breederName: state.settings.myUsername || '', breederUrl: '',
+        price: null, currency: 'HRC', feeType: 'Public',
+        date: toIsoDate(Date.now()), status: 'Pending'
+      });
+      HRStorage.setState(state, function () {
+        showToast('HR Ledger: breeding recorded for ' + (c.mareName || ('#' + c.mareLife)));
+      });
+    });
+  }
+  setupBreedCapture();
+
   function onPageReady() {
     healOwnedStubs();
     scrapeConfoStats();

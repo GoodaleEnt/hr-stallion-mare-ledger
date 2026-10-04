@@ -879,10 +879,10 @@
     if (!info || info.sex !== 'stallion') return '';
     var r = studTermRows(life);
     if (!r.rows.length) {
-      return '<div class="card" style="padding:12px 16px;margin-bottom:16px;"><strong>Stud fees</strong> <span class="notes-line" style="margin:0;">\u2014 not recorded yet. Open his page (the Public / Private Stud Service boxes) or his Breed page on Horse Reality and they are saved.</span></div>';
+      return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Stud fees</strong> <span class="notes-line" style="margin:0;">\u2014 not recorded yet. Open his page (the Public / Private Stud Service boxes) or his Breed page on Horse Reality and they are saved.</span></div>';
     }
-    return '<div class="card" style="padding:14px 16px;margin-bottom:16px;max-width:560px;"><strong>Stud fees</strong>' +
-      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;">' +
+    return '<div class="card profile-block" style="padding:14px 16px;margin-bottom:16px;"><strong>Stud fees</strong>' +
+      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;max-width:520px;">' +
         r.rows.map(function (x) { return '<div class="row" style="gap:14px;flex-wrap:wrap;"><span>' + L.esc(x[0]) + '</span><span class="v fee mono">' + L.esc(x[1]) + '</span></div>'; }).join('') +
       '</div>' + (r.seenAt ? '<p class="notes-line" style="margin:6px 0 0;">Read on ' + L.esc(L.fmtDate(r.seenAt)) + '; open his page again to refresh.</p>' : '') + '</div>';
   }
@@ -898,8 +898,8 @@
     var pub = L.feeObj(s, 'Public'), priv = L.feeObj(s, 'Private');
     var log = (s.lifeNumber && state.horseMeta[s.lifeNumber] && state.horseMeta[s.lifeNumber].studTermsLog) || [];
     var row = function (label, text) { return '<div class="row" style="gap:14px;flex-wrap:wrap;"><span>' + label + '</span><span class="v fee mono">' + (text ? L.esc(text) : '\u2014') + '</span></div>'; };
-    var html = '<div class="card" style="padding:14px 16px;margin:0 0 16px;max-width:520px;"><strong>Stud fees</strong>' +
-      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;">' +
+    var html = '<div class="card profile-block" style="padding:14px 16px;margin:0 0 16px;"><strong>Stud fees</strong>' +
+      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;max-width:520px;">' +
         row('Public fee', L.priceList(pub)) + row('Private fee', L.priceList(priv)) +
         (t && t.semen && L.priceList(t.semen) ? row('Semen vial', L.priceList(t.semen)) : '') +
       '</div>' +
@@ -1898,7 +1898,7 @@
     var meta = (state.horseMeta[life] && state.horseMeta[life].sale) || {};
     var id = 'sale-' + L.esc(life);
     var line = saleLineText(life);
-    return '<details style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Sale \u2014 ' + (line ? L.esc(line) : 'not sold / not recorded') + '</summary>' +
+    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Sale \u2014 ' + (line ? L.esc(line) : 'not sold / not recorded') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' +
         '<div class="field"><label for="' + id + '-price">Sold for</label><div style="display:flex;gap:8px;"><input id="' + id + '-price" type="number" min="0" step="any" data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="price" value="' + (meta.price ? L.esc(meta.price) : '') + '" placeholder="0" style="flex:1;min-width:0;">' +
           '<select data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="currency" aria-label="Sale currency">' + L.CURRENCIES.map(function (c) { return '<option' + (c === (meta.currency || 'HRC') ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div></div>' +
@@ -1962,7 +1962,7 @@
           L.CURRENCIES.map(function (c) { return '<option' + (c === (curValue || 'HRC') ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
         '</select></div></div>';
     }
-    return '<details style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Purchase price &amp; shipping — ' +
+    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Purchase price &amp; shipping — ' +
       (parts ? L.esc([parts.paid ? 'paid ' + parts.paid : '', parts.ship ? parts.ship + ' shipping' : ''].filter(Boolean).join(' + ')) : 'not recorded') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">' +
         money('Price paid', 'price', 'currency', meta.currency) +
@@ -1983,7 +1983,7 @@
   function geneDetailsHtml(lifeNumber) {
     if (!lifeNumber || !state.horseInfo[lifeNumber]) return '';
     var saved = savedGenesText(lifeNumber);
-    return '<details style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen…) — ' +
+    return '<details class="profile-block" style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen…) — ' +
       (saved ? L.esc(saved) : 'none entered yet') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;">' +
       geneEditorHtml(lifeNumber, 'Saved on this horse') +

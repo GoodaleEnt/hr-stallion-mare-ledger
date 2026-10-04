@@ -1375,6 +1375,62 @@
     });
   }
 
+  // Your own stud offers: the market office page "My Studs" (/market/office/my-studs). Its Overview lists one
+  // row per offer (a link to /market/studs-and-semen/<life number>, the name, and a price row with HRC, Delta
+  // Points, Foundation and Wildlife prices; greyed = not offered). With the "Private" switch off it shows your
+  // public offers; switched on it shows your private offers ("To 4 players"). Because these are YOUR offers they
+  // prove the stallion is yours. Several offers for one stallion: the lowest price per currency is kept.
+  var lastMyStudsSig = '', lastMyStudsAt = 0;
+  function scrapeMyStuds() {
+    if (location.pathname.indexOf('/market/office/my-studs') === -1 || /\/(edit|create)/.test(location.pathname)) return;
+    if (Date.now() - lastMyStudsAt < 2000) return;
+    lastMyStudsAt = Date.now();
+    var rows = deepQueryAll('.market-office-table-row-outer');
+    if (!rows.length) return;
+    var toggle = deepQuery('#checkboxForshow_private');
+    var privateView = !!(toggle && toggle.checked);
+    var found = {};
+    rows.forEach(function (row) {
+      var link = row.querySelector('a[href*="/market/studs-and-semen/"]');
+      var m = link ? /studs-and-semen\/([0-9]+)/.exec(link.href) : null;
+      var priceRow = row.querySelector('tr.market-item-price');
+      if (!m || !priceRow) return;
+      var life = m[1];
+      var nameA = row.querySelector('.market-office-table-row-horse-info a');
+      var prices = {};
+      [['hrc', 'HRC'], ['dp', 'DP'], ['ft', 'FT'], ['wt', 'WT']].forEach(function (p) {
+        var td = priceRow.querySelector('td.item-price-' + p[0]);
+        if (td && !td.classList.contains('disabled')) { var n = toAmount(td.textContent); if (n) prices[p[1]] = n; }
+      });
+      var isPrivate = privateView || /\bTo\s+[0-9]+\s+players?\b/i.test(row.textContent || '');
+      var entry = found[life] = found[life] || { name: nameA ? parseHorseNameHeader(nameA.textContent) : '' };
+      var key = isPrivate ? 'private' : 'public';
+      var into = entry[key] = entry[key] || {};
+      Object.keys(prices).forEach(function (c) { into[c] = into[c] ? Math.min(into[c], prices[c]) : prices[c]; });
+    });
+    var lives = Object.keys(found);
+    if (!lives.length) return;
+    var sig = (privateView ? 'private:' : 'public:') + JSON.stringify(found);
+    if (sig === lastMyStudsSig) return;
+    HRStorage.getState(function (state) {
+      var n = 0;
+      lives.forEach(function (life) {
+        var f = found[life];
+        // an offer of yours: the stallion is yours, so add him or promote an outside-stud entry
+        var res = HRStorage.upsertStallionByMatch(state, { name: f.name, lifeNumber: life });
+        promoteStubStallion(state, res.id);
+        var frames = {};
+        if (f.public) frames.public = f.public;
+        if (f.private) frames.private = f.private;
+        if (HRLib.applyStudFrames(state, life, frames) || res.created) n++;
+      });
+      lastMyStudsSig = sig;
+      HRStorage.setState(state, function () {
+        if (n) showToast('HR Ledger: ' + (privateView ? 'private' : 'public') + ' stud fees saved for ' + n + ' of your stallion' + (n === 1 ? '' : 's'));
+      });
+    });
+  }
+
   function setupBreedCapture() {
     document.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button.breedmare') : null;
@@ -1702,6 +1758,7 @@
     scrapeStatusPills();
     scrapeCoveredPanel();
     scrapeStudTerms();
+    scrapeMyStuds();
     annotateBreedDropdown();
     if (location.href !== lastHref) {
       lastHref = location.href;

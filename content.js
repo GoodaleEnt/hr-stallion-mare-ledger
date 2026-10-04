@@ -1363,10 +1363,15 @@
     var sig = life + ':' + JSON.stringify(found);
     if (sig === lastTermsSig) return;
     HRStorage.getState(function (state) {
-      var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
-      meta.studTerms = Object.assign({}, meta.studTerms, found, { seenAt: toIsoDate(Date.now()) });
+      if (onBreedPage) {
+        var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+        meta.studTerms = Object.assign({}, meta.studTerms, found, { seenAt: toIsoDate(Date.now()) });
+      } else {
+        // the stud boxes on his own page: his Public / Private fee fields are filled in from them
+        HRLib.applyStudFrames(state, life, found);
+      }
       lastTermsSig = sig;
-      HRStorage.setState(state, function () { showToast('HR Ledger: stud terms saved for this stallion'); });
+      HRStorage.setState(state, function () { showToast('HR Ledger: stud fees saved for this stallion'); });
     });
   }
 

@@ -820,6 +820,38 @@
     ['HRC', 'DP', 'FT', 'WT'].forEach(function (c) { if (p && p[c]) parts.push(fmtMoney(p[c]) + ' ' + c); });
     return parts.join(' / ');
   }
+  // Copies the prices listed on a stallion's page into his record, so the Public and Private fee fields (and
+  // everything built on them) stay current without typing. Also keeps a log of each change. frames = { public,
+  // private, semen } as read from the page; returns true if anything changed.
+  function applyStudFrames(state, life, frames) {
+    if (!life || !frames) return false;
+    var changed = false;
+    if (!state.horseMeta) state.horseMeta = {};
+    var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+    var prev = meta.studTerms || {};
+    var snap = function (t) { return JSON.stringify([t.public || null, t.private || null, t.semen || null]); };
+    var merged = Object.assign({}, prev, frames);
+    if (snap(prev) !== snap(merged)) {
+      var log = Array.isArray(meta.studTermsLog) ? meta.studTermsLog.slice() : [];
+      log.push({ date: new Date().toISOString().slice(0, 10), public: merged.public || null, private: merged.private || null, semen: merged.semen || null });
+      meta.studTermsLog = log.slice(-30);
+      changed = true;
+    }
+    meta.studTerms = Object.assign({}, merged, { seenAt: new Date().toISOString().slice(0, 10) });
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    if (rec && rec.owned !== false) {
+      ['Public', 'Private'].forEach(function (tier) {
+        var prices = frames[tier.toLowerCase()];
+        if (!prices) return;
+        CURRENCIES.forEach(function (c) {
+          var key = 'fee' + tier + c;
+          if (prices[c]) { if (rec[key] !== prices[c]) { rec[key] = prices[c]; changed = true; } }
+          else if (rec[key]) { delete rec[key]; changed = true; }
+        });
+      });
+    }
+    return changed;
+  }
   function studTermsOf(state, life) {
     var m = state.horseMeta && state.horseMeta[life];
     var t = m && m.studTerms;
@@ -1352,6 +1384,8 @@
     applyStudFee: applyStudFee,
     breedingSuggestions: breedingSuggestions,
     studTermsOf: studTermsOf,
+    applyStudFrames: applyStudFrames,
+    priceList: priceList,
     recordCoveringFromPage: recordCoveringFromPage,
     dedupeFoals: dedupeFoals,
     mareBreedStatus: mareBreedStatus,

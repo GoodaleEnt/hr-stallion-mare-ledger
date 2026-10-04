@@ -181,6 +181,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 **Stud fees.** The ledger saves what a stallion costs from two places. His own page lists his *Public Stud Service* and *Private Stud Service* (and any semen vial) with the price in HRC, Delta Points, Foundation and Wildlife tickets. His **Breed** page states the transport fee and the cheapest price per currency. Both are saved on the stallion and shown as his cost in the suggestions. When you click **Breed** on a stallion that isn't yours, the covering is recorded straight away with the price option you ticked and the transport fee; when the bank row for it appears, the amount you really paid replaces it. The last fee you paid him is the fallback when nothing has been saved from his pages.
 
+**Your own stallions.** The same reading works for your own studs: when you open one of your stallions' pages, his **Public** and **Private** fee fields are filled in from the Public / Private Stud Service boxes (every currency listed there), so you no longer have to type them. Each stallion's card always shows both fees (plus a semen vial price when there is one), and his page has a **Stud fees** panel with the date it was read and a **fee history** of every change. You can still edit the fees by hand; they are updated again the next time you open his page.
+
 ## Foal Calculator
 
 In the **Mare** list, a mare who is already covered or in foal says so next to her name (✔ COVERED by … / ♥ IN FOAL, in colour), and picking her shows a notice under the pickers saying who she is covered by or due to, and whether the stallion you are comparing is the pairing she already has.

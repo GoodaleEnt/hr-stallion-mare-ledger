@@ -560,7 +560,8 @@
           (s.lifeNumber ? '<div class="lifenum mono">#' + L.esc(s.lifeNumber) + '</div>' : '') +
           '<div class="meta">' + L.esc([s.breed, s.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
           '<div class="row"><span>Public fee</span><span class="v fee mono">' + L.moneyLine(pubFee) + '</span></div>' +
-          (L.hasAny(privFee) ? '<div class="row"><span>Private fee</span><span class="v fee mono">' + L.moneyLine(privFee) + '</span></div>' : '') +
+          '<div class="row"><span>Private fee</span><span class="v fee mono">' + L.moneyLine(privFee) + '</span></div>' +
+          studSemenRowHtml(s.lifeNumber) +
           '<div class="row"><span>Breedings</span><span class="v mono">' + a.count + '</span></div>' +
           '<div class="row"><span>Total earned</span><span class="v mono">' + L.moneyLine(a.totals) + '</span></div>' +
           purchaseRowsHtml(s.lifeNumber) +
@@ -841,6 +842,31 @@
       html += '<h3 style="margin:20px 0 10px;">Fillies</h3>' + youngGrid(fillies);
     }
     return html;
+  }
+
+  // ---------- a stallion's stud fees (from his page) ----------
+  function studSemenRowHtml(life) {
+    var t = life && state.horseMeta[life] && state.horseMeta[life].studTerms;
+    if (!t || !t.semen || !L.priceList(t.semen)) return '';
+    return '<div class="row"><span>Semen vial</span><span class="v fee mono">' + L.esc(L.priceList(t.semen)) + '</span></div>';
+  }
+  function studFeesPanelHtml(s) {
+    var t = s.lifeNumber && state.horseMeta[s.lifeNumber] && state.horseMeta[s.lifeNumber].studTerms;
+    var pub = L.feeObj(s, 'Public'), priv = L.feeObj(s, 'Private');
+    var log = (s.lifeNumber && state.horseMeta[s.lifeNumber] && state.horseMeta[s.lifeNumber].studTermsLog) || [];
+    var row = function (label, text) { return '<div class="row"><span>' + label + '</span><span class="v fee mono">' + (text ? L.esc(text) : '\u2014') + '</span></div>'; };
+    var html = '<div class="card" style="padding:14px 16px;margin:0 0 16px;max-width:520px;"><strong>Stud fees</strong>' +
+      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;">' +
+        row('Public fee', L.priceList(pub)) + row('Private fee', L.priceList(priv)) +
+        (t && t.semen && L.priceList(t.semen) ? row('Semen vial', L.priceList(t.semen)) : '') +
+      '</div>' +
+      '<p class="notes-line" style="margin:6px 0 0;">' + (t && t.seenAt ? 'Read from his page on Horse Reality on ' + L.esc(L.fmtDate(t.seenAt)) + '; open his page again to refresh.' : 'Not read from his page yet. Open his page on Horse Reality (the Public / Private Stud Service boxes) and it fills in; you can also edit the fees by hand.') + '</p>';
+    if (log.length > 1) {
+      html += '<details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Fee history (' + log.length + ' change' + (log.length === 1 ? '' : 's') + ')</summary><div style="font-size:13px;line-height:1.6;margin-top:6px;">' +
+        log.slice().reverse().map(function (e) { return '<div class="mono">' + L.esc(L.fmtDate(e.date)) + ' \u2014 public ' + L.esc(L.priceList(e.public) || '\u2014') + '; private ' + L.esc(L.priceList(e.private) || '\u2014') + (e.semen && L.priceList(e.semen) ? '; semen ' + L.esc(L.priceList(e.semen)) : '') + '</div>'; }).join('') +
+        '</div></details>';
+    }
+    return html + '</div>';
   }
 
   // ---------- breeding suggestions page ----------
@@ -2099,6 +2125,7 @@
     html += healthPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
+    html += studFeesPanelHtml(s);
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + breedings.length + '</div><div class="label">Breedings</div></div>' +

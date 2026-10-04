@@ -61,7 +61,8 @@
     if (!text) return { score: null, raw: '' };
     var parts = text.split('|');
     var last = parseFloat(parts[parts.length - 1]);
-    return { score: isNaN(last) ? null : last, raw: text };
+    // a foal's score is out of 100; a larger number means the wrong figure was read
+    return { score: isNaN(last) || last > 100 ? null : last, raw: text };
   }
   function parseBankDate(text) {
     var m = text.match(/(\d{2})-(\d{2})-(\d{4})/);

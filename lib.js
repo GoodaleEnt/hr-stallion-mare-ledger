@@ -743,7 +743,8 @@
         else if (st === 'Failed') { out.failed++; out.breedings++; }
         else { out.pending++; out.breedings++; }
         addTotals(out.earned, r);
-        if (r.foalScore > 0) out.scores.push(Number(r.foalScore));
+        // foal scores are out of 100; anything higher was misread from the page and is ignored
+        if (r.foalScore > 0 && r.foalScore <= 100) out.scores.push(Number(r.foalScore));
         if (st !== 'Foal Born') out.last = latest(out.last, r.date);
       });
       out.resolved = out.succeeded + out.failed;

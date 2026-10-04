@@ -1549,6 +1549,7 @@
         '<div style="font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">' + label + '</div>' +
         '<h3 style="margin:2px 0 4px;font-size:19px;">' + L.esc(info.name || ('#' + life)) + '</h3>' +
         '<div class="mono sub" style="color:var(--text-muted);font-size:12px;">#' + L.esc(life) + '</div>' +
+        (/^[0-9]+$/.test(String(life)) ? '<div style="margin-top:4px;font-size:13px;"><a href="https://www.horsereality.com/horses/' + L.esc(life) + '/" target="_blank" rel="noopener">View on Horse Reality \u2197</a></div>' : '') +
         (facts.length ? '<div style="font-size:13px;margin-top:6px;">' + facts.join(' · ') + '</div>' : '') +
         ((info.testedColours || genes) ? '<div class="mono" style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + L.esc([info.testedColours, genes].filter(Boolean).join(' · ')) + '</div>' : '') +
       '</div></div>';
@@ -1675,11 +1676,12 @@
     var isShared = shared[n.life];
     var full = n.name ? n.name + ' #' + n.life : '#' + n.life;
     var label = n.name ? L.esc(n.name) : '<span style="color:var(--text-muted);">#' + L.esc(n.life) + '</span>';
-    return '<div title="' + L.esc(full) + '" style="grid-column:' + col + ';grid-row:' + row + ' / span ' + span + ';align-self:center;height:46px;overflow:hidden;box-sizing:border-box;' +
+    var linkable = /^[0-9]+$/.test(String(n.life));
+    return '<' + (linkable ? 'a href="https://www.horsereality.com/horses/' + L.esc(n.life) + '/" target="_blank" rel="noopener"' : 'div') + ' title="' + L.esc(full) + '" style="text-decoration:none;color:inherit;display:block;grid-column:' + col + ';grid-row:' + row + ' / span ' + span + ';align-self:center;height:46px;overflow:hidden;box-sizing:border-box;' +
       'border:1px solid ' + (isShared ? 'var(--danger)' : 'var(--border)') + ';background:' + (isShared ? 'var(--danger-bg)' : 'var(--surface)') +
       ';border-radius:8px;padding:4px 8px;font-size:12px;line-height:1.2;">' +
       '<div style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + label + '</div>' +
-      (n.name ? '<div class="mono" style="font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">#' + L.esc(n.life) + (n.cached ? '' : ' \u00b7 not cached') + '</div>' : '') + '</div>';
+      (n.name ? '<div class="mono" style="font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">#' + L.esc(n.life) + (n.cached ? '' : ' \u00b7 not cached') + '</div>' : '') + '</' + (linkable ? 'a' : 'div') + '>';
   }
   // Every generation is a column of equal boxes; a horse spans the rows of its own ancestors, so the
   // sire and dam lines line up whether or not their pedigrees are cached.
@@ -1708,7 +1710,7 @@
       '<div class="card" style="padding:14px;overflow-x:auto;margin-bottom:16px;"><div style="display:grid;min-width:max-content;column-gap:12px;grid-template-columns:130px repeat(' + levels + ', 170px);grid-template-rows:auto repeat(' + rows + ', 52px);">' +
         head + root + pedCellsHtml(sire, shared, 1, 2, levels) + pedCellsHtml(dam, shared, 1, 2 + rows / 2, levels) +
       '</div></div>' +
-      '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet \u2014 visit their pages to fill them in. Hover a box for the full name.</p>';
+      '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet \u2014 visit their pages to fill them in. Click a box to open that horse on Horse Reality; hover for the full name.</p>';
   }
 
   // Under the pickers: is the chosen mare already covered, or in foal? And is that the pairing she's already got?

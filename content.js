@@ -283,6 +283,12 @@
     if (sex === 'mare') return 'Filly';
     return '';
   }
+  function toIsoDate(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
   function buildPregnancyInfo(horse, passportRoot, relatedHorses) {
     if (horse.pregnancyStatus !== 'pregnant') {
       return horse.pregnancyStatus ? { status: horse.pregnancyStatus, dueText: '', sireName: '', sireUrl: '', sireLifeNumber: '' } : null;
@@ -290,7 +296,12 @@
     var preg = passportRoot.pregnancy || {};
     var sireInfo = resolveAncestor(preg.sire ? { lifeNumber: preg.sire } : null, relatedHorses);
     var foalLabel = foalSexLabel(preg.sex);
+    // Horse Reality gives a delivery date; a covering date is used only if the
+    // API happens to expose one under a recognisable name.
+    var startKey = ['coveringDate', 'coveredAt', 'inseminationDate', 'inseminatedAt', 'breedingDate', 'startDate', 'startedAt'].find(function (k) { return preg[k]; });
     return {
+      deliveryDate: toIsoDate(preg.deliveryDate),
+      coveredDate: startKey ? toIsoDate(preg[startKey]) : '',
       status: 'Pregnant' + (foalLabel ? ' (Unborn ' + foalLabel + ')' : ''),
       dueText: preg.deliveryDate ? ('Due ' + formatBirthdate(preg.deliveryDate)) : '',
       sireName: sireInfo ? sireInfo.name : '',
@@ -401,10 +412,21 @@
         mareLifeNumber: lifeNumberFromUrl(links[0].href),
         stallionName: parseHorseLabel(links[1]),
         stallionUrl: links[1].href,
-        stallionLifeNumber: lifeNumberFromUrl(links[1].href)
+        stallionLifeNumber: lifeNumberFromUrl(links[1].href),
+        date: parseRowDate(text)
       });
     });
     return out;
+  }
+  // The notification's own date: "dd-mm-yyyy" if shown, else "Today"/"Yesterday".
+  function parseRowDate(text) {
+    var iso = parseBankDate(text || '');
+    if (iso) return iso;
+    var offset = /\bYesterday\b/i.test(text) ? 1 : (/\bToday\b/i.test(text) ? 0 : null);
+    if (offset == null) return '';
+    var d = new Date();
+    d.setDate(d.getDate() - offset);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
   function showToast(msg) {
@@ -523,12 +545,13 @@
         });
         if (match) {
           match.status = 'Failed';
+          if (!match.date && f.date) match.date = f.date;
         } else {
           HRStorage.upsertBreeding(state, sid, {
             mareName: f.mareName || '', mareLifeNumber: f.mareLifeNumber, mareUrl: f.mareUrl,
             breederName: state.settings.myUsername || '', breederUrl: '',
             price: null, currency: 'HRC', feeType: 'Public',
-            date: '', status: 'Failed'
+            date: f.date || '', status: 'Failed'
           });
         }
         failuresMarked++;
@@ -560,6 +583,48 @@
       // Images are fetched and attached afterward, independently — a slow or
       // failed image fetch must never block the data above from saving.
       attachOffspringImages(offspringStallionId, offspring);
+      cacheFoalBirthdates(offspringStallionId, offspring);
+    });
+  }
+
+  // The Offspring table doesn't show when a foal was born. Look each foal up
+  // once (Horse Reality's own horse API, same as visiting its page) and keep
+  // its birthdate on the breeding record. Capped per page load, skipped for
+  // foals already known, and failures are silent.
+  var FOAL_LOOKUP_CAP = 12;
+  function cacheFoalBirthdates(stallionId, offspring) {
+    if (!stallionId) return;
+    HRStorage.getState(function (state) {
+      var list = state.breedings[stallionId] || [];
+      var todo = [];
+      offspring.forEach(function (row) {
+        var life = lifeNumberFromUrl(row.foalUrl);
+        var rec = list.find(function (b) { return HRLib.breedingMatchKey(b) === HRLib.breedingMatchKey(Object.assign({ price: null, date: '' }, row)); });
+        if (!life || !rec || rec.dateBorn || todo.some(function (t) { return t.life === life; })) return;
+        var info = state.horseInfo[life];
+        if (info && info.dateOfBirth) { rec.dateBorn = info.dateOfBirth; todo.changed = true; return; }
+        if (todo.length < FOAL_LOOKUP_CAP) todo.push({ life: life, key: HRLib.breedingMatchKey(rec) });
+      });
+      if (todo.changed) HRStorage.setState(state);
+      if (!todo.length) return;
+      Promise.all(todo.map(function (t) {
+        return fetchHorseJson('/api/player/horse/' + t.life + '/passport').then(function (resp) {
+          var root = resp && resp.horsePassport ? resp.horsePassport : {};
+          return { life: t.life, key: t.key, birth: root.passport && root.passport.birthdate };
+        }).catch(function () { return null; });
+      })).then(function (results) {
+        var found = results.filter(function (r) { return r && r.birth; });
+        if (!found.length) return;
+        HRStorage.getState(function (fresh) {
+          var rows = fresh.breedings[stallionId] || [];
+          found.forEach(function (r) {
+            var rec = rows.find(function (b) { return HRLib.breedingMatchKey(b) === r.key; });
+            var d = new Date(r.birth);
+            if (rec && !isNaN(d.getTime())) rec.dateBorn = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          });
+          HRStorage.setState(fresh);
+        });
+      });
     });
   }
 
@@ -638,6 +703,13 @@
         });
         if (pregMatch) {
           if (pregMatch.status !== 'Succeeded') { pregMatch.status = 'Succeeded'; pregnancyMarked = true; }
+          if (!pregMatch.date) {
+            // No covering date anywhere on the page: use the day the mare was
+            // first seen in foal (usually the day you bred her), flagged approximate.
+            pregMatch.date = horseInfo.pregnancy.coveredDate || toIsoDate(Date.now());
+            if (!horseInfo.pregnancy.coveredDate) pregMatch.dateApprox = true;
+            pregnancyMarked = true;
+          }
         } else {
           HRStorage.upsertBreeding(state, sireId, {
             mareName: horseInfo.name, mareLifeNumber: horseInfo.lifeNumber, mareUrl: horseProfileUrl(horseInfo.lifeNumber),
@@ -645,7 +717,7 @@
             // merely look at would be listed under My Mares.
             breederName: horseInfo.ownerName || '', breederUrl: '',
             price: null, currency: 'HRC', feeType: 'Public',
-            date: '', status: 'Succeeded'
+            date: horseInfo.pregnancy.coveredDate || toIsoDate(Date.now()), dateApprox: !horseInfo.pregnancy.coveredDate, status: 'Succeeded'
           });
           pregnancyMarked = true;
         }

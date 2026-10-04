@@ -624,6 +624,39 @@
     '</form>';
   }
 
+  // Only bank rows carry a covering date; offspring, in-foal and failed rows
+  // often have none. Fall back to another record for the same mare that does
+  // (shown in italics) so a foal's row still says when she was bred.
+  var rowSiblings = [];
+  function bredDate(b) {
+    if (b.date) return { date: b.date, inferred: false, approx: !!b.dateApprox };
+    var best = '';
+    rowSiblings.forEach(function (o) {
+      if (o === b || !o.date) return;
+      var same = (b.mareLifeNumber && o.mareLifeNumber === b.mareLifeNumber) || (!b.mareLifeNumber && b.mareName && o.mareName === b.mareName);
+      if (same && o.date > best) best = o.date;
+    });
+    return best ? { date: best, inferred: true, approx: false } : { date: '', inferred: false, approx: false };
+  }
+  function bredDateCellHtml(b) {
+    var d = bredDate(b);
+    return '<div class="mono" data-label="Date bred"' + (d.inferred ? ' title="Taken from another record for this mare"' : d.approx ? ' title="Approximate: the day this mare was first seen in foal"' : '') + '>' +
+      (d.inferred || d.approx ? '<em>' + L.fmtDate(d.date) + '</em>' : L.fmtDate(d.date)) + '</div>';
+  }
+  // Foal's birth date: stored on the record, else from the foal's cached passport.
+  function bornDate(b) {
+    if (b.dateBorn) return b.dateBorn;
+    var m = /\/horses\/(\d+)/.exec(b.foalUrl || '');
+    var info = m && state.horseInfo ? state.horseInfo[m[1]] : null;
+    if (!info || !info.dateOfBirth) return '';
+    var d = new Date(info.dateOfBirth);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function bornDateCellHtml(b) {
+    return '<div class="mono" data-label="Date born">' + L.fmtDate(bornDate(b)) + '</div>';
+  }
+
   function renderBreedingRow(b, i, viewMode) {
     var curStatus = b.status || 'Pending';
     var sidForRow = b.stallionId || selectedId || '';
@@ -660,7 +693,8 @@
       : L.esc(b.breederName || '—');
 
     return '<div class="ledger-row" style="' + (i === 0 ? 'border-top:none' : '') + '">' +
-      '<div class="mono" data-label="Date">' + L.fmtDate(b.date) + '</div>' +
+      bredDateCellHtml(b) +
+      bornDateCellHtml(b) +
       '<div class="mare" data-label="' + col2Label + '">' + col2Html + '</div>' +
       '<div data-label="Owner">' + ownerCell + '</div>' +
       '<div class="price mono" data-label="Price">' + priceCell + '</div>' +
@@ -811,8 +845,9 @@
         '<p>' + L.esc(m.mareName) + ' hasn\'t been bred yet — once a covering shows up on your bank or notifications page, it\'ll appear here automatically.</p></div>';
     } else {
       html += '<div class="ledger">';
-      html += '<div class="ledger-head"><div>Date</div><div>Stallion</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
+      html += '<div class="ledger-head"><div>Date bred</div><div>Date born</div><div>Stallion</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
       html += '<div class="card">';
+      rowSiblings = m.records;
       m.records.forEach(function (b, i) { html += renderBreedingRow(b, i, 'mare'); });
       html += '</div></div>';
     }
@@ -1540,8 +1575,9 @@
         '<button class="btn btn-primary" data-action="toggle-add-breeding">+ Add Breeding</button></div>';
     } else if (breedings.length) {
       html += '<div class="ledger">';
-      html += '<div class="ledger-head"><div>Date</div><div>Mare</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
+      html += '<div class="ledger-head"><div>Date bred</div><div>Date born</div><div>Mare</div><div>Owner</div><div>Price</div><div>Status</div><div></div></div>';
       html += '<div class="card">';
+      rowSiblings = breedings;
       breedings.forEach(function (b, i) { html += renderBreedingRow(b, i); });
       html += '</div></div>';
     }

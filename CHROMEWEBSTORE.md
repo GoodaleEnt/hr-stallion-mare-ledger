@@ -107,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.10.0 | 2026-10-03 | Separate Date bred and Date born columns; dates filled from notifications, related records and foal passports; self-bred mares get an approximate date | Draft |
 | 1.9.0 | 2026-10-03 | Purchase price and transport fee are recorded automatically from the bank page | Draft |
 | 1.8.5 | 2026-10-03 | Fix: viewing another player's pregnant mare no longer lists her under My Mares | Draft |
 | 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Draft |

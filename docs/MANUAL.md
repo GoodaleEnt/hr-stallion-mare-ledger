@@ -179,7 +179,7 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 **Only horses saved in the ledger are considered**: stallions whose pages you have opened on Horse Reality (age 3 and over, not sold or retired, with a genetic potential saved). Open more stallions' pages and they join the list. A mare under 3 gets no suggestions, and a covered or in-foal mare shows a note that the list is for her next breeding.
 
-**Stud fees.** When you open a stallion's **Breed** page, the ledger saves the stud fee, transport and semen-vial prices it finds there. It also remembers the last stud fee you paid him from your bank page. The suggestions show these as his cost.
+**Stud fees.** The ledger saves what a stallion costs from two places. His own page lists his *Public Stud Service* and *Private Stud Service* (and any semen vial) with the price in HRC, Delta Points, Foundation and Wildlife tickets. His **Breed** page states the transport fee and the cheapest price per currency. Both are saved on the stallion and shown as his cost in the suggestions. When you click **Breed** on a stallion that isn't yours, the covering is recorded straight away with the price option you ticked and the transport fee; when the bank row for it appears, the amount you really paid replaces it. The last fee you paid him is the fallback when nothing has been saved from his pages.
 
 ## Foal Calculator
 

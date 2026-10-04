@@ -1298,35 +1298,75 @@
     });
   }
 
-  // The Breed page of a stallion that is not yours may state his stud fee, the transport cost and a semen
-  // vial price. Read them by their labels (the text near "fee" / "transport" or "shipping" / "semen" or
-  // "vial") and keep them on the stallion so the suggestions can show what he costs.
-  var lastTermsSig = '', lastTermsAt = 0;
-  function readStudTerms(text) {
-    function num(re) { var m = re.exec(text); return m ? parseInt(String(m[1]).replace(/[^0-9]/g, ''), 10) : 0; }
-    var amount = '([0-9][0-9\\s\\u00a0.,]*[0-9]|[0-9])';
-    var fee = num(new RegExp('(?:stud fee|covering fee|breeding fee|service fee|fee)[^0-9\\n]{0,24}' + amount, 'i'));
-    var transport = num(new RegExp('(?:transport(?:ation)?(?: cost| fee)?|shipping(?: cost| fee)?)[^0-9\\n]{0,24}' + amount, 'i'));
-    var vial = num(new RegExp('(?:semen|vial)[^0-9\\n]{0,30}' + amount, 'i'));
-    var cur = /\b(HRC|DP|FT|WT)\b/.exec(text);
-    return fee > 0 || vial > 0 ? { fee: fee, transport: transport, vial: vial, currency: cur ? cur[1] : 'HRC' } : null;
+  // ---- stud terms: what it costs to breed to a stallion ----
+  // 1) The stallion's own page has "Public Stud Service" / "Private Stud Service" (and any semen) boxes, each
+  //    with a price row: HRC, Delta Points, Foundation and Wildlife tickets (a greyed price is not offered).
+  // 2) His Breed page states the owner, the transport fee ("An additional transport fee of 1000 HRC ...") and
+  //    the cheapest price per currency as radio buttons. Both are saved on the stallion (horseMeta[life].studTerms).
+  var CURRENCY_NAMES = { 'hrc': 'HRC', 'delta points': 'DP', 'dp': 'DP', 'foundation tickets': 'FT', 'ft': 'FT', 'wildlife tickets': 'WT', 'wt': 'WT' };
+  function currencyCode(name) { return CURRENCY_NAMES[String(name || '').trim().toLowerCase()] || ''; }
+  function toAmount(text) { var n = parseInt(String(text || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function parseBreedPageTerms(area) {
+    var text = (area.textContent || '').replace(/\s+/g, ' ');
+    var cheapest = {};
+    area.querySelectorAll('input[name="price"]').forEach(function (inp) {
+      var code = currencyCode(inp.value);
+      var label = inp.closest('label') || inp.parentElement;
+      var amt = toAmount(label ? label.textContent : '');
+      if (code && amt) cheapest[code] = amt;
+    });
+    if (!Object.keys(cheapest).length) return null; // your own stud, or no price shown
+    var terms = { cheapest: cheapest, transport: 0, transportCurrency: 'HRC', owner: '' };
+    var tm = /transport fee of ([0-9\s\u00a0]+?)\s*(HRC|DP|FT|WT|Delta Points|Foundation Tickets|Wildlife Tickets)/i.exec(text);
+    if (tm) { terms.transport = toAmount(tm[1]); terms.transportCurrency = currencyCode(tm[2]) || 'HRC'; }
+    var owner = area.querySelector('a[href*="/user/"]');
+    if (owner) terms.owner = (owner.textContent || '').trim();
+    return terms;
   }
+  function parseStudFrames() {
+    var out = {}, found = false;
+    deepQueryAll('.component.frame').forEach(function (fr) {
+      var titleEl = fr.querySelector('.title');
+      var title = titleEl ? (titleEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      var row = fr.querySelector('tr.market-item-price');
+      if (!title || !row) return;
+      var key = /private/i.test(title) ? 'private' : /semen|vial/i.test(title) ? 'semen' : /stud/i.test(title) ? 'public' : '';
+      if (!key) return;
+      var prices = {};
+      [['hrc', 'HRC'], ['dp', 'DP'], ['ft', 'FT'], ['wt', 'WT']].forEach(function (p) {
+        var td = row.querySelector('td.item-price-' + p[0]);
+        if (td && !td.classList.contains('disabled')) { var n = toAmount(td.textContent); if (n) prices[p[1]] = n; }
+      });
+      out[key] = prices;
+      found = true;
+      var o = fr.querySelector('a[href*="/user/"]');
+      if (o) out.owner = (o.textContent || '').trim();
+    });
+    return found ? out : null;
+  }
+  var lastTermsSig = '', lastTermsAt = 0;
   function scrapeStudTerms() {
-    var parts = location.pathname.split('/').filter(Boolean);
-    if (parts[0] !== 'breed' || !parts[1] || Date.now() - lastTermsAt < 2000) return;
+    if (Date.now() - lastTermsAt < 2000) return;
     lastTermsAt = Date.now();
-    var life = parts[1];
-    var area = document.querySelector('.breeding') || document.getElementById('breed');
-    if (!area) return;
-    var terms = readStudTerms(area.textContent || '');
-    if (!terms) return;
-    var sig = life + ':' + terms.fee + ':' + terms.transport + ':' + terms.vial;
+    var parts = location.pathname.split('/').filter(Boolean);
+    var onBreedPage = parts[0] === 'breed' && parts[1];
+    var life = onBreedPage ? parts[1] : parseHorseIdFromUrl();
+    if (!life) return;
+    var found = null;
+    if (onBreedPage) {
+      var area = document.querySelector('.breeding');
+      found = area ? parseBreedPageTerms(area) : null;
+    } else {
+      found = parseStudFrames();
+    }
+    if (!found) return;
+    var sig = life + ':' + JSON.stringify(found);
     if (sig === lastTermsSig) return;
     HRStorage.getState(function (state) {
       var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
-      meta.studTerms = { fee: terms.fee, transport: terms.transport, vial: terms.vial, currency: terms.currency, seenAt: toIsoDate(Date.now()) };
+      meta.studTerms = Object.assign({}, meta.studTerms, found, { seenAt: toIsoDate(Date.now()) });
       lastTermsSig = sig;
-      HRStorage.setState(state, function () { showToast('HR Ledger: stud terms saved (fee ' + terms.fee + ' ' + terms.currency + (terms.transport ? ' + ' + terms.transport + ' transport' : '') + (terms.vial ? ', vial ' + terms.vial : '') + ')'); });
+      HRStorage.setState(state, function () { showToast('HR Ledger: stud terms saved for this stallion'); });
     });
   }
 
@@ -1349,6 +1389,17 @@
         stallionName: parseHorseNameHeader(stallionTop ? stallionTop.textContent : ''),
         at: Date.now()
       };
+      // the price option ticked on a stallion that is not yours (HRC, Delta Points, ...) and the transport fee
+      var chosen = document.querySelector('input[name="price"]:checked');
+      if (chosen) {
+        var chosenLabel = chosen.closest('label') || chosen.parentElement;
+        covering.price = toAmount(chosenLabel ? chosenLabel.textContent : '');
+        covering.currency = currencyCode(chosen.value) || 'HRC';
+        var tfm = /transport fee of ([0-9\s\u00a0]+?)\s*(HRC|DP|FT|WT|Delta Points|Foundation Tickets|Wildlife Tickets)/i.exec((document.querySelector('.breeding') || document.body).textContent.replace(/\s+/g, ' '));
+        covering.transport = tfm ? toAmount(tfm[1]) : 0;
+        var ownerLink = (document.querySelector('.breeding') || document).querySelector('a[href*="/user/"]');
+        covering.studOwner = ownerLink ? (ownerLink.textContent || '').trim() : '';
+      }
       // Written immediately and without waiting: the page is about to unload.
       readPendingCoverings(function (list) {
         list = list.filter(function (p) { return p.mareLife !== covering.mareLife; });
@@ -1381,11 +1432,12 @@
       HRStorage.upsertBreeding(state, sid, {
         mareName: c.mareName, mareLifeNumber: c.mareLife, mareUrl: horseProfileUrl(c.mareLife),
         breederName: state.settings.myUsername || '', breederUrl: '',
-        price: null, currency: 'HRC', feeType: 'Public',
+        price: c.price > 0 ? c.price : null, currency: c.currency || 'HRC', feeType: 'Public',
+        transport: c.transport || 0, studOwner: c.studOwner || '', feeSource: c.price > 0 ? 'breed page' : '',
         date: toIsoDate(Date.now()), status: 'Pending'
       });
       HRStorage.setState(state, function () {
-        showToast('HR Ledger: breeding recorded for ' + (c.mareName || ('#' + c.mareLife)));
+        showToast('HR Ledger: breeding recorded for ' + (c.mareName || ('#' + c.mareLife)) + (c.price > 0 ? ' (fee ' + c.price + ' ' + (c.currency || 'HRC') + (c.transport ? ' + ' + c.transport + ' transport' : '') + ')' : ''));
       });
     });
   }

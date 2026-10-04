@@ -813,13 +813,33 @@
   var TRAIT_RANKS = { 'below average': 0, 'average': 1, 'good': 2, 'good+': 3, 'good +': 3, 'very good': 4 };
   function traitRankOf(v) { var r = TRAIT_RANKS[String(v || '').toLowerCase().trim()]; return r == null ? null : r; }
   var FERT_BONUS = { excellent: 0.4, good: 0.2, average: 0, fair: -0.4, poor: -0.8 };
-  // What it costs to breed to this stallion, if known: terms seen on his Breed page, else the last fee you paid.
+  // What it costs to breed to this stallion, if known: the prices saved from his page and Breed page, else the
+  // last fee you paid him. summary is a sentence fragment; fee is the HRC price (0 if none) for sorting/totals.
+  function priceList(p) {
+    var parts = [];
+    ['HRC', 'DP', 'FT', 'WT'].forEach(function (c) { if (p && p[c]) parts.push(fmtMoney(p[c]) + ' ' + c); });
+    return parts.join(' / ');
+  }
   function studTermsOf(state, life) {
     var m = state.horseMeta && state.horseMeta[life];
     var t = m && m.studTerms;
-    if (t && Number(t.fee) > 0) return { fee: Number(t.fee), transport: Number(t.transport) || 0, vial: Number(t.vial) || 0, currency: t.currency || 'HRC', source: 'seen on his Breed page', when: t.seenAt || '' };
+    if (t && (t.public || t.private || t.semen || t.cheapest)) {
+      var parts = [];
+      if (t.public && priceList(t.public)) parts.push('public stud ' + priceList(t.public));
+      if (t.private && priceList(t.private)) parts.push('private stud ' + priceList(t.private));
+      if (t.semen && priceList(t.semen)) parts.push('semen vial ' + priceList(t.semen));
+      if (!parts.length && t.cheapest) parts.push('cheapest ' + priceList(t.cheapest));
+      if (t.transport) parts.push('+ ' + fmtMoney(t.transport) + ' ' + (t.transportCurrency || 'HRC') + ' transport');
+      return {
+        fee: (t.public && t.public.HRC) || (t.cheapest && t.cheapest.HRC) || 0, transport: Number(t.transport) || 0, currency: 'HRC',
+        summary: parts.join('; ') + ' (seen ' + (t.seenAt || 'recently') + ')', owner: t.owner || ''
+      };
+    }
     var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
-    if (rec && rec.lastFee && Number(rec.lastFee.fee) > 0) return { fee: Number(rec.lastFee.fee), transport: Number(rec.lastFee.transport) || 0, vial: 0, currency: rec.lastFee.currency || 'HRC', source: 'last fee you paid', when: rec.lastFee.date || '' };
+    if (rec && rec.lastFee && Number(rec.lastFee.fee) > 0) {
+      return { fee: Number(rec.lastFee.fee), transport: Number(rec.lastFee.transport) || 0, currency: rec.lastFee.currency || 'HRC', owner: rec.lastFee.studOwner || '',
+        summary: 'last fee you paid ' + fmtMoney(rec.lastFee.fee) + ' ' + (rec.lastFee.currency || 'HRC') + (rec.lastFee.transport ? ' + ' + fmtMoney(rec.lastFee.transport) + ' transport' : '') };
+    }
     return null;
   }
   function breedingSuggestions(state, mareLife, limit) {
@@ -880,8 +900,8 @@
       if (FERT_BONUS[fert] != null) reasons.push('His fertility is ' + sInfo.fertility + (FERT_BONUS[fert] > 0 ? ' (fewer failed coverings)' : FERT_BONUS[fert] < 0 ? ' (more failed coverings)' : ''));
       else reasons.push('His fertility is not recorded' + (isYoungInfo(sInfo) ? '' : ' (open his page after a fertility test)'));
       if (yours) reasons.push('Your own stallion: no stud fee');
-      else if (terms) reasons.push('Stud fee ' + fmtMoney(terms.fee) + ' ' + terms.currency + (terms.transport ? ' + ' + fmtMoney(terms.transport) + ' transport' : '') + (terms.vial ? '; semen vial ' + fmtMoney(terms.vial) + ' ' + terms.currency : '') + ' (' + terms.source + ')');
-      else reasons.push('Stud fee not known yet (open his Breed page to record it)');
+      else if (terms) reasons.push('Cost: ' + terms.summary);
+      else reasons.push('Stud fee not known yet (open his page or his Breed page to record it)');
       if (hist.foals || hist.failed) reasons.push('Bred together before: ' + (hist.foals ? hist.foals + ' foal' + (hist.foals === 1 ? '' : 's') + (hist.bestScore ? ' (best score ' + hist.bestScore + ')' : '') : '') + (hist.foals && hist.failed ? ', ' : '') + (hist.failed ? hist.failed + ' failed covering' + (hist.failed === 1 ? '' : 's') : ''));
       var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus;
       list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
@@ -919,7 +939,17 @@
     var list = state.breedings[sid] || (state.breedings[sid] = []);
     var sameMare = function (b) { return mareLife ? String(b.mareLifeNumber) === String(mareLife) : tidyName(b.mareName) === tidyName(sf.mareName); };
     // already recorded with this fee on this date? nothing to do
-    if (list.some(function (b) { return sameMare(b) && b.price === sf.fee && (!b.date || !sf.date || b.date === sf.date); })) return '';
+    if (list.some(function (b) { return sameMare(b) && b.price === sf.fee && b.feeSource !== 'breed page' && (!b.date || !sf.date || b.date === sf.date); })) return '';
+    // the Breed page already put its (cheapest-price) fee on this covering: the bank row has the amount really paid
+    var fromBreedPage = list.find(function (b) { return sameMare(b) && b.feeSource === 'breed page' && b.status === 'Pending' && (!b.date || !sf.date || b.date === sf.date); });
+    if (fromBreedPage) {
+      fromBreedPage.price = sf.fee; fromBreedPage.currency = sf.currency || 'HRC';
+      if (sf.transport) fromBreedPage.transport = sf.transport;
+      if (sf.studOwner) fromBreedPage.studOwner = sf.studOwner;
+      if (!fromBreedPage.date && sf.date) fromBreedPage.date = sf.date;
+      fromBreedPage.feeSource = 'bank';
+      return 'updated';
+    }
     var pending = list.find(function (b) { return sameMare(b) && b.price == null && b.status === 'Pending' && (!b.date || !sf.date || b.date === sf.date); });
     if (pending) {
       pending.price = sf.fee;

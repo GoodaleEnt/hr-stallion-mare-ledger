@@ -2096,6 +2096,9 @@
       html += oddsCardHtml(g.name, g.outcomes.map(function (o) { return oddsRowHtml(o.genotype, o.pct, o.effect); }).join(''));
     });
     html += '</details>';
+    if (c.unread && c.unread.length) {
+      html += '<p class="notes-line" style="color:var(--danger);">Could not read these from the tested colours: <span class="mono">' + L.esc(c.unread.join(' ')) + '</span>. Tell the developer how Horse Reality writes them.</p>';
+    }
     if (c.untested.length) {
       html += '<p class="notes-line">Not known on both parents, so left out: ' + L.esc(c.untested.join(', ')) + '.</p>';
     }

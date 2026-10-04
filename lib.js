@@ -399,9 +399,20 @@
     }
     return (out.length === 2 && !rest) ? out : null;
   }
+  // Splits the text into one token per gene. A genotype written with a separator ("PATN1/patn1",
+  // "PATN1, patn1") is joined first, and stray punctuation is dropped.
+  function colourTokens(text) {
+    return String(text || '').replace(/\s*[\/|,;]\s*/g, '').split(/\s+/).map(function (t) { return t.replace(/[^A-Za-z0-9]/g, ''); }).filter(Boolean);
+  }
+  // Tokens of the tested-colours text that matched no gene (so the screen can show what was skipped).
+  function unreadColourTokens(text) {
+    return colourTokens(text).filter(function (tok) {
+      return !ALL_LOCI.some(function (l) { return splitAlleles(tok, l.alleles); });
+    });
+  }
   function parseColourGenes(text) {
     var out = {};
-    String(text || '').split(/\s+/).filter(Boolean).forEach(function (tok) {
+    colourTokens(text).forEach(function (tok) {
       for (var i = 0; i < ALL_LOCI.length; i++) {
         var al = splitAlleles(tok, ALL_LOCI[i].alleles);
         if (al) { out[ALL_LOCI[i].id] = al; return; }
@@ -540,9 +551,11 @@
     var colourIds = ['E', 'A', 'CR', 'D', 'G'].concat(EXTRA_LOCI.map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
     // Modifiers usable without a base colour (not A, not the base-dependent extras).
     var noBaseIds = ['CR', 'D', 'G'].concat(EXTRA_LOCI.filter(function (l) { return !l.only; }).map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
+    var unread = unreadColourTokens(sireText).concat(unreadColourTokens(damText)).filter(function (t, i, a) { return a.indexOf(t) === i; });
     var patternIds = ['LP', 'PATN1'].filter(function (id) { return dist[id]; });
     return {
       genes: genes,
+      unread: unread,
       extras: extras,
       untested: untested,
       colours: dist.E ? enumerateOutcomes(dist, colourIds, baseColourLabel) : (noBaseIds.length ? enumerateOutcomes(dist, noBaseIds, baseColourLabel) : null),
@@ -1579,6 +1592,7 @@
     parseConformation: parseConformation,
     pedigreeTreeOf: pedigreeTreeOf,
     parseColourGenes: parseColourGenes,
+    unreadColourTokens: unreadColourTokens,
     colourOutcomes: colourOutcomes,
     EXTRA_LOCI: EXTRA_LOCI,
     extraGenotypeOptions: extraGenotypeOptions,

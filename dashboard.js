@@ -310,7 +310,7 @@
       '<p>Every covering, every mare, every fee — captured as you browse.' +
       (version ? ' <span class="mono" style="color:var(--text-muted);font-size:12px;">v' + L.esc(version) + '</span>' : '') +
       '</p>' +
-      '</div></header>';
+      '</div><a class="btn btn-sm" style="text-decoration:none;" href="' + L.esc((chrome.runtime.getURL && chrome.runtime.getURL('manual.html')) || 'https://github.com/GoodaleEnt/hr-stallion-mare-ledger/blob/master/docs/MANUAL.md') + '" target="_blank" rel="noopener">User Manual</a></header>';
 
     html += apiWarningBannerHtml();
     html += renderNeedsReviewHtml();

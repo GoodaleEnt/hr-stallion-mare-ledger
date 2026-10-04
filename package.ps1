@@ -7,7 +7,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $version = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
 $files = @(
   'manifest.json', 'background.js', 'content.js', 'lib.js', 'storage.js',
-  'dashboard.html', 'dashboard.js',
+  'dashboard.html', 'dashboard.js', 'manual.html',
   'icons/16.png', 'icons/32.png', 'icons/48.png', 'icons/128.png'
 )
 $out = Join-Path $PSScriptRoot "hr-stallion-mare-ledger-v$version.zip"

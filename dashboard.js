@@ -21,6 +21,7 @@
   var showArchive = false;
   var herdRoleFilter = '';
   var herdProjectFilter = '';
+  var suggestLife = null;
   var calcMare = '';
   var calcStallion = '';
 
@@ -204,7 +205,8 @@
   function render() {
     var app = document.getElementById('app');
     var html;
-    if (selectedPassportLife) html = renderPassportDetail();
+    if (suggestLife) html = renderSuggestions();
+    else if (selectedPassportLife) html = renderPassportDetail();
     else if (selectedId) html = renderDetail();
     else if (selectedMareKey) html = renderMareDetail();
     else if (activeTab === 'mares') html = renderMaresList();
@@ -352,6 +354,7 @@
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
     var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : activeTab === 'retired' ? '← Back to retired' : '← Back to search') + '</button>';
+    html += suggestionsLinkHtml(selectedPassportLife);
     html += goalStripHtml(selectedPassportLife);
     html += '<div class="detail-head"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
@@ -840,6 +843,40 @@
     return html;
   }
 
+  // ---------- breeding suggestions page ----------
+  function suggestionsLinkHtml(life) {
+    var info = life && state.horseInfo ? state.horseInfo[life] : null;
+    if (!info || info.sex !== 'mare') return '';
+    return '<div style="margin:0 0 12px;"><button type="button" class="btn btn-primary btn-sm" data-action="open-suggestions" data-life="' + L.esc(life) + '">Breeding suggestions \u2192</button></div>';
+  }
+  function renderSuggestions() {
+    var life = suggestLife;
+    var r = L.breedingSuggestions(state, life, 10);
+    var html = '<button class="back-link" data-action="close-suggestions">\u2190 Back to ' + L.esc(r.mareName) + '</button>';
+    html += '<div class="section-head"><h2>Breeding suggestions for ' + L.esc(r.mareName) + '</h2></div>';
+    html += '<div class="card" style="padding:12px 16px;margin-bottom:14px;border-color:var(--accent-2);"><strong>Only horses saved in the ledger are considered.</strong> ' +
+      'That means stallions whose pages you have opened on Horse Reality (your own and other players\'). Open more stallions\' pages and they will show up here. ' +
+      'Ranked by the foal\'s estimated Breed Total, adjusted for conformation traits that cover each other, the stallion\'s fertility and inbreeding.</div>';
+    if (r.error === 'young') return html + '<div class="empty"><h3>' + L.esc(r.mareName) + ' is under 3</h3><p>A mare can only be bred from age 3.</p></div>';
+    if (r.error) return html + '<div class="empty"><h3>Not a mare</h3><p>Breeding suggestions are for mares.</p></div>';
+    if (r.status.status === 'pregnant') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6dbe9;border-color:#c8588f;color:#8a2a5c;"><strong>\u2665 She is in foal' + (r.status.stallion ? ' to ' + L.esc(r.status.stallion) : '') + (r.status.due ? ' \u2014 ' + L.esc(r.status.due.replace(/^Due /, 'due ')) : '') + '.</strong> These suggestions are for her next breeding.</div>';
+    else if (r.status.status === 'covered') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6e4a8;border-color:#d9a21b;color:#6b4f00;"><strong>\u2714 She is already covered' + (r.status.stallion ? ' by ' + L.esc(r.status.stallion) : '') + ' \u2014 waiting for the result.</strong> These suggestions are for her next breeding.</div>';
+    html += '<p class="notes-line" style="margin:0 0 10px;">' + r.considered + ' stallion' + (r.considered === 1 ? '' : 's') + ' considered' +
+      (r.noData ? ' \u00b7 ' + r.noData + ' skipped (no genetic potential saved yet)' : '') + (r.tooRelated ? ' \u00b7 ' + r.tooRelated + ' left out (more than 12.5% inbred to her)' : '') + '.</p>';
+    if (!r.suggestions.length) return html + '<div class="empty"><h3>No stallions to suggest yet</h3><p>Open some stallions\' pages on Horse Reality (age 3 and over) so the ledger has them saved.</p></div>';
+    r.suggestions.forEach(function (s, i) {
+      html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;justify-content:space-between;">' +
+          '<div><span class="tag mono">#' + (i + 1) + '</span> <button type="button" class="link-btn" style="font-size:17px;font-weight:600;" data-action="open-passport" data-life="' + L.esc(s.life) + '">' + L.esc(s.name) + '</button>' +
+            (s.yours ? ' <span class="tag">Your stallion</span>' : '') + '</div>' +
+          '<div class="mono" style="font-size:15px;">' + (s.estBT != null ? 'Foal BT ~<strong>' + s.estBT + '</strong>' : 'Avg GP <strong>' + s.gp + '</strong>') + '</div>' +
+        '</div>' +
+        '<ul style="margin:8px 0 0 18px;padding:0;font-size:13.5px;line-height:1.55;">' + s.reasons.map(function (x) { return '<li>' + L.esc(x) + '</li>'; }).join('') + '</ul>' +
+      '</div>';
+    });
+    return html;
+  }
+
   function renderMareDetail() {
     var m = maresIndex.find(function (x) { return x.key === selectedMareKey; });
     if (!m) { selectedMareKey = null; return renderMaresList(); }
@@ -854,6 +891,7 @@
         '<button class="btn btn-sm" data-action="nav-mare" data-dir="next">Next ›</button>' +
       '</div>' : '') +
     '</div>';
+    html += suggestionsLinkHtml(m.mareLifeNumber);
     html += goalStripHtml(m.mareLifeNumber);
     html += '<div class="detail-head">' +
       '<div><h1>' + L.esc(m.mareName) + '</h1>' +
@@ -2103,7 +2141,7 @@
 
       if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
-        selectedMareKey = null; selectedId = null; selectedPassportLife = null;
+        selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
         render();
       }
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
@@ -2127,6 +2165,8 @@
       else if (action === 'back-to-mares') { selectedMareKey = null; render(); }
       else if (action === 'back-to-list') { selectedId = null; editingStallion = false; addingBreeding = false; render(); }
       else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
+      else if (action === 'open-suggestions') { suggestLife = t.getAttribute('data-life'); render(); window.scrollTo(0, 0); }
+      else if (action === 'close-suggestions') { suggestLife = null; render(); }
       else if (action === 'close-passport') { selectedPassportLife = null; render(); }
       else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
       else if (action === 'an-sort') {

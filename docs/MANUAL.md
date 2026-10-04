@@ -173,6 +173,14 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 
 Click any column heading in the stallion, mare or Colts & Fillies tables to sort by it; click it again to reverse the order (a small arrow shows the direction). Empty values always sort to the bottom. Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
 
+## Breeding suggestions
+
+Open a mare's page (My Mares, or any mare's profile) and click **Breeding suggestions →** to see the 10 best stallions for her, each with the reasons: the foal's estimated Breed Total (from both parents' genetic potential and top conformation), inbreeding, conformation traits where he covers her weak ones (or where you are both weak), his fertility, what he costs (stud fee, transport and semen vial when known), and whether they have been bred together before.
+
+**Only horses saved in the ledger are considered**: stallions whose pages you have opened on Horse Reality (age 3 and over, not sold or retired, with a genetic potential saved). Open more stallions' pages and they join the list. A mare under 3 gets no suggestions, and a covered or in-foal mare shows a note that the list is for her next breeding.
+
+**Stud fees.** When you open a stallion's **Breed** page, the ledger saves the stud fee, transport and semen-vial prices it finds there. It also remembers the last stud fee you paid him from your bank page. The suggestions show these as his cost.
+
 ## Foal Calculator
 
 In the **Mare** list, a mare who is already covered or in foal says so next to her name (✔ COVERED by … / ♥ IN FOAL, in colour), and picking her shows a notice under the pickers saying who she is covered by or due to, and whether the stallion you are comparing is the pairing she already has.

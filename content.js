@@ -1298,6 +1298,38 @@
     });
   }
 
+  // The Breed page of a stallion that is not yours may state his stud fee, the transport cost and a semen
+  // vial price. Read them by their labels (the text near "fee" / "transport" or "shipping" / "semen" or
+  // "vial") and keep them on the stallion so the suggestions can show what he costs.
+  var lastTermsSig = '', lastTermsAt = 0;
+  function readStudTerms(text) {
+    function num(re) { var m = re.exec(text); return m ? parseInt(String(m[1]).replace(/[^0-9]/g, ''), 10) : 0; }
+    var amount = '([0-9][0-9\\s\\u00a0.,]*[0-9]|[0-9])';
+    var fee = num(new RegExp('(?:stud fee|covering fee|breeding fee|service fee|fee)[^0-9\\n]{0,24}' + amount, 'i'));
+    var transport = num(new RegExp('(?:transport(?:ation)?(?: cost| fee)?|shipping(?: cost| fee)?)[^0-9\\n]{0,24}' + amount, 'i'));
+    var vial = num(new RegExp('(?:semen|vial)[^0-9\\n]{0,30}' + amount, 'i'));
+    var cur = /\b(HRC|DP|FT|WT)\b/.exec(text);
+    return fee > 0 || vial > 0 ? { fee: fee, transport: transport, vial: vial, currency: cur ? cur[1] : 'HRC' } : null;
+  }
+  function scrapeStudTerms() {
+    var parts = location.pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'breed' || !parts[1] || Date.now() - lastTermsAt < 2000) return;
+    lastTermsAt = Date.now();
+    var life = parts[1];
+    var area = document.querySelector('.breeding') || document.getElementById('breed');
+    if (!area) return;
+    var terms = readStudTerms(area.textContent || '');
+    if (!terms) return;
+    var sig = life + ':' + terms.fee + ':' + terms.transport + ':' + terms.vial;
+    if (sig === lastTermsSig) return;
+    HRStorage.getState(function (state) {
+      var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+      meta.studTerms = { fee: terms.fee, transport: terms.transport, vial: terms.vial, currency: terms.currency, seenAt: toIsoDate(Date.now()) };
+      lastTermsSig = sig;
+      HRStorage.setState(state, function () { showToast('HR Ledger: stud terms saved (fee ' + terms.fee + ' ' + terms.currency + (terms.transport ? ' + ' + terms.transport + ' transport' : '') + (terms.vial ? ', vial ' + terms.vial : '') + ')'); });
+    });
+  }
+
   function setupBreedCapture() {
     document.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button.breedmare') : null;
@@ -1612,6 +1644,7 @@
     scrapeFoalsTab();
     scrapeStatusPills();
     scrapeCoveredPanel();
+    scrapeStudTerms();
     annotateBreedDropdown();
     if (location.href !== lastHref) {
       lastHref = location.href;

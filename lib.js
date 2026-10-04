@@ -806,6 +806,91 @@
     return 'added';
   }
 
+  // ---------- breeding suggestions for one mare ----------
+  // Every stallion saved in the ledger (age 3+, not sold or retired, with a genetic potential) is paired with
+  // her. Ranked mostly by the foal's estimated Breed Total, nudged up where his strong traits cover her weak
+  // ones and by good fertility, down for shared weak traits and inbreeding. Only horses in the ledger count.
+  var TRAIT_RANKS = { 'below average': 0, 'average': 1, 'good': 2, 'good+': 3, 'good +': 3, 'very good': 4 };
+  function traitRankOf(v) { var r = TRAIT_RANKS[String(v || '').toLowerCase().trim()]; return r == null ? null : r; }
+  var FERT_BONUS = { excellent: 0.4, good: 0.2, average: 0, fair: -0.4, poor: -0.8 };
+  // What it costs to breed to this stallion, if known: terms seen on his Breed page, else the last fee you paid.
+  function studTermsOf(state, life) {
+    var m = state.horseMeta && state.horseMeta[life];
+    var t = m && m.studTerms;
+    if (t && Number(t.fee) > 0) return { fee: Number(t.fee), transport: Number(t.transport) || 0, vial: Number(t.vial) || 0, currency: t.currency || 'HRC', source: 'seen on his Breed page', when: t.seenAt || '' };
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    if (rec && rec.lastFee && Number(rec.lastFee.fee) > 0) return { fee: Number(rec.lastFee.fee), transport: Number(rec.lastFee.transport) || 0, vial: 0, currency: rec.lastFee.currency || 'HRC', source: 'last fee you paid', when: rec.lastFee.date || '' };
+    return null;
+  }
+  function breedingSuggestions(state, mareLife, limit) {
+    mareLife = String(mareLife || '');
+    var mInfo = state.horseInfo && state.horseInfo[mareLife];
+    var out = { mareName: (mInfo && mInfo.name) || ('#' + mareLife), status: mareBreedStatus(state, mareLife), error: '', suggestions: [], considered: 0, noData: 0, tooRelated: 0 };
+    if (!mInfo || mInfo.sex !== 'mare') { out.error = 'not-a-mare'; return out; }
+    if (isYoungInfo(mInfo)) { out.error = 'young'; return out; }
+    var mMeta = (state.horseMeta && state.horseMeta[mareLife]) || {};
+    var mConf = bestConformation(mMeta).best;
+    var mAnc = ancestorMap(state, mareLife, 3);
+    var list = [];
+    Object.keys(state.horseInfo || {}).forEach(function (life) {
+      var sInfo = state.horseInfo[life];
+      if (!sInfo || sInfo.sex !== 'stallion' || isYoungInfo(sInfo)) return;
+      var sMeta = (state.horseMeta && state.horseMeta[life]) || {};
+      if (isSoldLife(state, life) || sMeta.status === 'Retired' || sMeta.status === 'Deceased') return;
+      if (sInfo.geneticPotential == null || mInfo.geneticPotential == null) { out.noData++; return; }
+      out.considered++;
+      var sConf = bestConformation(sMeta).best;
+      var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
+      var confs = [mConf, sConf].filter(function (x) { return x > 0; });
+      var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+      var estBT = conf ? breedTotal(gp, conf) : null;
+      var common = commonAncestors(mAnc, ancestorMap(state, life, 3));
+      var coi = estimateCoi(common);
+      if (coi > 12.5) { out.tooRelated++; return; }
+      var shared = [], fixes = [];
+      if (mInfo.confTraits && sInfo.confTraits) {
+        Object.keys(mInfo.confTraits).forEach(function (t) {
+          var a = traitRankOf(mInfo.confTraits[t]), b = traitRankOf(sInfo.confTraits[t]);
+          if (a == null || b == null) return;
+          if (a === 0 && b === 0) shared.push(t);
+          else if (a === 0 && b >= 2) fixes.push(t);
+        });
+      }
+      var fert = String(sInfo.fertility || '').toLowerCase().trim();
+      var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
+      var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+      var yours = !!(rec && rec.owned !== false);
+      var terms = yours ? null : studTermsOf(state, life);
+      // what she and he have produced together already
+      var hist = { foals: 0, failed: 0, bestScore: 0 };
+      if (rec) {
+        (state.breedings[rec.id] || []).forEach(function (b) {
+          if (String(b.mareLifeNumber) !== mareLife) return;
+          if (b.status === 'Foal Born') { hist.foals++; if (b.foalScore > 0 && b.foalScore <= 100 && b.foalScore > hist.bestScore) hist.bestScore = b.foalScore; }
+          else if (b.status === 'Failed') hist.failed++;
+        });
+      }
+      var reasons = [];
+      reasons.push(estBT != null
+        ? 'Estimated foal Breed Total ' + (Math.round(estBT * 10) / 10) + ' (average genetic potential ' + (Math.round(gp * 10) / 10) + ', average top conformation ' + (Math.round(conf * 10) / 10) + ')'
+        : 'Average genetic potential ' + (Math.round(gp * 10) / 10) + ' (neither has a show score saved yet, so Breed Total is not estimated)');
+      reasons.push(common.length ? 'Estimated inbreeding ' + (Math.round(coi * 100) / 100) + '% (' + common.length + ' shared ancestor' + (common.length === 1 ? '' : 's') + ')' : 'No shared ancestors in the saved pedigrees (0% inbreeding)');
+      if (fixes.length) reasons.push('Covers her Below-average ' + fixes.join(', ') + ' (his rating there is Good or better)');
+      if (shared.length) reasons.push('Watch: she and he are both Below average in ' + shared.join(', '));
+      if (FERT_BONUS[fert] != null) reasons.push('His fertility is ' + sInfo.fertility + (FERT_BONUS[fert] > 0 ? ' (fewer failed coverings)' : FERT_BONUS[fert] < 0 ? ' (more failed coverings)' : ''));
+      else reasons.push('His fertility is not recorded' + (isYoungInfo(sInfo) ? '' : ' (open his page after a fertility test)'));
+      if (yours) reasons.push('Your own stallion: no stud fee');
+      else if (terms) reasons.push('Stud fee ' + fmtMoney(terms.fee) + ' ' + terms.currency + (terms.transport ? ' + ' + fmtMoney(terms.transport) + ' transport' : '') + (terms.vial ? '; semen vial ' + fmtMoney(terms.vial) + ' ' + terms.currency : '') + ' (' + terms.source + ')');
+      else reasons.push('Stud fee not known yet (open his Breed page to record it)');
+      if (hist.foals || hist.failed) reasons.push('Bred together before: ' + (hist.foals ? hist.foals + ' foal' + (hist.foals === 1 ? '' : 's') + (hist.bestScore ? ' (best score ' + hist.bestScore + ')' : '') : '') + (hist.foals && hist.failed ? ', ' : '') + (hist.failed ? hist.failed + ' failed covering' + (hist.failed === 1 ? '' : 's') : ''));
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus;
+      list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
+    });
+    list.sort(function (a, b) { return b.score - a.score; });
+    out.suggestions = list.slice(0, limit || 10);
+    return out;
+  }
+
   // ---------- stud fees you paid to breed to someone else's stallion ----------
   // Bank row: "You paid 35 000 HRC + 1 000 HRC for transport to <owner> to breed <mare> with the stud <stallion>."
   // sf = { fee, currency, transport, studOwner, mareName, mareLife, stallionName, stallionLife, date }
@@ -829,6 +914,8 @@
       if (!state.breedings) state.breedings = {};
       state.breedings[sid] = [];
     }
+    var studRec = state.stallions.find(function (x) { return x.id === sid; });
+    if (studRec && sf.date >= String((studRec.lastFee && studRec.lastFee.date) || '')) studRec.lastFee = { fee: sf.fee, transport: sf.transport || 0, currency: sf.currency || 'HRC', date: sf.date || '', studOwner: sf.studOwner || '' };
     var list = state.breedings[sid] || (state.breedings[sid] = []);
     var sameMare = function (b) { return mareLife ? String(b.mareLifeNumber) === String(mareLife) : tidyName(b.mareName) === tidyName(sf.mareName); };
     // already recorded with this fee on this date? nothing to do
@@ -1233,6 +1320,8 @@
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
     applyStudFee: applyStudFee,
+    breedingSuggestions: breedingSuggestions,
+    studTermsOf: studTermsOf,
     recordCoveringFromPage: recordCoveringFromPage,
     dedupeFoals: dedupeFoals,
     mareBreedStatus: mareBreedStatus,

@@ -1080,7 +1080,7 @@
     html += '</div>';
 
     // stallion table
-    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Stallions</h3>';
+    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Stallions <span class="sub" style="font-size:12px;color:var(--text-muted);font-weight:400;">3 years and older</span></h3>';
     if (!a.stallions.length) {
       html += '<p class="notes-line" style="margin:0;">No stallions yet.</p>';
     } else {
@@ -1096,14 +1096,29 @@
     html += '</div>';
 
     // mares table
-    html += '<div class="an-card"><h3>Your mares</h3>';
-    if (!a.mares.length) {
-      html += '<p class="notes-line" style="margin:0;">No mares of yours cached yet.</p>';
+    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Your mares <span class="sub" style="font-size:12px;color:var(--text-muted);font-weight:400;">3 years and older</span></h3>';
+    var adultMares = a.mares.filter(function (m) { return !m.young; });
+    if (!adultMares.length) {
+      html += '<p class="notes-line" style="margin:0;">No adult mares (3+) of yours cached yet.</p>';
     } else {
       html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Mare</th><th class="num">Breedings</th><th class="num">Foals</th><th>Last bred</th><th>Status</th></tr></thead><tbody>';
-      a.mares.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (m) {
+      adultMares.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (m) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(m.life) + '">' + L.esc(m.name) + '</button></td>' +
-          '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (m.young ? 'Young' : m.pregnant ? 'In foal' : 'Open') + '</td></tr>';
+          '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (m.pregnant ? 'In foal' : 'Open') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    // under 3: colts and fillies
+    html += '<div class="an-card"><h3>Colts &amp; Fillies <span class="sub" style="font-size:12px;color:var(--text-muted);font-weight:400;">under 3 years</span></h3>';
+    if (!a.young.length) {
+      html += '<p class="notes-line" style="margin:0;">No colts or fillies of yours cached yet.</p>';
+    } else {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Horse</th><th></th><th>Age</th><th class="num">GP</th><th class="num">Top conformation</th><th class="num">Breed Total</th></tr></thead><tbody>';
+      a.young.forEach(function (y) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(y.life) + '">' + L.esc(y.name) + '</button></td><td><span class="tag">' + y.kind + '</span></td><td>' + L.esc(y.age || '\u2014') + '</td>' +
+          '<td class="num mono">' + (y.gp != null ? L.esc(y.gp) : '\u2014') + '</td><td class="num mono">' + (y.conf != null ? Math.round(y.conf * 1000) / 1000 : '\u2014') + '</td><td class="num mono">' + (y.bt ? Math.round(y.bt * 1000) / 1000 : '\u2014') + '</td></tr>';
       });
       html += '</tbody></table></div>';
     }

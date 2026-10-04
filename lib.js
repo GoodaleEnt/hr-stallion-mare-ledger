@@ -727,7 +727,11 @@
     }
     function latest(a, b) { return b && (!a || b > a) ? b : a; }
 
-    var stallions = (state.stallions || []).filter(function (s) { return s.owned !== false; }).map(function (s) {
+    var stallions = (state.stallions || []).filter(function (s) {
+      if (s.owned === false) return false;
+      var si = s.lifeNumber && state.horseInfo ? state.horseInfo[s.lifeNumber] : null;
+      return !(si && isYoungInfo(si));
+    }).map(function (s) {
       var recs = allBreedings[s.id] || [];
       var foalMares = {};
       recs.forEach(function (r) { if (r.status === 'Foal Born' && r.mareLifeNumber) foalMares[r.mareLifeNumber] = true; });
@@ -797,6 +801,24 @@
       });
       mares.push(m);
     });
+
+    // under 3: listed as colts (young stallions) and fillies (young mares)
+    var youngList = [];
+    ownedHorses(state).forEach(function (h) {
+      var info = h.info;
+      if ((info.sex !== 'stallion' && info.sex !== 'mare') || !isYoungInfo(info)) return;
+      if (h.meta.status === 'Sold' || h.meta.status === 'Retired' || h.meta.status === 'Deceased') return;
+      var conf = bestConformation(h.meta).best;
+      var meta = (state.horseMeta && state.horseMeta[h.lifeNumber]) || {};
+      youngList.push({
+        life: h.lifeNumber, name: info.name || ('#' + h.lifeNumber), kind: info.sex === 'stallion' ? 'Colt' : 'Filly',
+        age: info.ageText || formatAgeMonths(effectiveAgeMonths(info)),
+        gp: info.geneticPotential != null ? info.geneticPotential : null,
+        conf: conf > 0 ? conf : null,
+        bt: Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf)) || null
+      });
+    });
+    youngList.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
 
     // suggestions
     var tips = [];
@@ -895,7 +917,7 @@
     var topBT = best.filter(function (x) { return x.bt > 0; }).sort(function (a, b) { return b.bt - a.bt; }).slice(0, 5);
     var topConf = best.filter(function (x) { return x.conf > 0; }).sort(function (a, b) { return b.conf - a.conf; }).slice(0, 5);
 
-    return { overall: overall, stallions: stallions, months: monthList, mares: mares, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, goalHitList: goalHits, nearMiss: nearMiss.length, nearMissList: nearMiss, gaps: gaps.length };
+    return { overall: overall, stallions: stallions, months: monthList, mares: mares, young: youngList, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, goalHitList: goalHits, nearMiss: nearMiss.length, nearMissList: nearMiss, gaps: gaps.length };
   }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.

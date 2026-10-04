@@ -156,7 +156,8 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 - **Pairing ideas:** your free mares crossed with your active stallions, keeping only pairs with an estimated inbreeding under 6.25%. They are ranked by the foal's estimated Breed Total (from both parents' average genetic potential and average top conformation score), nudged up when one parent is strong where the other is Below average ("Covers") and down when both are Below average in the same trait ("Watch") and for inbreeding. A pair where a parent has no show score yet uses the other parent's score only.
 - **Breedings per month:** the last 12 months as a bar chart.
 - **Top Breed Total, top conformation and goals:** your best horses and how many meet your highlight goals.
-- **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred.
+- **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred. These list horses aged 3 and over only.
+- **Colts & Fillies:** horses under 3 are listed separately, a young stallion as a **Colt** and a young mare as a **Filly**, with age, genetic potential, top conformation and Breed Total.
 
 Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
 

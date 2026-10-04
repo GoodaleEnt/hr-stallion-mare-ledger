@@ -107,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.11.1 | 2026-10-03 | Breeding date survives the site reloading onto the stallion page after you click Breed | Draft |
 | 1.11.0 | 2026-10-03 | Breeding date recorded automatically when you breed a mare on the Breed page | Draft |
 | 1.10.1 | 2026-10-03 | Tidy mare names that showed icon markers or only a life number | Draft |
 | 1.10.0 | 2026-10-03 | Separate Date bred and Date born columns; dates filled from notifications, related records and foal passports; self-bred mares get an approximate date | Draft |

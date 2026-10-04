@@ -1068,9 +1068,18 @@
   }
 
   // The Breed page (/breed/<stallion life number>/) has a mare dropdown and a
-  // "Breed" button. Clicking it makes Horse Reality show "Your mare was
-  // successfully covered"; when that appears, record the covering with
-  // today's date. Nothing is saved if the covering isn't confirmed.
+  // "Breed" button. Clicking Breed reloads the site onto the stallion's page,
+  // so the click is saved straight to extension storage (not the page) and
+  // recorded a moment later, or on the next page load. If Horse Reality shows
+  // an error pop-up instead, the covering is dropped.
+  var PENDING_KEY = 'hrPendingCoverings';
+  function readPendingCoverings(cb) {
+    chrome.storage.local.get(PENDING_KEY, function (res) { cb(Array.isArray(res[PENDING_KEY]) ? res[PENDING_KEY] : []); });
+  }
+  function writePendingCoverings(list, cb) {
+    var o = {}; o[PENDING_KEY] = list;
+    chrome.storage.local.set(o, cb || function () {});
+  }
   function setupBreedCapture() {
     document.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button.breedmare') : null;
@@ -1079,26 +1088,41 @@
       var mareLife = select ? select.value : '';
       if (!mareLife) return;
       var opt = select.options[select.selectedIndex];
-      var urlMatch = location.pathname.split('/').filter(Boolean);
-      var stallionLife = btn.getAttribute('lang') || (urlMatch[0] === 'breed' ? urlMatch[1] : '');
+      var urlPart = location.pathname.split('/').filter(Boolean);
+      var stallionLife = btn.getAttribute('lang') || (urlPart[0] === 'breed' ? urlPart[1] : '');
       if (!stallionLife) return;
       var stallionTop = document.querySelector('#first_horseinfo .top');
       var covering = {
         mareLife: mareLife,
         mareName: parseHorseNameHeader(opt ? opt.textContent : ''),
         stallionLife: stallionLife,
-        stallionName: parseHorseNameHeader(stallionTop ? stallionTop.textContent : '')
+        stallionName: parseHorseNameHeader(stallionTop ? stallionTop.textContent : ''),
+        at: Date.now()
       };
-      var done = false;
-      var observer = new MutationObserver(function () {
-        if (done || !/successfully covered/i.test(document.body.textContent || '')) return;
-        done = true;
-        observer.disconnect();
-        recordCovering(covering);
+      // Written immediately and without waiting: the page is about to unload.
+      readPendingCoverings(function (list) {
+        list = list.filter(function (p) { return p.mareLife !== covering.mareLife; });
+        list.push(covering);
+        writePendingCoverings(list);
       });
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-      setTimeout(function () { observer.disconnect(); }, 20000);
+      var observer = new MutationObserver(function () {
+        if (!document.querySelector('.notifyjs-bootstrap-error, .notifyjs-corner [class*="error"]')) return;
+        observer.disconnect();
+        readPendingCoverings(function (list) {
+          writePendingCoverings(list.filter(function (p) { return p.mareLife !== covering.mareLife; }));
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(function () { observer.disconnect(); }, 8000);
+      setTimeout(confirmPendingCoverings, 4000);
     }, true);
+  }
+  function confirmPendingCoverings() {
+    readPendingCoverings(function (list) {
+      var fresh = list.filter(function (p) { return Date.now() - p.at < 120000; });
+      if (list.length) writePendingCoverings([]);
+      fresh.forEach(recordCovering);
+    });
   }
   function recordCovering(c) {
     HRStorage.getState(function (state) {
@@ -1116,6 +1140,7 @@
     });
   }
   setupBreedCapture();
+  setTimeout(confirmPendingCoverings, 2500);
 
   function onPageReady() {
     healOwnedStubs();

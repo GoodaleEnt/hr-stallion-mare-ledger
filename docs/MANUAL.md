@@ -151,7 +151,7 @@ Below the inbreeding check, the calculator shows the odds for the foal's **coat 
 
 ## Breeding dates
 
-When you breed a mare on Horse Reality's **Breed** page and the site confirms "Your mare was successfully covered", the ledger records the covering with today's date (shown as **Date bred**) and the status *Pending*. Nothing is saved if the covering isn't confirmed. The foal's **Date born** is filled in from the foal's passport once it's born.
+When you click **Breed** on Horse Reality's Breed page, the ledger records the covering with today's date (shown as **Date bred**) and the status *Pending*, unless the site shows an error. The foal's **Date born** is filled in from the foal's passport once it's born.
 
 ## Understanding breeding statuses
 

@@ -464,7 +464,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife);
+    html += healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -1138,7 +1138,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber);
+    html += healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -2373,6 +2373,21 @@
   }
 
   // ---------- health & fertility (read from the horse's Health box) ----------
+  // Shows read from conformation-show results pages: the latest few, and progress to the Star predicate
+  // (three 1st premiums, a score of 80 or more; wiki: Predicates).
+  function showLogPanelHtml(life) {
+    var meta = state.horseMeta[life];
+    var log = meta && Array.isArray(meta.showLog) ? meta.showLog : [];
+    if (!log.length) return '';
+    var firsts = log.filter(function (e) { return e.score >= 80; }).length;
+    var recent = log.slice().sort(function (a, b) { return b.seenAt - a.seenAt; }).slice(0, 6);
+    var ord = function (n) { return n ? (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th') : ''; };
+    return '<details class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;font-weight:600;">Show results saved from results pages (' + log.length + ') \u2014 Star: ' + Math.min(firsts, 3) + ' of 3 first premiums</summary>' +
+      '<div style="margin-top:8px;">' + recent.map(function (e) {
+        return '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding:5px 0;font-size:13.5px;"><span>' + L.esc(e.name || 'Show') + (e.category ? ' <span class="sub">(' + L.esc(e.category) + ')</span>' : '') + '</span>' +
+          '<span class="mono">' + (e.rank ? ord(e.rank) + ' \u00b7 ' : '') + L.esc(e.score) + (e.premium ? ' \u00b7 ' + ord(e.premium) + ' premium' : '') + '</span></div>';
+      }).join('') + '</div><p class="notes-line" style="margin:8px 0 0;">Read when you open a show\'s results page. The Star predicate needs three scores of 80 or more; only shows you have opened are counted here.</p></details>';
+  }
   // Which disciplines the horse's conformation suits (wiki: Competitions lists the traits each discipline uses).
   function disciplinePanelHtml(life) {
     var info = state.horseInfo[life];
@@ -2734,7 +2749,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber);
+    html += healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);

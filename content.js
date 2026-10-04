@@ -1145,6 +1145,92 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // ---- conformation show results page ----
+  // A show's results page lists every horse in each category (Foals / Mares / Stallions / Geldings) with its rank and
+  // score. The score of each horse that is in the ledger (or is yours) raises its top conformation score, and the
+  // result is kept in a short per-horse log of shows (used for the Star predicate count on the horse's page).
+  var lastShowSig = '';
+  function readShowResults() {
+    var frames = document.querySelectorAll('.component.frame.show-table');
+    if (!frames.length) return null;
+    var h1 = document.querySelector('h1');
+    var out = {
+      showId: ((/\/show\/([0-9a-f-]{8,})\//i.exec(location.pathname) || [])[1]) || '',
+      name: h1 ? (h1.textContent || '').replace(/\s+/g, ' ').trim() : 'Conformation show',
+      rows: []
+    };
+    frames.forEach(function (fr) {
+      var t = fr.querySelector('.title');
+      var category = t ? (t.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      fr.querySelectorAll('.responsive-tr').forEach(function (tr) {
+        var link = tr.querySelector('a[href*="/horses/"]');
+        var m = link && /\/horses\/(\d+)\//.exec(link.getAttribute('href') || '');
+        if (!m) return;
+        var scoreEl = tr.querySelector('.text-right strong.fontbigger') || tr.querySelector('strong.fontbigger');
+        var sm = scoreEl && /\d+(?:\.\d+)?/.exec((scoreEl.textContent || '').replace(/,/g, ''));
+        if (!sm) return;
+        var rankEl = tr.querySelector('.text-bold');
+        var rank = 0;
+        if (rankEl) {
+          var rimg = rankEl.querySelector('img[alt$="Prize"]');
+          var rm = rimg ? /(\d+)/.exec(rimg.getAttribute('alt') || '') : /#\s*(\d+)/.exec(rankEl.textContent || '');
+          rank = rm ? parseInt(rm[1], 10) : 0;
+        }
+        var pm = /(\d)(?:st|nd|rd|th) Premium/i.exec((scoreEl.innerHTML || ''));
+        var owner = tr.querySelector('a[href*="/user/"]');
+        out.rows.push({
+          life: m[1], score: parseFloat(sm[0]), rank: rank, premium: pm ? parseInt(pm[1], 10) : 0,
+          category: category, owner: owner ? (owner.textContent || '').trim() : '',
+          mine: tr.classList.contains('mine')
+        });
+      });
+    });
+    return out.rows.length ? out : null;
+  }
+  function scrapeShowResults(force) {
+    if (!force && !(/conformation-shows/.test(location.pathname) && /\/results\/?$/.test(location.pathname))) return;
+    var res = readShowResults();
+    if (!res) return;
+    var sig = res.showId + '|' + res.rows.map(function (r) { return r.life + ':' + r.score; }).join(',');
+    if (sig === lastShowSig) return;
+    lastShowSig = sig;
+    HRStorage.getState(function (state) {
+      if (!state.horseMeta) state.horseMeta = {};
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      var ignored = (state.settings && state.settings.ignored) || {};
+      var saved = 0, raisedCount = 0, names = [];
+      res.rows.forEach(function (r) {
+        if (ignored[r.life]) return;
+        var mine = r.mine || (me && r.owner.toLowerCase() === me);
+        if (!mine && !(state.horseInfo && state.horseInfo[r.life])) return;
+        var meta = Object.assign({}, state.horseMeta[r.life]);
+        var log = Array.isArray(meta.showLog) ? meta.showLog.slice() : [];
+        var key = res.showId || res.name;
+        var existing = log.find(function (e) { return e.show === key; });
+        var entry = { show: key, name: res.name, score: r.score, rank: r.rank, premium: r.premium, category: r.category, seenAt: Date.now() };
+        var changed = false;
+        if (existing) { if (existing.score !== r.score || existing.rank !== r.rank) { Object.assign(existing, entry); changed = true; } }
+        else { log.push(entry); changed = true; }
+        var prev = Number(meta.confBest) || 0;
+        if (r.score > prev) {
+          meta.confBest = r.score; meta.confBestAt = Date.now(); meta.confBestDate = ''; meta.confBestEvent = res.name.slice(0, 90);
+          raisedCount++; changed = true;
+          names.push((state.horseInfo[r.life] && state.horseInfo[r.life].name) || ('#' + r.life));
+        }
+        if (!changed) return;
+        meta.showLog = log.slice(-40);
+        state.horseMeta[r.life] = meta;
+        saved++;
+      });
+      if (!saved) return;
+      HRLib.refreshBreedTotals(state);
+      HRStorage.setState(state, function () {
+        showToast('HR Ledger: ' + saved + ' show score' + (saved === 1 ? '' : 's') + ' saved' + (raisedCount ? ' (' + raisedCount + ' new best)' : ''));
+      });
+    });
+  }
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrTest = { scrapeShowResults: scrapeShowResults, readShowResults: readShowResults };
+
   // Per-trait conformation ratings from the horse page's genetics table
   // (.genetic_table_row: a trait name element, then its rating element —
   // Good / Average / Below average). Saved as horseInfo[id].confTraits.
@@ -1804,6 +1890,7 @@
     scrapeMyStuds();
     annotateBreedDropdown();
     addBreedParentLinks();
+    scrapeShowResults();
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

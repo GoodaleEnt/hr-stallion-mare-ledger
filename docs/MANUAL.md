@@ -177,6 +177,7 @@ Besides conformation and Breed Total, you can set a **minimum Genetic Potential*
 
 The ledger follows the rules on the Horse Reality wiki:
 
+- **Show results:** opening a show's Results page saves the scores of your horses (see Show results below).
 - **Time of breeding:** when you click Breed, the time is saved with the date and shown under the date in the ledger (and in the CSV export).
 - **Due date window:** a pregnancy lasts 13.5 to 17 days, so for a mare in foal whose due date the site hasn't shown, Foals due gives an estimated window counted from the covering.
 - **Ageing:** a game month is 32 real hours. The age read off a horse's page is moved forward by the time since you last saw it, so a horse that turns 3 shows up as an adult without you opening its page. If Horse Reality's data includes the exact time of birth it is used to land on the right hour, and a foal's official time of birth is saved and shown under its date born.
@@ -189,6 +190,16 @@ The ledger follows the rules on the Horse Reality wiki:
 If you breed more than one breed, the **Breed** picker under the tabs on every page limits the whole ledger to one breed: the lists, the Active stallions / mares / colts / fillies counts, Analytics, the calendar, sell ideas and goal suggestions, and the Foal Calculator and Compare lists. Choose **All breeds** to go back. Your choice is remembered.
 
 Every horse page also has **Best disciplines from conformation**, which scores the seven disciplines from the conformation traits each one uses (from the wiki). The game also counts genetic potential stats, training, fitness and tack, which the ledger cannot see, so it is a guide only.
+
+## Show results
+
+When you open a conformation show's **Results** page on Horse Reality (the page with the Foals / Mares / Stallions / Geldings tables), the ledger reads every score on it:
+
+- A horse that is yours, or already in the ledger, gets its **top conformation score** raised if the score is higher. The new best is shown as "seen <date>" with the show's name, and Breed Total, the goal boxes and the best-disciplines panel follow from it. A lower score never replaces a higher one.
+- Each horse's page then has a **Show results saved from results pages** panel with the latest shows, the rank, the score and the premium, and a count towards the **Star predicate** (three scores of 80 or more). Only shows whose results page you have opened are counted.
+- A small message in the corner says how many scores were saved. Opening the same results page again changes nothing unless a score changed.
+
+You can enter a show and open the results as soon as it has finished; there is no need to visit each horse's stats page. (The stats page's "Latest 25 show results" list is still read as well.)
 
 ## Removing a horse
 

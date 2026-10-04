@@ -1042,7 +1042,34 @@
     }
     html += topList('Top Breed Total', a.topBT, function (x) { return Math.round(x.bt * 1000) / 1000; });
     html += topList('Top conformation', a.topConf, function (x) { return Math.round(x.conf * 1000) / 1000; });
-    html += '<div class="an-card"><h3>Goals</h3><p style="margin:0 0 6px;"><strong>' + a.goalHits + '</strong> horse' + (a.goalHits === 1 ? '' : 's') + ' meet all your goals; <strong>' + a.nearMiss + '</strong> miss by one box.</p><p class="notes-line" style="margin:0;">Set goals under <em>Highlight goals</em> at the top of the page.</p></div>';
+    html += '</div>';
+
+    // goals: who meets them, and who misses by exactly one box (and which box)
+    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Goals</h3>';
+    var goalSet = L.goalsOf(state);
+    var anyGoal = Object.keys(goalSet).some(function (k) { return goalSet[k] != null; });
+    if (!anyGoal) {
+      html += '<p class="notes-line" style="margin:0;">No goals set. Open <em>Highlight goals</em> at the top of the page to set some.</p>';
+    } else {
+      html += '<p style="margin:0 0 8px;"><strong>' + a.goalHits + '</strong> horse' + (a.goalHits === 1 ? '' : 's') + ' meet all your goals; <strong>' + a.nearMiss + '</strong> miss by one box.</p>';
+      html += '<div class="an-grid" style="margin:0;">';
+      html += '<div><strong>Meet all goals</strong>';
+      if (!a.goalHitList.length) html += '<p class="notes-line" style="margin:6px 0 0;">None yet.</p>';
+      else {
+        html += '<table class="an-table"><tbody>';
+        a.goalHitList.forEach(function (h) { html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(h.life) + '">' + L.esc(h.name) + '</button></td><td class="num">\u2605</td></tr>'; });
+        html += '</tbody></table>';
+      }
+      html += '</div><div><strong>Miss by one</strong>';
+      if (!a.nearMissList.length) html += '<p class="notes-line" style="margin:6px 0 0;">None.</p>';
+      else {
+        html += '<table class="an-table"><thead><tr><th>Horse</th><th>What is missing</th></tr></thead><tbody>';
+        a.nearMissList.forEach(function (n) { html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(n.life) + '">' + L.esc(n.name) + '</button></td><td><span class="goal-pill" style="background:var(--danger);color:#fff;">' + L.esc(n.missing) + '</span> ' + L.esc(n.detail) + '</td></tr>'; });
+        html += '</tbody></table>';
+      }
+      html += '</div></div>';
+      html += '<p class="notes-line" style="margin:8px 0 0;">Horses with missing data (no show score, health check, etc.) are left out of \u201cmiss by one\u201d until their page has been opened once.</p>';
+    }
     html += '</div>';
 
     // stallion table

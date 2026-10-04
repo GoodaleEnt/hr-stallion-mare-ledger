@@ -838,11 +838,11 @@
     ownedHorses(state).forEach(function (h) {
       var c = goalCheck(state, h.lifeNumber);
       if (!c.active) return;
-      if (c.met) { goalHits.push(h); return; }
+      if (c.met) { goalHits.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber }); return; }
       var s = c.sections;
       var bad = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad'; });
       var unknown = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'na' && x.text === 'no data yet'; });
-      if (bad.length === 1 && !unknown.length) nearMiss.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, why: bad[0].label + ' ' + bad[0].text });
+      if (bad.length === 1 && !unknown.length) nearMiss.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, missing: bad[0].label, detail: bad[0].text, why: bad[0].label + ' ' + bad[0].text });
     });
     if (nearMiss.length) tips.push({ level: 'tip', text: nearMiss.length + ' horse' + (nearMiss.length === 1 ? ' misses' : 's miss') + ' your goals by only one box: ' + nearMiss.slice(0, 5).map(function (n) { return n.name + ' (' + n.why + ')'; }).join('; ') + '.' });
 
@@ -867,7 +867,7 @@
     var topBT = best.filter(function (x) { return x.bt > 0; }).sort(function (a, b) { return b.bt - a.bt; }).slice(0, 5);
     var topConf = best.filter(function (x) { return x.conf > 0; }).sort(function (a, b) { return b.conf - a.conf; }).slice(0, 5);
 
-    return { overall: overall, stallions: stallions, months: monthList, mares: mares, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, nearMiss: nearMiss.length, gaps: gaps.length };
+    return { overall: overall, stallions: stallions, months: monthList, mares: mares, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, goalHitList: goalHits, nearMiss: nearMiss.length, nearMissList: nearMiss, gaps: gaps.length };
   }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.

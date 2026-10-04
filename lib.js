@@ -583,6 +583,33 @@
     return out;
   }
 
+  // Breed Total (BT) = ((Genetic Potential / 10) + top conformation score) / 2.
+  function breedTotal(gp, conf) {
+    gp = Number(gp); conf = Number(conf);
+    if (!gp || !conf) return 0;
+    return Math.round(((gp / 10 + conf) / 2) * 1000) / 1000;
+  }
+  // Keeps each horse's all-time best BT (only ever raised, like the best
+  // conformation score) together with when it was reached and what produced it.
+  // Returns how many horses changed.
+  function refreshBreedTotals(state) {
+    var n = 0;
+    if (!state.horseMeta) state.horseMeta = {};
+    Object.keys(state.horseInfo || {}).forEach(function (life) {
+      var info = state.horseInfo[life];
+      var meta = state.horseMeta[life];
+      if (!info || !meta || info.geneticPotential == null) return;
+      var conf = bestConformation(meta).best;
+      var bt = breedTotal(info.geneticPotential, conf);
+      if (!bt || bt <= (Number(meta.btBest) || 0)) return;
+      state.horseMeta[life] = Object.assign({}, meta, {
+        btBest: bt, btBestAt: Date.now(), btBestGp: Number(info.geneticPotential), btBestConf: conf,
+        btBestDate: meta.confBestDate || ''
+      });
+      n++;
+    });
+    return n;
+  }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.
   function purchaseOf(state, lifeNumber) {
@@ -595,6 +622,8 @@
 
   global.HRLib = {
     purchaseOf: purchaseOf,
+    breedTotal: breedTotal,
+    refreshBreedTotals: refreshBreedTotals,
     parseConformation: parseConformation,
     pedigreeTreeOf: pedigreeTreeOf,
     parseColourGenes: parseColourGenes,

@@ -958,6 +958,22 @@
   //  2. If the HRToolkit extension is also installed, its injected "All-time
   //     Confo" / "Current Confo" summary rows — its all-time figure can reach
   //     further back than the 25 listed shows.
+  // Show date from a results-row cell: "dd-mm-yyyy", "Today"/"Yesterday",
+  // "yyyy-mm-dd" or "5 Mar 2026". Empty string when it isn't a date.
+  var MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function parseShowDate(text) {
+    text = String(text || '');
+    var iso = parseRowDate(text);
+    if (iso) return iso;
+    var m = /([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(text);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = /([0-9]{1,2}) ([A-Za-z]{3,9}) ([0-9]{4})/.exec(text);
+    if (m) {
+      var mi = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase());
+      if (mi > -1) return m[3] + '-' + String(mi + 1).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    }
+    return '';
+  }
   function readConfoHighs() {
     var highs = [];
     function number(text) {
@@ -973,7 +989,18 @@
         var category = (cols[1].textContent || '').replace(/\s+/g, ' ').trim();
         if (/\bBT\b|breed\s*type/i.test(category)) return;
         var value = number(cols[2].textContent);
-        if (isFinite(value) && value > 0) highs.push(value);
+        if (!(isFinite(value) && value > 0)) return;
+        // Whatever isn't the points column: the first date-like cell is the
+        // show date, the rest (show / category) is kept as the details.
+        var date = '', details = [];
+        for (var i = 0; i < cols.length; i++) {
+          if (i === 2) continue;
+          var t = (cols[i].textContent || '').replace(/\s+/g, ' ').trim();
+          if (!t) continue;
+          var d = parseShowDate(t);
+          if (d && !date) date = d; else if (!d) details.push(t);
+        }
+        highs.push({ value: value, date: date, event: details.join(' · ').slice(0, 90) });
       });
     });
     document.querySelectorAll('tr').forEach(function (tr) {
@@ -982,7 +1009,7 @@
       var label = (cells[0].textContent || '').replace(/\s+/g, ' ').trim();
       if (!/^(all-time|current) confo$/i.test(label)) return;
       var value = number(cells[1].textContent);
-      if (isFinite(value) && value > 0) highs.push(value);
+      if (isFinite(value) && value > 0) highs.push({ value: value, date: '', event: 'HRToolkit all-time' });
     });
     return highs;
   }
@@ -992,17 +1019,28 @@
     function tryCapture() {
       var highs = readConfoHighs();
       if (!highs.length) return false;
-      var best = Math.max.apply(null, highs);
+      // Highest score wins; on a tie prefer the entry that knows its date.
+      var top = highs.reduce(function (a, b) {
+        return b.value > a.value || (b.value === a.value && b.date && !a.date) ? b : a;
+      });
+      var best = top.value;
       HRStorage.getState(function (state) {
         if (!state.horseMeta) state.horseMeta = {};
         var meta = Object.assign({}, state.horseMeta[id]);
-        if (best <= (Number(meta.confBest) || 0)) return;
+        var prev = Number(meta.confBest) || 0;
+        var raised = best > prev;
+        // A same-score re-read can still fill in a date/details that were missing.
+        var fillsDetails = best === prev && ((top.date && !meta.confBestDate) || (top.event && !meta.confBestEvent));
+        if (!raised && !fillsDetails) return;
         meta.confBest = best;
-        meta.confBestAt = Date.now();
+        if (raised) meta.confBestAt = Date.now();
+        if (top.date || raised) meta.confBestDate = top.date || '';
+        if (top.event || raised) meta.confBestEvent = top.event || '';
         state.horseMeta[id] = meta;
+        HRLib.refreshBreedTotals(state);
         var name = (state.horseInfo[id] && state.horseInfo[id].name) || 'this horse';
         HRStorage.setState(state, function () {
-          showToast('HR Ledger: best conformation score ' + best + ' saved for ' + name);
+          if (raised) showToast('HR Ledger: best conformation score ' + best + ' saved for ' + name);
         });
       });
       return true;
@@ -1058,7 +1096,9 @@
 
   function healOwnedStubs() {
     HRStorage.getState(function (state) {
+      var btChanged = HRLib.refreshBreedTotals(state);
       var fixed = HRLib.adoptOwnedStallions(state);
+      if (btChanged && !fixed) HRStorage.setState(state);
       if (fixed) {
         HRStorage.setState(state, function () {
           showToast('HR Ledger: ' + fixed + ' stallion' + (fixed === 1 ? '' : 's') + ' of yours added to the Stallions tab');

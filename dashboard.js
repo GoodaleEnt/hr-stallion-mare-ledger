@@ -550,6 +550,7 @@
           '<div class="row"><span>Breedings</span><span class="v mono">' + a.count + '</span></div>' +
           '<div class="row"><span>Total earned</span><span class="v mono">' + L.moneyLine(a.totals) + '</span></div>' +
           purchaseRowsHtml(s.lifeNumber) +
+          highScoreRowsHtml(s.lifeNumber) +
           '</div>';
       });
       html += '</div>';
@@ -750,6 +751,7 @@
           '<div class="row"><span>Failed</span><span class="v mono">' + (m.counts.Failed || 0) + '</span></div>' +
           '<div class="row"><span>Foals born</span><span class="v mono">' + (m.counts['Foal Born'] || 0) + '</span></div>' +
           purchaseRowsHtml(m.mareLifeNumber) +
+          highScoreRowsHtml(m.mareLifeNumber) +
         '</div>';
       });
       html += '</div>';
@@ -794,6 +796,7 @@
           '<div class="lifenum mono">#' + L.esc(h.lifeNumber) + '</div>' +
           '<div class="meta">' + L.esc([h.breed, h.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
           (h.dateOfBirth ? '<div class="row"><span>Born</span><span class="v mono">' + L.esc(h.dateOfBirth) + '</span></div>' : '') +
+          highScoreRowsHtml(h.lifeNumber) +
           renderAgeControlHtml(h.lifeNumber) +
           '</div>';
       });
@@ -896,7 +899,7 @@
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
       '<div data-label="Status"><select class="pill-select ' + L.herdStatusClass(meta.status) + '" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
       '<div data-label="Project"><input type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
-      '<div data-label="Show scores"><span><input type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5" title="Conformation show scores, separated by commas">' + bestScoreHtml(meta) + '</span></div>' +
+      '<div data-label="Show scores"><span><input type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5" title="Conformation show scores, separated by commas">' + bestScoreHtml(meta) + btLineHtml(life) + '</span></div>' +
     '</div>';
   }
 
@@ -915,7 +918,7 @@
     return '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">' +
       '<div class="field"><label for="hm-status">Status</label><select id="hm-status" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
       '<div class="field"><label for="hm-role">Role</label><select id="hm-role" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
-      '<div class="field"><label for="hm-scores">Conformation scores (typed — the stats page is read automatically)</label><input id="hm-scores" type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5">' + bestScoreHtml(meta) + '</div>' +
+      '<div class="field"><label for="hm-scores">Conformation scores (typed — the stats page is read automatically)</label><input id="hm-scores" type="text" data-action="herd-scores" data-life="' + life + '" value="' + L.esc(meta.confScores.join(', ')) + '" placeholder="e.g. 84.2, 87.5">' + bestScoreHtml(meta) + btLineHtml(life) + '</div>' +
       '<div class="field"><label for="hm-project">Project</label><input id="hm-project" type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
     '</div>';
   }
@@ -1313,6 +1316,68 @@
     return html + '</div></div>';
   }
 
+  // ---------- high scores: top conformation + Breed Total (BT) ----------
+  // BT = ((Genetic Potential / 10) + top conformation score) / 2. Both highs are
+  // only ever raised; their dates come from Horse Reality's results list when
+  // it shows one, otherwise the day the ledger first saw the score.
+  function isoFromMs(ms) {
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function highDateText(date, at) {
+    if (date) return L.fmtDate(date);
+    return at ? 'seen ' + L.fmtDate(isoFromMs(at)) : '';
+  }
+  function round3(n) { return Math.round(n * 1000) / 1000; }
+  function highScoreInfo(life) {
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    var conf = L.bestConformation(meta).best;
+    var out = { conf: null, bt: null };
+    if (conf) {
+      out.conf = { value: round3(conf), when: highDateText(meta.confBestDate, meta.confBestAt), event: meta.confBestEvent || '' };
+    }
+    var btNow = L.breedTotal(info.geneticPotential, conf);
+    var btVal = Math.max(Number(meta.btBest) || 0, btNow);
+    if (btVal) {
+      var stored = Number(meta.btBest) >= btNow && Number(meta.btBest) > 0;
+      out.bt = {
+        value: round3(btVal),
+        when: stored ? highDateText(meta.btBestDate, meta.btBestAt) : 'seen ' + L.fmtDate(isoFromMs(Date.now())),
+        formula: stored && meta.btBestGp ? '((GP ' + meta.btBestGp + ' ÷ 10) + ' + round3(meta.btBestConf) + ') ÷ 2' : '((GP ' + info.geneticPotential + ' ÷ 10) + ' + round3(conf) + ') ÷ 2'
+      };
+    }
+    return out;
+  }
+  // rows for the horse cards (stallion / mare / young horse)
+  function highScoreRowsHtml(life) {
+    var h = highScoreInfo(life);
+    var sub = 'font-size:11.5px;color:var(--text-muted);text-align:right;padding:0 0 3px;';
+    var out = '';
+    if (h.conf) {
+      out += '<div class="row"><span>Top conformation</span><span class="v mono">' + L.esc(h.conf.value) + '</span></div>' +
+        '<div style="' + sub + '">' + L.esc([h.conf.when, h.conf.event].filter(Boolean).join(' · ')) + '</div>';
+    }
+    if (h.bt) {
+      out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
+        '<div style="' + sub + '">' + L.esc([h.bt.when, h.bt.formula].filter(Boolean).join(' · ')) + '</div>';
+    }
+    return out;
+  }
+  // tags for a horse's own page header
+  function highScoreTagsHtml(life) {
+    var h = highScoreInfo(life);
+    var out = '';
+    if (h.conf) out += '<span class="tag mono" title="' + L.esc(['Highest conformation show score', h.conf.event].filter(Boolean).join(' — ')) + '">Top confo ' + L.esc(h.conf.value) + (h.conf.when ? ' · ' + L.esc(h.conf.when) : '') + '</span>';
+    if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
+    return out;
+  }
+  function btLineHtml(life) {
+    var h = highScoreInfo(life);
+    if (!h.bt) return '';
+    return '<div class="sub" title="' + L.esc(h.bt.formula) + '">BT <strong>' + L.esc(h.bt.value) + '</strong>' + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</div>';
+  }
+
   // ---------- purchase price & shipping ----------
   function purchaseParts(lifeNumber) {
     var p = L.purchaseOf(state, lifeNumber);
@@ -1452,6 +1517,8 @@
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');
     var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
     if (paidTags) tags.push(paidTags);
+    var scoreTags = info.lifeNumber ? highScoreTagsHtml(info.lifeNumber) : '';
+    if (scoreTags) tags.push(scoreTags);
     if (info.training) tags.push('<span class="tag">' + L.esc(info.training) + '</span>');
     if (info.predicates) tags.push('<span class="tag">' + L.esc(info.predicates) + '</span>');
     if (info.height) tags.push('<span class="tag">' + L.esc(info.height) + '</span>');
@@ -1840,7 +1907,8 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    if (L.adoptOwnedStallions(state)) { persist(); return; }
+    var scoresChanged = L.refreshBreedTotals(state);
+    if (L.adoptOwnedStallions(state) || scoresChanged) { persist(); return; }
     recompute();
     render();
   });

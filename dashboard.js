@@ -1084,13 +1084,14 @@
     html += '<div class="section-head"><h2>Breeding suggestions for ' + L.esc(r.mareName) + '</h2></div>';
     html += '<div class="card" style="padding:12px 16px;margin-bottom:14px;border-color:var(--accent-2);"><strong>Only horses saved in the ledger are considered.</strong> ' +
       'That means stallions whose pages you have opened on Horse Reality (your own and other players\'). Open more stallions\' pages and they will show up here. ' +
+      'Only stallions that can be used are listed: yours that are active, and any stallion with semen vials or an active public or private stud fee saved from his page. ' +
       'Ranked by the foal\'s estimated Breed Total, adjusted for conformation traits that cover each other, the stallion\'s fertility and inbreeding.</div>';
     if (r.error === 'young') return html + '<div class="empty"><h3>' + L.esc(r.mareName) + ' is under 3</h3><p>A mare can only be bred from age 3.</p></div>';
     if (r.error) return html + '<div class="empty"><h3>Not a mare</h3><p>Breeding suggestions are for mares.</p></div>';
     if (r.status.status === 'pregnant') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6dbe9;border-color:#c8588f;color:#8a2a5c;"><strong>\u2665 She is in foal' + (r.status.stallion ? ' to ' + L.esc(r.status.stallion) : '') + (r.status.due ? ' \u2014 ' + L.esc(r.status.due.replace(/^Due /, 'due ')) : '') + '.</strong> These suggestions are for her next breeding.</div>';
     else if (r.status.status === 'covered') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6e4a8;border-color:#d9a21b;color:#6b4f00;"><strong>\u2714 She is already covered' + (r.status.stallion ? ' by ' + L.esc(r.status.stallion) : '') + ' \u2014 waiting for the result.</strong> These suggestions are for her next breeding.</div>';
     html += '<p class="notes-line" style="margin:0 0 10px;">' + r.considered + ' stallion' + (r.considered === 1 ? '' : 's') + ' considered' +
-      (r.noData ? ' \u00b7 ' + r.noData + ' skipped (no genetic potential saved yet)' : '') + (r.tooRelated ? ' \u00b7 ' + r.tooRelated + ' left out (more than 12.5% inbred to her)' : '') + '.</p>';
+      (r.noData ? ' \u00b7 ' + r.noData + ' skipped (no genetic potential saved yet)' : '') + (r.tooRelated ? ' \u00b7 ' + r.tooRelated + ' left out (more than 12.5% inbred to her)' : '') + (r.notAvailable ? ' \u00b7 ' + r.notAvailable + ' left out (not active at stud and no semen vials)' : '') + '.</p>';
     if (!r.suggestions.length) return html + '<div class="empty"><h3>No stallions to suggest yet</h3><p>Open some stallions\' pages on Horse Reality (age 3 and over) so the ledger has them saved.</p></div>';
     r.suggestions.forEach(function (s, i) {
       html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;">' +

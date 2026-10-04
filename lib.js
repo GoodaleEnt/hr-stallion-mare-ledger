@@ -953,10 +953,22 @@
     }
     return null;
   }
+  // A stallion is worth suggesting only if he can actually be used: one of yours that is active, or (anyone's) one
+  // that has semen vials or is currently offered at stud (a public or private stud fee saved from his page).
+  function stallionAvailable(state, life) {
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var inactive = function (st) { return st === 'Retired' || st === 'Sold' || st === 'Deceased'; };
+    if (inactive(meta.status) || (rec && inactive(rec.status))) return false;
+    var t = meta.studTerms;
+    if (t && ((t.semen && priceList(t.semen)) || (t.public && priceList(t.public)) || (t.private && priceList(t.private)) || (t.cheapest && priceList(t.cheapest)))) return true;
+    if (rec && rec.owned !== false) return rec.status === 'Active' || (!rec.status && meta.status !== 'Observation');
+    return false;
+  }
   function breedingSuggestions(state, mareLife, limit) {
     mareLife = String(mareLife || '');
     var mInfo = state.horseInfo && state.horseInfo[mareLife];
-    var out = { mareName: (mInfo && mInfo.name) || ('#' + mareLife), status: mareBreedStatus(state, mareLife), error: '', suggestions: [], considered: 0, noData: 0, tooRelated: 0 };
+    var out = { mareName: (mInfo && mInfo.name) || ('#' + mareLife), status: mareBreedStatus(state, mareLife), error: '', suggestions: [], considered: 0, noData: 0, tooRelated: 0, notAvailable: 0 };
     if (!mInfo || mInfo.sex !== 'mare') { out.error = 'not-a-mare'; return out; }
     if (isYoungInfo(mInfo)) { out.error = 'young'; return out; }
     var mMeta = (state.horseMeta && state.horseMeta[mareLife]) || {};
@@ -967,6 +979,7 @@
       var sInfo = state.horseInfo[life];
       if (!sInfo || sInfo.sex !== 'stallion' || isYoungInfo(sInfo)) return;
       if (!sameBreed(sInfo, mInfo)) return;
+      if (!stallionAvailable(state, life)) { out.notAvailable++; return; }
       var sMeta = (state.horseMeta && state.horseMeta[life]) || {};
       if (isSoldLife(state, life) || sMeta.status === 'Retired' || sMeta.status === 'Deceased') return;
       if (sInfo.geneticPotential == null || mInfo.geneticPotential == null) { out.noData++; return; }
@@ -1383,7 +1396,7 @@
   function pairIdeas(state, life, limit) {
     life = String(life || '');
     var info = state.horseInfo && state.horseInfo[life];
-    var out = { life: life, name: (info && info.name) || ('#' + life), kind: '', mine: [], other: [], error: '', hasGoal: false };
+    var out = { life: life, name: (info && info.name) || ('#' + life), kind: '', mine: [], other: [], error: '', hasGoal: false, notAvailable: 0 };
     if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) { out.error = 'unknown'; return out; }
     if (isYoungInfo(info)) { out.error = 'young'; return out; }
     var isMare = info.sex === 'mare';
@@ -1404,6 +1417,7 @@
       if (ci.geneticPotential == null || info.geneticPotential == null) return;
       if (!isMare && mareBreedStatus(state, cl).status) return;
       if (!sameBreed(ci, info)) return;
+      if (isMare && !stallionAvailable(state, cl)) { out.notAvailable++; return; }
       var maxFee = parseFloat(state.settings && state.settings.calcMaxFee);
       if (isMare && maxFee > 0 && !(!!myName && String(ci.ownerName || '').trim().toLowerCase() === myName)) {
         var tm = studTermsOf(state, cl);
@@ -2085,6 +2099,7 @@
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
+    stallionAvailable: stallionAvailable,
     HR_BREEDS: HR_BREEDS,
     DISCIPLINES: DISCIPLINES,
     disciplineFit: disciplineFit,

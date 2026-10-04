@@ -128,6 +128,12 @@ Horses marked **Sold, Retired or Deceased** move out of the working list and the
 
 Each horse's card and page shows its **top conformation score** and its **Breed Total (BT)**, with when each was reached. The conformation high is read from the horse's stats page (the show results list, with the show date when the page gives one) and only ever goes up, so it stays after the score drops off the latest-25 list. **Breed Total = ((Genetic Potential ÷ 10) + Top Conformation Score) ÷ 2**, and its high score is kept the same way. A date shown as "seen" means the ledger first noticed the score that day because the page didn't give the show date.
 
+### Highlight goals
+
+Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and a maximum number of Good, Average or Below-average (BA) conformation traits. Leave a box empty to ignore it.
+
+Every horse card, herd row and horse page then shows three labelled boxes above its picture: **Conformation**, **Breed Total** and **Conformation traits**. A box is green if the horse meets that goal, red if it doesn't, and grey if there's no goal set or no data yet. A horse that meets every goal you set is outlined. Trait limits are "at or under": a maximum of 2 BA traits accepts horses with 0, 1 or 2.
+
 ## Other Horses
 
 When you open a horse on Horse Reality that **isn't yours**, a small box appears in the bottom-right corner asking whether to add it to your ledger (this needs your username set in Settings, so the extension can tell your horses from other people's).

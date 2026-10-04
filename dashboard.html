@@ -130,6 +130,17 @@
   .detail-head .portrait{ width:96px; height:96px; object-fit:contain; border-radius:12px; background:var(--surface-2); flex-shrink:0; }
   .detail-head .name-row{ display:flex; gap:16px; align-items:flex-start; }
   .detail-head .tags{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .goal-hit{ outline:2px solid var(--accent-2); outline-offset:-2px; }
+  .herd-row.goal-hit, .herd-row.other-row.goal-hit{ background:var(--warn-bg); }
+  .goal-strip{ display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-bottom:8px; }
+  .goal-sec{ border-radius:6px; padding:4px 5px; font-size:11px; line-height:1.25; text-align:center; border:1px solid var(--border); background:var(--surface-2); color:var(--text-muted); }
+  .goal-sec .gl{ display:block; font-weight:700; text-transform:uppercase; letter-spacing:.03em; font-size:10px; }
+  .goal-sec.ok{ background:var(--success-bg); border-color:var(--success); color:var(--success); }
+  .goal-sec.bad{ background:var(--danger-bg); border-color:var(--danger); color:var(--danger); }
+  .goals-panel{ margin:0 0 14px; }
+  .goals-panel summary{ cursor:pointer; color:var(--text-muted); font-size:13px; }
+  .goals-grid{ display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-top:8px; }
+  .goals-grid input{ width:100%; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:6px 9px; font-size:13px; color:var(--text); font-family:inherit; }
   .tag{ background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:3px 11px; font-size:12.5px; color:var(--text-muted); }
   .detail-actions{ display:flex; gap:8px; flex-shrink:0; }
   .notes-line{ color:var(--text-muted); font-size:14px; margin-top:10px; max-width:60ch; }

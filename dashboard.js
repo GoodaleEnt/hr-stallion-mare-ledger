@@ -331,6 +331,7 @@
       html += '</div>';
     }
 
+    html += goalsPanelHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
@@ -347,6 +348,7 @@
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
     var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : '← Back to search') + '</button>';
+    html += goalStripHtml(selectedPassportLife);
     html += '<div class="detail-head"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
       '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
@@ -539,7 +541,8 @@
       ownedStallions.forEach(function (s) {
         var a = aggregates[s.id] || { count: 0, totals: {} };
         var pubFee = L.feeObj(s, 'Public'), privFee = L.feeObj(s, 'Private');
-        html += '<div class="card stallion-card" data-action="open-stallion" data-id="' + s.id + '">' +
+        html += '<div class="card stallion-card' + goalClass(s.lifeNumber) + '" data-action="open-stallion" data-id="' + s.id + '">' +
+          goalStripHtml(s.lifeNumber) +
           (s.status && s.status !== 'Active' ? '<span class="pill corner-badge ' + L.stallionStatusClass(s.status) + '">' + L.esc(s.status) + '</span>' : '') +
           (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(s.name) + '</h3>' +
@@ -742,7 +745,8 @@
       html += '<div class="stallion-grid">';
       maresIndex.forEach(function (m) {
         var mareInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
-        html += '<div class="card stallion-card" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+        html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+          goalStripHtml(m.mareLifeNumber) +
           (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
@@ -790,7 +794,8 @@
     function youngGrid(list) {
       var out = '<div class="stallion-grid">';
       list.forEach(function (h) {
-        out += '<div class="card stallion-card" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
+        out += '<div class="card stallion-card' + goalClass(h.lifeNumber) + '" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
+          goalStripHtml(h.lifeNumber) +
           (h.imageUrl ? '<img class="portrait" src="' + L.esc(h.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(h.name || 'Unnamed horse') + '</h3>' +
           '<div class="lifenum mono">#' + L.esc(h.lifeNumber) + '</div>' +
@@ -827,6 +832,7 @@
         '<button class="btn btn-sm" data-action="nav-mare" data-dir="next">Next ›</button>' +
       '</div>' : '') +
     '</div>';
+    html += goalStripHtml(m.mareLifeNumber);
     html += '<div class="detail-head">' +
       '<div><h1>' + L.esc(m.mareName) + '</h1>' +
       '<div class="tags">' +
@@ -892,8 +898,8 @@
     var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : ''].filter(Boolean).join(' · ');
     var life = L.esc(h.lifeNumber);
     var pic = horsePictureUrl(h.lifeNumber);
-    return '<div class="herd-row">' +
-      '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+    return '<div class="herd-row' + goalClass(h.lifeNumber) + '">' +
+      '<div>' + goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div></div>' +
       '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span></div>' +
       '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
@@ -992,8 +998,8 @@
       var life = L.esc(info.lifeNumber);
       var pic = horsePictureUrl(info.lifeNumber);
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
-      html += '<div class="herd-row other-row">' +
-        '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+      html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
+        '<div>' + goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div></div>' +
         '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
         '<div><button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button></div>' +
@@ -1378,6 +1384,48 @@
     return '<div class="sub" title="' + L.esc(h.bt.formula) + '">BT <strong>' + L.esc(h.bt.value) + '</strong>' + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</div>';
   }
 
+  // ---------- goals: highlight horses that meet your minimums / maximums ----------
+  var goalsOpen = false;
+  function goalClass(life) {
+    return L.goalCheck(state, life).met ? ' goal-hit' : '';
+  }
+  // Three labelled boxes shown above a horse's picture: green = meets that
+  // goal, red = doesn't, grey = no goal set or no data yet. Hidden entirely
+  // until at least one goal is set.
+  function goalStripHtml(life) {
+    var c = L.goalCheck(state, life);
+    if (!c.active) return '';
+    function box(sec) {
+      return '<div class="goal-sec ' + sec.state + '" title="' + L.esc(sec.label + ': ' + sec.text) + '"><span class="gl">' + L.esc(sec.label) + '</span>' + L.esc(sec.text) + '</div>';
+    }
+    return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.bt) + box(c.sections.traits) + '</div>';
+  }
+  function goalsPanelHtml() {
+    var g = L.goalsOf(state);
+    var any = Object.keys(g).some(function (k) { return g[k] != null; });
+    var hits = 0;
+    if (any) {
+      var seen = {};
+      L.ownedHorses(state).forEach(function (h) { seen[h.lifeNumber] = true; });
+      L.trackedOtherHorses(state).forEach(function (h) { seen[h.lifeNumber] = true; });
+      Object.keys(seen).forEach(function (life) { if (L.goalCheck(state, life).met) hits++; });
+    }
+    function field(label, key, step) {
+      return '<div class="field"><label for="goal-' + key + '">' + label + '</label>' +
+        '<input id="goal-' + key + '" type="number" min="0" step="' + step + '" data-action="update-goal" data-field="' + key + '" value="' + (g[key] != null ? L.esc(g[key]) : '') + '" placeholder="no limit"></div>';
+    }
+    return '<details class="goals-panel"' + (goalsOpen || any ? ' open' : '') + '><summary>Highlight goals' +
+      (any ? ' — ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
+      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows three boxes above its picture: green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a box empty to ignore it. Trait limits count traits at or under the number you enter.</p>' +
+      '<div class="goals-grid">' +
+        field('Min top conformation', 'minConf', 'any') +
+        field('Min Breed Total (BT)', 'minBT', 'any') +
+        field('Max Good traits', 'maxG', '1') +
+        field('Max Average traits', 'maxA', '1') +
+        field('Max Below-average (BA) traits', 'maxBA', '1') +
+      '</div></details>';
+  }
+
   // ---------- purchase price & shipping ----------
   function purchaseParts(lifeNumber) {
     var p = L.purchaseOf(state, lifeNumber);
@@ -1597,6 +1645,7 @@
     if (editingStallion) {
       html += renderStallionForm(s);
     } else {
+      html += goalStripHtml(s.lifeNumber);
       html += '<div class="detail-head"><div class="name-row">' +
         (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
         '<div><h1>' + L.esc(s.name) + '</h1>' +
@@ -1894,6 +1943,13 @@
       else if (action === 'herd-filter-project') { herdProjectFilter = t.value; render(); }
       else if (action === 'toggle-auto-delete') {
         state.settings.autoDeleteRetired = t.checked;
+        persist();
+      }
+      else if (action === 'update-goal') {
+        var goals = Object.assign({}, state.settings.goals);
+        goals[t.getAttribute('data-field')] = t.value.trim();
+        state.settings.goals = goals;
+        goalsOpen = true;
         persist();
       }
       else if (action === 'update-username') {

@@ -610,6 +610,61 @@
     });
     return n;
   }
+  // ---------- goals: horses worth a closer look ----------
+  // state.settings.goals = { minConf, minBT, maxG, maxA, maxBA }. A blank goal
+  // is ignored. Each horse gets three sections - top conformation, Breed Total
+  // and conformation traits - each 'ok' (meets the goal), 'bad' (doesn't) or
+  // 'na' (no goal set, or no data yet). A horse is highlighted overall when it
+  // has at least one goal and every set goal is met.
+  function goalsOf(state) {
+    var g = (state && state.settings && state.settings.goals) || {};
+    function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
+    return { minConf: num(g.minConf), minBT: num(g.minBT), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
+  }
+  function traitCounts(info) {
+    var t = info && info.confTraits;
+    if (!t) return null;
+    var c = { G: 0, A: 0, BA: 0 };
+    Object.keys(t).forEach(function (k) {
+      var r = String(t[k]).toLowerCase();
+      if (r.indexOf('below') === 0) c.BA++; else if (r === 'good') c.G++; else if (r === 'average') c.A++;
+    });
+    return c;
+  }
+  function goalSections(state, life) {
+    var g = goalsOf(state);
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    var conf = bestConformation(meta).best;
+    var bt = Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf));
+    function r3(n) { return Math.round(n * 1000) / 1000; }
+    function minSection(label, goal, have) {
+      if (goal == null) return { label: label, state: 'na', text: 'no goal' };
+      if (!(have > 0)) return { label: label, state: 'na', text: 'no data yet' };
+      return { label: label, state: have >= goal ? 'ok' : 'bad', text: r3(have) + ' (min ' + goal + ')' };
+    }
+    var counts = traitCounts(info);
+    var traits = { label: 'Conformation traits', state: 'na', text: 'no goal' };
+    var limits = [['G', 'Good', g.maxG], ['A', 'Avg', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
+    if (limits.length) {
+      if (!counts) {
+        traits.text = 'no data yet';
+      } else {
+        traits.state = limits.every(function (x) { return counts[x[0]] <= x[2]; }) ? 'ok' : 'bad';
+        traits.text = limits.map(function (x) { return x[1] + ' ' + counts[x[0]] + ' (max ' + x[2] + ')'; }).join(', ');
+      }
+    }
+    return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits };
+  }
+  function goalCheck(state, life) {
+    var s = goalSections(state, life);
+    var list = [s.conf, s.bt, s.traits].filter(function (x) { return x.text !== 'no goal'; });
+    return {
+      active: list.length > 0,
+      met: list.length > 0 && list.every(function (x) { return x.state === 'ok'; }),
+      sections: s
+    };
+  }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.
   function purchaseOf(state, lifeNumber) {
@@ -623,6 +678,10 @@
   global.HRLib = {
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
+    goalsOf: goalsOf,
+    goalSections: goalSections,
+    goalCheck: goalCheck,
+    traitCounts: traitCounts,
     refreshBreedTotals: refreshBreedTotals,
     parseConformation: parseConformation,
     pedigreeTreeOf: pedigreeTreeOf,

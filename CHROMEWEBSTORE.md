@@ -107,6 +107,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.13.0 | 2026-10-03 | Highlight goals: min conformation, min Breed Total and max trait counts, shown as green/red boxes above each horse | Draft |
 | 1.12.0 | 2026-10-03 | Top conformation and Breed Total (BT) highs, with dates, on horse cards and pages | Draft |
 | 1.11.1 | 2026-10-03 | Breeding date survives the site reloading onto the stallion page after you click Breed | Submitted |
 | 1.11.0 | 2026-10-03 | Breeding date recorded automatically when you breed a mare on the Breed page | Included in 1.11.1 |

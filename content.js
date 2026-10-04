@@ -1271,7 +1271,41 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // A small "Open in Ledger" button on every horse page. On desktop it asks the
+  // extension to open (or focus) the dashboard on this horse's profile; on mobile
+  // it opens the on-page overlay on the same profile.
+  var LEDGER_BTN_ID = 'hr-ledger-open-btn';
+  function injectLedgerButton() {
+    var life = parseHorseIdFromUrl();
+    var existing = document.getElementById(LEDGER_BTN_ID);
+    if (!life) { if (existing) existing.remove(); return; }
+    if (existing) { existing.setAttribute('data-life', life); return; }
+    if (!document.body) return;
+    var btn = document.createElement('button');
+    btn.id = LEDGER_BTN_ID;
+    btn.type = 'button';
+    btn.textContent = 'Open in Ledger';
+    btn.title = 'Open this horse in HR Stallion & Mare Ledger';
+    btn.setAttribute('data-life', life);
+    btn.style.cssText = [
+      'position:fixed', 'left:16px', 'bottom:16px', 'z-index:2147483000', 'cursor:pointer',
+      'background:#46592C', 'color:#fff', 'border:none', 'border-radius:999px', 'padding:9px 16px',
+      'font:600 14px system-ui,sans-serif', 'box-shadow:0 4px 14px rgba(0,0,0,.3)'
+    ].join(';');
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-life');
+      if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
+        window.HRMobileOverlay.show();
+        window.HRLedgerOpenProfile(id);
+        return;
+      }
+      chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
+    });
+    document.body.appendChild(btn);
+  }
+
   function onPageReady() {
+    injectLedgerButton();
     healOwnedStubs();
     scrapeHealth();
     scrapeConfoStats();

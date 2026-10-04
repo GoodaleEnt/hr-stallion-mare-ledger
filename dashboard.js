@@ -2320,13 +2320,37 @@
     };
   }
 
+  // ---------- open a horse's profile (from the "Open in Ledger" button on Horse Reality) ----------
+  // Picks the richest page for the horse: your stallion's page, your mare's page, otherwise
+  // its cached passport; an uncached horse falls back to a search for its number.
+  window.HRLedgerOpenProfile = function (life) {
+    life = String(life || '').replace(/[^0-9]/g, '');
+    if (!life || !state) return;
+    selectedId = null; selectedMareKey = null; selectedPassportLife = null; pendingConfirm = null;
+    horseSearchQuery = '';
+    var stud = state.stallions.find(function (s) { return s.lifeNumber && String(s.lifeNumber) === life && s.owned !== false; });
+    var mare = maresIndex.find(function (m) { return String(m.mareLifeNumber) === life; });
+    if (stud) selectedId = stud.id;
+    else if (mare) selectedMareKey = mare.key;
+    else if (state.horseInfo && state.horseInfo[life]) selectedPassportLife = life;
+    else horseSearchQuery = life;
+    render();
+    window.scrollTo(0, 0);
+  };
+  function openFromHash() {
+    var m = /horse=([0-9]+)/.exec(location.hash || '');
+    if (m) window.HRLedgerOpenProfile(m[1]);
+  }
+  window.addEventListener('hashchange', openFromHash);
+
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
     var scoresChanged = L.refreshBreedTotals(state);
-    if (L.adoptOwnedStallions(state) || scoresChanged) { persist(); return; }
+    if (L.adoptOwnedStallions(state) || scoresChanged) { persist(openFromHash); return; }
     recompute();
     render();
+    openFromHash();
   });
 
   // Live-update if a content script writes new data while this tab is open.

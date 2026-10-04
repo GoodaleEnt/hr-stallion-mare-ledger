@@ -60,6 +60,10 @@ Studs that show up here only because they were needed to track one of *your mare
 
 **Export Backup / Restore Backup** (top of this tab) save or reload your *entire* ledger as a single JSON file — every stallion, mare, breeding record, and cached horse passport. Use it before doing anything risky (switching computers, clearing browser data), or just periodically for peace of mind. Restoring a backup replaces everything currently stored, so you'll be asked to confirm first.
 
+## The Open in Ledger button
+
+On every horse's page on Horse Reality there is a green **Open in Ledger** button at the bottom-left of the screen. Click it to jump straight to that horse in the ledger: your stallions open on their stallion page, any other horse on its profile (your mares open on their mare page). If the dashboard is already open it is brought to the front instead of opening a second copy. If the ledger hasn't saved that horse yet, the dashboard opens with its life number in the search box. On mobile, the button opens the Ledger overlay on the same horse.
+
 ## Looking up any horse
 
 The search box (top of every list view) looks up *any* horse the extension has ever cached a passport snapshot for — by name or life number — even if that horse isn't tied to a tracked stallion or a logged breeding yet.

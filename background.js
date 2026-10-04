@@ -40,25 +40,34 @@ refreshReviewBadge();
 // copy. chrome.tabs.query({ url }) can't see a tab's URL without the "tabs"
 // permission, so ask the runtime which pages of THIS extension are open
 // (runtime.getContexts needs no permission and reports tabId/windowId).
-chrome.action.onClicked.addListener(async function () {
+// With a life number, the dashboard also jumps to that horse's profile: it reads
+// "#horse=<life>" (a timestamp keeps repeat clicks on the same horse working).
+async function openDashboard(life) {
   var url = chrome.runtime.getURL('dashboard.html');
+  var target = life ? url + '#horse=' + encodeURIComponent(life) + '&t=' + Date.now() : url;
   try {
     var contexts = await chrome.runtime.getContexts({ contextTypes: ['TAB'] });
-    var open = contexts.find(function (c) { return c.documentUrl === url && c.tabId >= 0; });
+    var open = contexts.find(function (c) { return c.documentUrl && c.documentUrl.split('#')[0] === url && c.tabId >= 0; });
     if (open) {
-      await chrome.tabs.update(open.tabId, { active: true });
+      await chrome.tabs.update(open.tabId, life ? { active: true, url: target } : { active: true });
       await chrome.windows.update(open.windowId, { focused: true });
       return;
     }
   } catch (e) { /* fall through and open a new tab */ }
-  chrome.tabs.create({ url: url });
-});
+  chrome.tabs.create({ url: target });
+}
+chrome.action.onClicked.addListener(function () { openDashboard(); });
 
 // Content scripts' own fetch() is still bound by the page's CORS policy, so
 // image fetches (which Horse Reality's CDN seems to reject cross-origin) are
 // done here instead — the background service worker gets an unrestricted
 // fetch for any host covered by host_permissions.
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+  if (msg && msg.type === 'HR_OPEN_PROFILE') {
+    openDashboard(String(msg.life || '').replace(/[^0-9]/g, ''));
+    sendResponse({ ok: true });
+    return false;
+  }
   if (!msg || msg.type !== 'HR_FETCH_IMAGE') return false;
 
   fetch(msg.url)

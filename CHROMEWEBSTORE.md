@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.19.0 | 2026-10-03 | "Open in Ledger" button on Horse Reality horse pages opens that horse's profile in the dashboard | Draft |
 | 1.18.0 | 2026-10-03 | Sales picked up from the bank page and shown on the horse profile; sold horses left out of Analytics and given their own sold-horse stats | Draft |
 | 1.17.8 | 2026-10-03 | Analytics tables sort by clicking the column headings | Draft |
 | 1.17.7 | 2026-10-03 | Foal scores above 100 are ignored (they were misread) | Draft |

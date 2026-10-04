@@ -10,20 +10,33 @@ A visual walkthrough of installing and using the extension. For a quick technica
 2. [Pin the toolbar icon](#pin-the-toolbar-icon)
 3. [First-time setup](#first-time-setup)
 4. [Your Stallions](#your-stallions)
-5. [Looking up any horse](#looking-up-any-horse)
-6. [A stallion's detail page](#a-stallions-detail-page)
-7. [Adding a stallion by hand](#adding-a-stallion-by-hand)
-8. [Bulk-importing breeding records](#bulk-importing-breeding-records)
-9. [My Mares](#my-mares)
-10. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
-11. [My Herd](#my-herd)
-12. [Other Horses](#other-horses)
-13. [Foal Calculator](#foal-calculator)
-14. [Understanding breeding statuses](#understanding-breeding-statuses)
-15. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
-16. [Updating](#updating)
-17. [Privacy](#privacy)
-18. [Troubleshooting](#troubleshooting)
+5. [The Open in Ledger button](#the-open-in-ledger-button)
+6. [Looking up any horse](#looking-up-any-horse)
+7. [A stallion's detail page](#a-stallions-detail-page)
+8. [Adding a stallion by hand](#adding-a-stallion-by-hand)
+9. [Bulk-importing breeding records](#bulk-importing-breeding-records)
+10. [My Mares](#my-mares)
+11. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
+12. [My Herd](#my-herd) (high scores, sales, retired horses, highlight goals)
+13. [Handy extras](#handy-extras)
+14. [Separate goals for mares and stallions](#separate-goals-for-mares-and-stallions)
+15. [Goal suggestions](#goal-suggestions)
+16. [Breeding calendar, money and more](#breeding-calendar-money-and-more)
+17. [Times, ages and the game's rules](#times-ages-and-the-games-rules)
+18. [Breed picker on every page and best disciplines](#breed-picker-on-every-page-and-best-disciplines)
+19. [Show results](#show-results)
+20. [Removing a horse](#removing-a-horse)
+21. [Other Horses](#other-horses)
+22. [Analytics](#analytics)
+23. [Sell ideas](#sell-ideas)
+24. [Breeding suggestions](#breeding-suggestions)
+25. [Foal Calculator](#foal-calculator)
+26. [Foals, covered mares and breeding dates](#foals)
+27. [Understanding breeding statuses](#understanding-breeding-statuses)
+28. [Reviewing coverings before they auto-fail](#reviewing-coverings-before-they-auto-fail)
+29. [Updating](#updating)
+30. [Privacy](#privacy)
+31. [Troubleshooting](#troubleshooting)
 
 ## Installing
 
@@ -49,6 +62,8 @@ Open the dashboard (click the toolbar icon) and enter your Horse Reality usernam
 This is the dashboard's home view. As you browse Horse Reality, stallions you own are tracked here automatically — no manual entry needed for a horse you own, though you can always add one by hand (see below).
 
 ![Stallions overview: roster, fees, earnings, and the search box](images/01-stallions-overview.png)
+
+The row of tiles at the top counts your **Active stallions, Active mares, Active colts and Active fillies** (retired and sold horses are left out), with **Breedings logged** and **Total earned**. Under each of the four counts, if you have set highlight goals, are three lines: how many **fit your goals**, how many are **off by one** goal box and how many are **off by more**. The **Breed** picker under the tabs limits everything to one breed, and the **Filter** box hides cards that do not match what you type.
 
 Each stallion card shows his public/private stud fee, how many breedings are logged, and total earnings. A stat bar across the top rolls all of this up across your whole roster.
 
@@ -146,12 +161,17 @@ Set a horse's **Status** to **Retired** (on My Herd, on a mare's card or page, o
 
 ### Highlight goals
 
+**Colours:** a horse that meets every goal is outlined in **gold** (on its card or row, and across the top of its own page); a horse that misses **exactly one** goal box is outlined in **blue**. Anything else has no outline. Gold and blue are separate from the pink and amber outlines used for in-foal and covered mares.
+
 Fertility can only be tested from age 3, so for a horse younger than that the Fertility box is greyed ("tested from age 3") and is left out of your goals. Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and, for conformation traits and for the five vet-check health traits, the **worst rating you will accept** and **how many** may be at that rating (for example, worst = Below average with 2 allows up to two BA traits; worst = Average with 3 allows up to three Average traits and no BA). Nothing may be rated worse than the one you pick. You can also set a **minimum fertility**. Leave a goal on "no limit" to ignore it.
 
 Every horse card, herd row and horse page then shows five labelled boxes above its picture: **Conformation**, **Breed Total**, **Conformation traits**, **Health** and **Fertility**. A box is green if the horse meets that goal, red if it doesn't, and grey if there's no goal set or no data yet. A horse that meets every goal you set is outlined. A **Health** box turns **gold** when more than 3 of the 5 health traits are Excellent, and the **Fertility** box turns gold when fertility is Excellent, whatever your goals say. On a horse's page, each Excellent rating is gold too. Each horse's own page lists its health and fertility ratings once it has had a vet health check (and, for an adult, a fertility test); they are read from the horse's page on Horse Reality. Trait limits are "at or under": a maximum of 2 BA traits accepts horses with 0, 1 or 2.
 
 ## Handy extras
 
+- **Breed page links:** on Horse Reality's Breed page, **Open mare ↗** (it follows the mare you pick in the drop-down) and **Open stallion ↗** appear beside the mare selector and open each parent's own page in a new tab.
+- **Foal Calculator pages:** each parent's card and every box of the pedigree links to that horse on Horse Reality.
+- **Refresh:** the Foal Calculator's **Refresh** button reloads the saved horses and recalculates without clearing the mare and stallion you picked, which are also remembered when you reload the page.
 - **Filter box:** every list tab (Stallions, My Mares, Colts & Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
 - **Open in Foal Calculator:** pairing ideas on Analytics and the stallions on a mare's Breeding suggestions page have a button that opens the Foal Calculator with both parents already chosen.
 - **Max stud fee:** the Foal Calculator suggestions have a "Max stud fee (HRC)" box that hides other players' stallions that cost more.
@@ -242,6 +262,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 **Only horses saved in the ledger are considered**: stallions whose pages you have opened on Horse Reality (age 3 and over, not sold or retired, with a genetic potential saved). Open more stallions' pages and they join the list. A mare under 3 gets no suggestions, and a covered or in-foal mare shows a note that the list is for her next breeding.
 
+**Only stallions you can actually use are suggested:** yours that are active, and any stallion with semen vials or an active public or private stud fee saved from his page or Breed page. Retired, sold and deceased stallions, and other players' stallions the ledger has no stud details for, are left out (the page says how many). Suggestions are also limited to the mare's own breed, because Horse Reality has no crossbreeding.
+
 **Stud fees.** The ledger saves what a stallion costs from two places. His own page lists his *Public Stud Service* and *Private Stud Service* (and any semen vial) with the price in HRC, Delta Points, Foundation and Wildlife tickets. His **Breed** page states the transport fee and the cheapest price per currency. Both are saved on the stallion and shown as his cost in the suggestions. When you click **Breed** on a stallion that isn't yours, the covering is recorded straight away with the price option you ticked and the transport fee; when the bank row for it appears, the amount you really paid replaces it. The last fee you paid him is the fallback when nothing has been saved from his pages.
 
 **Your own stallions.** Your stallions' fees come from the **My Studs** page in the Horse Reality market office (v2.horsereality.com/market/office/my-studs). Open it and the ledger reads your **public** offers (every currency with a price); flip its **Private** switch on and it reads your **private** offers too. Each stallion listed there is yours, so he is added to your Stallions tab if he wasn't, and his **Public** and **Private** fee fields are filled in (when a stallion has several offers, the lowest price per currency is kept). His card always shows both fees (plus a semen vial price when there is one), and his page has a **Stud fees** panel with the date it was read and a **fee history** of every change. You can still edit the fees by hand; they are replaced the next time you open that page.
@@ -322,6 +344,7 @@ Everything lives in `chrome.storage.local` inside your own browser profile and n
 
 ## Troubleshooting
 
+- **"Extension context invalidated" in the extension's Errors list.** This appears when the extension is reloaded or updated while a Horse Reality tab is still open: that tab keeps running the old copy of the page script. It is harmless and the old script now stops quietly; reload the Horse Reality tab to get the new one.
 - **Nothing is showing up.** Make sure you've set your username in Settings (Stallions tab) — most auto-tracking depends on matching it against a horse's owner.
 - **A stallion I don't own is cluttering things.** If it only exists to anchor one of your mares' breeding history with an outside stud, it's intentionally kept off the Stallions grid — check that mare's own detail page instead.
 - **Data seems stale after a Horse Reality update.** The extension reads Horse Reality's own API and page content directly; if the site changes its markup or API shape, some captures may need an update. Open an issue on the [GitHub repository](https://github.com/GoodaleEnt/hr-stallion-mare-ledger/issues) if something stops working.

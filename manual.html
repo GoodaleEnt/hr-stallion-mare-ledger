@@ -79,12 +79,13 @@
 </table>
 
 <h2 id="button">The Open in Ledger button</h2>
+<p>On Horse Reality's Breed page the ledger also adds <strong>Open mare &#8599;</strong> (it follows the mare picked in the drop-down) and <strong>Open stallion &#8599;</strong> beside the mare selector, which open each parent's own page in a new tab.</p>
 <p>On every horse's page there is a white <strong>Open in Ledger</strong> pill in the top-left of the picture. Click it to jump straight to that horse in the ledger. If the dashboard is already open it is brought to the front.</p>
 
 <h2 id="tabs">The tabs</h2>
 <table>
   <tr><th>Tab</th><th>What it holds</th></tr>
-  <tr><td>Stallions</td><td>Your stud roster: fees, breedings, earnings.</td></tr>
+  <tr><td>Stallions</td><td>Your stud roster: fees, breedings, earnings. The tiles at the top count your Active stallions, mares, colts and fillies, each with how many fit your goals, are off by one, or off by more.</td></tr>
   <tr><td>My Mares</td><td>Your mares (age 3 and over) with their breeding status.</td></tr>
   <tr><td>Colts &amp; Fillies</td><td>Your horses under 3. Click a heading to sort.</td></tr>
   <tr><td>My Herd</td><td>Every horse you own, with role, status and project.</td></tr>
@@ -116,7 +117,7 @@
   <li>A mare shows an amber <strong>Covered</strong> ribbon right after a covering and an <strong>In foal</strong> ribbon when pregnant. A mare that is bred but doesn't meet your goals gets a different outline colour.</li>
   <li>Breeding to an outside stallion is recorded too, using the fee shown on the Breed page.</li>
   <li>Horse Reality only tells the <em>mare's</em> owner about a failed covering. The <strong>Needs Review</strong> panel lists coverings waiting too long so you can check her page before they are marked failed.</li>
-  <li><strong>Breeding suggestions:</strong> on a mare's page click <em>Breeding suggestions</em> for the 10 best stallions in your ledger, with reasons, estimated foal Breed Total and the stud fee.</li>
+  <li><strong>Breeding suggestions:</strong> on a mare's page click <em>Breeding suggestions</em> for the 10 best stallions in your ledger, with reasons, estimated foal Breed Total and the stud fee. Only stallions you can use are listed: yours that are active, and any stallion with semen vials or an active public or private stud fee. They are limited to the mare's breed, because Horse Reality has no crossbreeding.</li>
 </ul>
 
 <h2 id="herd">Your herd, goals &amp; sales</h2>
@@ -124,6 +125,7 @@
   <li><strong>Role, status, project:</strong> set them on My Herd or on a horse's page. Status choices are Active, Observation, Companion, For Sale, Sold, Retired, Deceased.</li>
   <li><strong>For Sale</strong> puts a big faint $ behind the card. <strong>Sold</strong> is recorded automatically from your bank page.</li>
   <li><strong>Breed Total</strong> = (Genetic Potential &divide; 10 + top conformation score) &divide; 2.</li>
+  <li><strong>Outlines:</strong> a horse that meets every goal is outlined in <strong>gold</strong> (on its card or row and across the top of its page); a horse that misses exactly one goal box is outlined in <strong>blue</strong>.</li>
   <li><strong>Highlight goals</strong> (under the search box): set a minimum conformation, minimum Breed Total, the worst conformation trait allowed and how many, the worst health rating allowed and how many, and a minimum fertility. Every horse then shows five boxes (Conformation, Breed Total, Traits, Health, Fertility): green when met, red when missed, gold for outstanding health or fertility. Fertility is ignored under age 3.</li>
   <li>Purchase price and transport are picked up from your bank page, or you can enter them by hand on the horse's page.</li>
 </ul>
@@ -195,6 +197,7 @@
 <h2 id="calc">Foal Calculator</h2>
 <p>A <strong>Breed</strong> picker (all 34 Horse Reality breeds) narrows both lists, and picking one parent shows only horses of the same breed, because Horse Reality has no crossbreeding. The Compare card on Analytics and the suggested partners work the same way.</p>
 <p>Check boxes above each selector (All, 3+, Under 3, My horses, Other horses, Suggestions) narrow the horses it offers; Suggestions keeps only those suggested for the parent picked on the other side. Below the selectors the calculator suggests partners for the mare and/or stallion you picked, split into your horses and other players' horses, and says whether the foal might fit your goals. Click <strong>Use</strong> to pick one.</p>
+<p>Each parent's card and every pedigree box links to that horse on Horse Reality. The <strong>Refresh</strong> button reloads the saved horses without clearing your picks, which are also remembered when you reload. For genes that can hide (Extension, agouti's recessive allele, flaxen, silver on a chestnut, PATN1 without LP), a <strong>Carried or visible</strong> card shows the chance the foal shows the gene, carries it, or does not have it. A gene Horse Reality does not list for a horse counts as not there, except Extension and Agouti, which are left out when untested. Under a horse's <em>Extra genes</em> you can enter W20 and the hidden agouti alleles (A+ wild bay, At seal brown). A single cream copy makes Smokey Black, Buckskin or Palomino and a double makes Smokey Cream, Perlino or Cremello; the dun gene makes Grulla, Dun and Red Dun, and nd1 without D is a Pseudo Dun.</p>
 <p>Pick a mare and a stallion from horses the ledger has seen. It shows each parent, an inbreeding estimate, and the odds for coat colour and Appaloosa pattern. A mare that is already covered or in foal is marked in the list. Your chosen mare and stallion are remembered when you reload the page, and the <strong>Refresh</strong> button reloads the saved horses and recalculates without clearing them. If ancestors haven't been seen it says <strong>Pedigree incomplete</strong> and lists them; open those horses on Horse Reality to fill the gaps. Colour genes the site doesn't show (Sooty, Silver, Flaxen and so on) can be set by hand under <em>Extra genes</em>.</p>
 
 <h2 id="backup">Backups &amp; updating</h2>
@@ -205,6 +208,7 @@
 </ul>
 
 <h2 id="faq">Questions &amp; fixes</h2>
+<details><summary>"Extension context invalidated" shows in the extension's Errors list.</summary>It appears when the extension is reloaded or updated while a Horse Reality tab is still open, because that tab keeps running the old copy of the script. It is harmless, and the old script now stops quietly. Reload the Horse Reality tab to get the new one.</details>
 <details><summary>My Mares is empty / my horses aren't counted as mine.</summary>Enter your Horse Reality username on the Stallions tab, then open your horses' pages once.</details>
 <details><summary>A horse is missing or out of date.</summary>Open its page on Horse Reality. The ledger saves what it sees when you load a page.</details>
 <details><summary>The Open in Ledger button isn't on a horse's page.</summary>Reload the Horse Reality tab. If it still isn't there, reload the extension on <code>chrome://extensions</code> and try again.</details>

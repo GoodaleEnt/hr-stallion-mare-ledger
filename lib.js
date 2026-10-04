@@ -351,13 +351,15 @@
   var COLOUR_LOCI = [
     { id: 'E', name: 'Extension (E)', alleles: ['E', 'e'] },
     { id: 'A', name: 'Agouti (A)', alleles: ['A', 'a'] },
-    { id: 'CR', name: 'Cream (CR)', alleles: ['CR', 'n'] },
-    { id: 'D', name: 'Dun (D)', alleles: ['D', 'nd1', 'nd2'] },
-    { id: 'G', name: 'Grey (G)', alleles: ['G', 'g'] },
-    { id: 'LP', name: 'Leopard complex (LP)', alleles: ['LP', 'lp'] },
-    { id: 'PATN1', name: 'Pattern-1 (PATN1)', alleles: ['PATN1', 'patn1'] },
-    { id: 'SW1', name: 'Splashed white (SW1)', alleles: ['SW1', 'n'] },
-    { id: 'W20', name: 'White spotting (W20)', alleles: ['W20', 'n'] }
+    // A gene Horse Reality doesn't list for a horse was not tested, and is treated as not there (`absent`).
+    // Only Extension and Agouti, which decide the base colour, are left unknown when untested.
+    { id: 'CR', name: 'Cream (CR)', alleles: ['CR', 'n'], absent: ['n', 'n'] },
+    { id: 'D', name: 'Dun (D)', alleles: ['D', 'nd1', 'nd2'], absent: ['nd2', 'nd2'] },
+    { id: 'G', name: 'Grey (G)', alleles: ['G', 'g'], absent: ['g', 'g'] },
+    { id: 'LP', name: 'Leopard complex (LP)', alleles: ['LP', 'lp'], absent: ['lp', 'lp'] },
+    { id: 'PATN1', name: 'Pattern-1 (PATN1)', alleles: ['PATN1', 'patn1'], absent: ['patn1', 'patn1'] },
+    { id: 'SW1', name: 'Splashed white (SW1)', alleles: ['SW1', 'n'], absent: ['n', 'n'] },
+    { id: 'W20', name: 'White spotting (W20)', alleles: ['W20', 'n'], absent: ['n', 'n'] }
   ];
   // Genes Horse Reality's tested-colours text doesn't report, entered by hand
   // per horse (stored in state.horseMeta[life].genes) — and parsed from the
@@ -517,7 +519,8 @@
     // An extra gene nobody has set counts as NOT present on that parent.
     var sM = sireManual || {}, dM = damManual || {}, sP = parseColourGenes(sireText), dP = parseColourGenes(damText);
     var absent = {}, touched = {};
-    EXTRA_LOCI.forEach(function (l) {
+    ALL_LOCI.forEach(function (l) {
+      if (!l.absent) return;
       absent[l.id] = l.absent.slice();
       touched[l.id] = !!(sM[l.id] || dM[l.id] || sP[l.id] || dP[l.id]);
     });
@@ -526,9 +529,9 @@
     var dist = {}, untested = [];
     ALL_LOCI.forEach(function (l) {
       if (s[l.id] && d[l.id]) dist[l.id] = foalDistribution(l, s[l.id], d[l.id]);
-      else if (!l.label) untested.push(l.name);
+      else if (!l.absent) untested.push(l.name);
     });
-    var genes = ALL_LOCI.filter(function (l) { return dist[l.id] && (!l.label || touched[l.id]); }).map(function (l) {
+    var genes = ALL_LOCI.filter(function (l) { return dist[l.id] && (!l.absent || touched[l.id]); }).map(function (l) {
       return { id: l.id, name: l.name, outcomes: dist[l.id].map(function (o) {
         return { genotype: o.alleles.join(' / '), pct: o.p * 100, effect: geneEffect(l.id, o.alleles) };
       }) };
@@ -553,6 +556,7 @@
     var noBaseIds = ['CR', 'D', 'G'].concat(EXTRA_LOCI.filter(function (l) { return !l.only; }).map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
     var unread = unreadColourTokens(sireText).concat(unreadColourTokens(damText)).filter(function (t, i, a) { return a.indexOf(t) === i; });
     var patternIds = ['LP', 'PATN1'].filter(function (id) { return dist[id]; });
+    var patternTested = !!(touched.LP || touched.PATN1);
     return {
       genes: genes,
       unread: unread,
@@ -560,7 +564,7 @@
       untested: untested,
       colours: dist.E ? enumerateOutcomes(dist, colourIds, baseColourLabel) : (noBaseIds.length ? enumerateOutcomes(dist, noBaseIds, baseColourLabel) : null),
       baseKnown: !!dist.E,
-      patterns: dist.LP ? enumerateOutcomes(dist, patternIds, patternLabel) : null
+      patterns: patternTested ? enumerateOutcomes(dist, patternIds, patternLabel) : null
     };
   }
 

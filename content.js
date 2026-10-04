@@ -1279,6 +1279,10 @@
   // on this horse's profile; on mobile it opens the on-page overlay.
   var LEDGER_BTN_ID = 'hr-ledger-open-btn';
   var LEDGER_PILL_ID = 'hr-ledger-open-pill';
+  // which version of the extension is running on this page (shown in the button's tooltip and the console)
+  var LEDGER_VERSION = '';
+  try { LEDGER_VERSION = chrome.runtime.getManifest().version; } catch (e) {}
+  try { console.info('HR Ledger content script v' + (LEDGER_VERSION || '?')); } catch (e) {}
   var areaFailed = false, pillHiddenTicks = 0;
   function openInLedger(id) {
     if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
@@ -1316,7 +1320,7 @@
       pill = document.createElement('button');
       pill.id = LEDGER_PILL_ID;
       pill.type = 'button';
-      pill.title = 'Open this horse in HR Stallion & Mare Ledger';
+      pill.title = 'Open this horse in HR Stallion & Mare Ledger' + (LEDGER_VERSION ? ' (v' + LEDGER_VERSION + ')' : '');
       pill.setAttribute('data-life', life);
       var dot = document.createElement('span');
       dot.style.cssText = 'width:9px;height:9px;border-radius:50%;background:#46592C;display:inline-block;';
@@ -1348,7 +1352,7 @@
     edge.id = LEDGER_BTN_ID;
     edge.type = 'button';
     edge.textContent = 'Open in Ledger';
-    edge.title = 'Open this horse in HR Stallion & Mare Ledger';
+    edge.title = 'Open this horse in HR Stallion & Mare Ledger' + (LEDGER_VERSION ? ' (v' + LEDGER_VERSION + ')' : '') + ' \u2014 edge tab: the picture box was not found on this page';
     edge.setAttribute('data-life', life);
     edge.style.cssText = [
       'position:fixed', 'right:0', 'top:38%', 'z-index:2147483000', 'cursor:pointer',

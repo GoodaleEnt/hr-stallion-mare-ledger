@@ -447,7 +447,7 @@
     var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : activeTab === 'retired' ? '← Back to retired' : '← Back to search') + '</button>';
     html += suggestionsLinkHtml(selectedPassportLife);
     html += goalStripHtml(selectedPassportLife);
-    html += '<div class="detail-head"><div class="name-row">' +
+    html += '<div class="detail-head profile-goal' + goalClass(selectedPassportLife) + '"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
       '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
       '<div class="tags">' +
@@ -1122,7 +1122,7 @@
     '</div>';
     html += suggestionsLinkHtml(m.mareLifeNumber);
     html += goalStripHtml(m.mareLifeNumber);
-    html += '<div class="detail-head">' +
+    html += '<div class="detail-head profile-goal' + goalClass(m.mareLifeNumber) + '">' +
       '<div><h1>' + L.esc(m.mareName) + '</h1>' +
       '<div class="tags">' +
         (m.mareLifeNumber ? '<span class="tag mono">#' + L.esc(m.mareLifeNumber) + '</span>' : '') +
@@ -2290,7 +2290,10 @@
   var goalsOpen = false;
   // classes for a horse's card or row: outlined if it meets your goals, and a big $ behind it if it is for sale
   function goalClass(life) {
-    return (L.goalCheck(state, life).met ? ' goal-hit' : '') + (lifeStatus(life) === 'For Sale' ? ' for-sale' : '');
+    // outlined gold when every goal is met; outlined blue when exactly one goal box is missed ("off by one")
+    var met = L.goalCheck(state, life).met;
+    var near = !met && L.goalMisses(state, life).length === 1;
+    return (met ? ' goal-hit' : near ? ' goal-near' : '') + (lifeStatus(life) === 'For Sale' ? ' for-sale' : '');
   }
   // Three labelled boxes shown above a horse's picture: green = meets that
   // goal, red = doesn't, grey = no goal set or no data yet. Hidden entirely
@@ -2700,7 +2703,7 @@
       html += renderStallionForm(s);
     } else {
       html += goalStripHtml(s.lifeNumber);
-      html += '<div class="detail-head"><div class="name-row">' +
+      html += '<div class="detail-head profile-goal' + goalClass(s.lifeNumber) + '"><div class="name-row">' +
         (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
         '<div><h1>' + L.esc(s.name) + '</h1>' +
         '<div class="tags">' +

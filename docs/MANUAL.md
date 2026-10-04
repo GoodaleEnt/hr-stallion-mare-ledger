@@ -147,6 +147,19 @@ When you open a horse on Horse Reality that **isn't yours**, a small box appears
 
 The Other Horses tab shows each added horse with its picture, breed, sex and owner. Click a name to open its passport, or search for it in the box at the top of any tab (added horses are tagged "Other Horses" in the results). **Remove** takes a horse off the tab but keeps it searchable; the box may appear again the next time you open its page.
 
+## Analytics
+
+The **Analytics** tab turns what the ledger has saved into numbers and advice. It never contacts Horse Reality; it only reads your own records.
+
+- **Overview:** breedings logged, success rate, foals born, pending coverings, stud fees earned and the average foal score.
+- **Suggestions:** coverings waiting for a result, stallions with a high failure rate (40% or more once at least 5 have resolved), stallions with no breedings in 45+ days, mares that are not in foal and haven't been bred in 30+ days, horses missing data, and horses that miss your goals by only one box.
+- **Pairing ideas:** your free mares crossed with your active stallions, ranked by average genetic potential, keeping only pairs with an estimated inbreeding under 6.25%.
+- **Breedings per month:** the last 12 months as a bar chart.
+- **Top Breed Total, top conformation and goals:** your best horses and how many meet your highlight goals.
+- **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred.
+
+Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
+
 ## Foal Calculator
 
 Pick a **mare** and a **stallion** from any horses whose pages you've visited (the lists are grouped into 3 and older, then under 3, with your own horses first in each group) and the **Foal Calculator** shows the average of their genetic potential and checks both pedigrees for shared ancestors up to three generations behind each parent. If any turn up, it lists them with how far back they sit on each side and gives an *estimated* inbreeding percentage (an estimate that ignores the ancestors' own inbreeding, so Horse Reality's figure can be higher).

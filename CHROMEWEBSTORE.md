@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.17.0 | 2026-10-03 | Analytics tab: stats, charts, per-stallion and per-mare tables, and suggestions | Draft |
 | 1.16.1 | 2026-10-03 | Health "how many" is a 0-5 menu | Draft |
 | 1.16.0 | 2026-10-03 | Traits and Health goals use a worst-rating selector plus how many are accepted | Draft |
 | 1.15.0 | 2026-10-03 | Health and Fertility read from the horse page, shown on each horse page, and added to the highlight goals as two more boxes | Draft |

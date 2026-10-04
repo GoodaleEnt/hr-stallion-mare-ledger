@@ -212,6 +212,7 @@
     else if (activeTab === 'herd') html = renderHerdList();
     else if (activeTab === 'others') html = renderOthersList();
     else if (activeTab === 'retired') html = renderRetiredList();
+    else if (activeTab === 'analytics') html = renderAnalytics();
     else if (activeTab === 'calc') html = renderCalculator();
     else html = renderStallionsList();
     app.innerHTML = html;
@@ -340,6 +341,7 @@
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
         '<button class="tab-btn' + (activeTab === 'retired' ? ' active' : '') + '" data-action="show-tab" data-tab="retired">Retired</button>' +
         '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
+        '<button class="tab-btn' + (activeTab === 'analytics' ? ' active' : '') + '" data-action="show-tab" data-tab="analytics">Analytics</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
     return html;
@@ -988,6 +990,90 @@
       html += '<div class="section-head"><h2>Archive</h2></div>';
       html += herdListHtml(archived);
     }
+    return html;
+  }
+
+  // ---------- Analytics ----------
+  function pct(x) { return x == null ? '\u2014' : Math.round(x * 100) + '%'; }
+  function renderAnalytics() {
+    var html = topHeaderHtml();
+    var a = L.analytics(state);
+    var o = a.overall;
+    if (!a.stallions.length && !a.mares.length) {
+      return html + '<div class="empty"><h3>Nothing to analyse yet</h3><p>Analytics appear once the ledger has your stallions, mares and breedings. Browse your bank page and horses on Horse Reality and they fill in automatically.</p></div>';
+    }
+    html += '<div class="section-head"><h2>Analytics</h2></div>';
+    html += '<div class="stats-bar">' +
+      '<div class="stat-tile"><div class="num mono">' + o.breedings + '</div><div class="label">Breedings logged</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + pct(o.successRate) + '</div><div class="label">Success rate</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + o.foals + '</div><div class="label">Foals born</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + o.pending + '</div><div class="label">Pending</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + L.esc(L.moneyLine(o.earned)) + '</div><div class="label">Stud fees earned</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + (o.avgScore != null ? Math.round(o.avgScore * 10) / 10 : '\u2014') + '</div><div class="label">Avg foal score</div></div>' +
+    '</div>';
+
+    // suggestions
+    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Suggestions</h3>';
+    if (!a.tips.length) html += '<div class="an-tip info">Nothing needs attention right now.</div>';
+    a.tips.forEach(function (t) { html += '<div class="an-tip ' + t.level + '">' + L.esc(t.text) + '</div>'; });
+    if (a.pairs.length) {
+      html += '<div style="margin-top:10px;"><strong>Pairing ideas</strong> <span class="sub" style="color:var(--text-muted);font-size:12px;">your free mares \u00d7 your active stallions, best average genetic potential with an estimated inbreeding under 6.25%</span>';
+      a.pairs.forEach(function (p) {
+        html += '<div class="an-tip tip">' + L.esc(p.mare) + ' \u00d7 ' + L.esc(p.stallion) + ' \u2014 average GP <strong>' + p.gp + '</strong>, estimated inbreeding ' + p.coi + '%</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="an-grid">';
+    // months
+    var maxB = Math.max.apply(null, a.months.map(function (m) { return m.breedings; }).concat([1]));
+    html += '<div class="an-card"><h3>Breedings per month</h3><div class="an-bars">' +
+      a.months.map(function (m) { return '<div class="an-bar" style="height:' + Math.max(2, Math.round(110 * m.breedings / maxB)) + 'px;" title="' + L.esc(m.key + ': ' + m.breedings + ' breeding' + (m.breedings === 1 ? '' : 's') + (m.earned ? ', ' + L.fmtMoney(m.earned) + ' HRC' : '')) + '"></div>'; }).join('') +
+      '</div><div class="an-barlabels">' + a.months.map(function (m) { return '<span>' + L.esc(m.key.slice(5)) + '</span>'; }).join('') + '</div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">Last 12 months. Hover a bar for the count and HRC fees.</p></div>';
+    // top lists
+    function topList(title, list, valueOf) {
+      var out = '<div class="an-card"><h3>' + title + '</h3>';
+      if (!list.length) return out + '<p class="notes-line" style="margin:0;">Not enough data yet.</p></div>';
+      out += '<table class="an-table"><tbody>';
+      list.forEach(function (x) { out += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button></td><td class="num mono">' + valueOf(x) + '</td></tr>'; });
+      return out + '</tbody></table></div>';
+    }
+    html += topList('Top Breed Total', a.topBT, function (x) { return Math.round(x.bt * 1000) / 1000; });
+    html += topList('Top conformation', a.topConf, function (x) { return Math.round(x.conf * 1000) / 1000; });
+    html += '<div class="an-card"><h3>Goals</h3><p style="margin:0 0 6px;"><strong>' + a.goalHits + '</strong> horse' + (a.goalHits === 1 ? '' : 's') + ' meet all your goals; <strong>' + a.nearMiss + '</strong> miss by one box.</p><p class="notes-line" style="margin:0;">Set goals under <em>Highlight goals</em> at the top of the page.</p></div>';
+    html += '</div>';
+
+    // stallion table
+    html += '<div class="an-card" style="margin-bottom:18px;"><h3>Stallions</h3>';
+    if (!a.stallions.length) {
+      html += '<p class="notes-line" style="margin:0;">No stallions yet.</p>';
+    } else {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Stallion</th><th class="num">Breedings</th><th class="num">Success</th><th class="num">Failed</th><th class="num">Pending</th><th class="num">Foals</th><th class="num">Avg foal</th><th class="num">Best foal</th><th class="num">Earned</th><th>Last bred</th></tr></thead><tbody>';
+      a.stallions.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (s) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-stallion" data-id="' + L.esc(s.id) + '">' + L.esc(s.name) + '</button></td>' +
+          '<td class="num mono">' + s.breedings + '</td><td class="num mono">' + pct(s.successRate) + '</td><td class="num mono">' + s.failed + '</td><td class="num mono">' + s.pending + '</td><td class="num mono">' + s.foals + '</td>' +
+          '<td class="num mono">' + (s.avgScore != null ? Math.round(s.avgScore * 10) / 10 : '\u2014') + '</td><td class="num mono">' + (s.bestScore != null ? s.bestScore : '\u2014') + '</td>' +
+          '<td class="num mono">' + L.esc(L.moneyLine(s.earned)) + '</td><td>' + (s.last ? L.fmtDate(s.last) : '\u2014') + '</td></tr>';
+      });
+      html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Success rate = foals and in-foal results out of every covering with a known result (pending ones are left out).</p>';
+    }
+    html += '</div>';
+
+    // mares table
+    html += '<div class="an-card"><h3>Your mares</h3>';
+    if (!a.mares.length) {
+      html += '<p class="notes-line" style="margin:0;">No mares of yours cached yet.</p>';
+    } else {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Mare</th><th class="num">Breedings</th><th class="num">Foals</th><th>Last bred</th><th>Status</th></tr></thead><tbody>';
+      a.mares.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (m) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(m.life) + '">' + L.esc(m.name) + '</button></td>' +
+          '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (m.young ? 'Young' : m.pregnant ? 'In foal' : 'Open') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
     return html;
   }
 

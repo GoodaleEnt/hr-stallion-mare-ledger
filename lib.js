@@ -708,6 +708,162 @@
       sections: s
     };
   }
+  // ---------- analytics: numbers and suggestions drawn from what is already saved ----------
+  // Nothing here makes a network request. A breeding that worked is stored as a
+  // "Succeeded" row and later also as a "Foal Born" row, so a success is counted
+  // once: every Foal Born row, plus each Succeeded row whose mare has no Foal
+  // Born row under the same stallion.
+  function analytics(state) {
+    var now = Date.now();
+    var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var allBreedings = state.breedings || {};
+    function addTotals(into, rec) {
+      if (rec.price > 0) { var c = rec.currency || 'HRC'; into[c] = (into[c] || 0) + rec.price; }
+    }
+    function latest(a, b) { return b && (!a || b > a) ? b : a; }
+
+    var stallions = (state.stallions || []).filter(function (s) { return s.owned !== false; }).map(function (s) {
+      var recs = allBreedings[s.id] || [];
+      var foalMares = {};
+      recs.forEach(function (r) { if (r.status === 'Foal Born' && r.mareLifeNumber) foalMares[r.mareLifeNumber] = true; });
+      var out = { id: s.id, name: s.name, lifeNumber: s.lifeNumber, status: s.status || 'Active', breedings: 0, succeeded: 0, failed: 0, pending: 0, foals: 0, earned: {}, scores: [], last: '' };
+      recs.forEach(function (r) {
+        var st = r.status || 'Pending';
+        if (st === 'Foal Born') { out.foals++; out.succeeded++; }
+        else if (st === 'Succeeded') { if (!(r.mareLifeNumber && foalMares[r.mareLifeNumber])) out.succeeded++; out.breedings++; }
+        else if (st === 'Failed') { out.failed++; out.breedings++; }
+        else { out.pending++; out.breedings++; }
+        addTotals(out.earned, r);
+        if (r.foalScore > 0) out.scores.push(Number(r.foalScore));
+        if (st !== 'Foal Born') out.last = latest(out.last, r.date);
+      });
+      out.resolved = out.succeeded + out.failed;
+      out.successRate = out.resolved ? out.succeeded / out.resolved : null;
+      out.avgScore = out.scores.length ? out.scores.reduce(function (a, b) { return a + b; }, 0) / out.scores.length : null;
+      out.bestScore = out.scores.length ? Math.max.apply(null, out.scores) : null;
+      return out;
+    });
+
+    var overall = { breedings: 0, succeeded: 0, failed: 0, pending: 0, foals: 0, earned: {}, scores: [] };
+    stallions.forEach(function (s) {
+      overall.breedings += s.breedings; overall.succeeded += s.succeeded; overall.failed += s.failed;
+      overall.pending += s.pending; overall.foals += s.foals;
+      Object.keys(s.earned).forEach(function (c) { overall.earned[c] = (overall.earned[c] || 0) + s.earned[c]; });
+      overall.scores = overall.scores.concat(s.scores);
+    });
+    overall.resolved = overall.succeeded + overall.failed;
+    overall.successRate = overall.resolved ? overall.succeeded / overall.resolved : null;
+    overall.avgScore = overall.scores.length ? overall.scores.reduce(function (a, b) { return a + b; }, 0) / overall.scores.length : null;
+
+    // breedings and fee income per month (all stallions, including studs used for your own mares)
+    var months = {};
+    Object.keys(allBreedings).forEach(function (sid) {
+      (allBreedings[sid] || []).forEach(function (r) {
+        if (r.status === 'Foal Born' || !r.date) return;
+        var key = String(r.date).slice(0, 7);
+        var m = months[key] = months[key] || { key: key, breedings: 0, earned: 0 };
+        m.breedings++;
+        if (r.price > 0 && (r.currency || 'HRC') === 'HRC') m.earned += r.price;
+      });
+    });
+    var monthList = [];
+    var d = new Date(now);
+    for (var i = 11; i >= 0; i--) {
+      var dt = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      var key = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+      monthList.push(months[key] || { key: key, breedings: 0, earned: 0 });
+    }
+
+    // your own adult mares
+    var mares = [];
+    Object.keys(state.horseInfo || {}).forEach(function (life) {
+      var info = state.horseInfo[life];
+      var meta = (state.horseMeta && state.horseMeta[life]) || {};
+      if (!info || info.sex !== 'mare' || !myName || String(info.ownerName || '').trim().toLowerCase() !== myName) return;
+      if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased') return;
+      var m = { life: life, name: info.name || ('#' + life), young: isYoungInfo(info), breedings: 0, foals: 0, last: '', pregnant: !!(info.pregnancy && String(info.pregnancy.status || '').indexOf('Pregnant') === 0) };
+      Object.keys(allBreedings).forEach(function (sid) {
+        (allBreedings[sid] || []).forEach(function (r) {
+          if (String(r.mareLifeNumber) !== String(life)) return;
+          if (r.status === 'Foal Born') { m.foals++; return; }
+          m.breedings++;
+          m.last = latest(m.last, r.date);
+        });
+      });
+      mares.push(m);
+    });
+
+    // suggestions
+    var tips = [];
+    var review = findReviewCandidates(state, 6);
+    if (review.length) tips.push({ level: 'warn', text: review.length + ' covering' + (review.length === 1 ? ' is' : 's are') + ' 6+ days old with no result yet. Check the mares\' pages before they are marked Failed.' });
+    stallions.forEach(function (s) {
+      if (s.resolved >= 5 && s.failed / s.resolved >= 0.4) {
+        tips.push({ level: 'warn', text: s.name + ': ' + Math.round(100 * s.failed / s.resolved) + '% of resolved coverings failed (' + s.failed + ' of ' + s.resolved + '). Consider a fertility check or a lower fee until it improves.' });
+      }
+    });
+    var idle = stallions.filter(function (s) {
+      if (s.status !== 'Active') return false;
+      var days = s.last ? daysSince(s.last) : null;
+      return days == null || days > 45;
+    }).map(function (s) { return s.name; });
+    if (idle.length) tips.push({ level: 'tip', text: 'No breedings in 45+ days: ' + idle.join(', ') + '. A lower fee or a promotion may help.' });
+    var ready = mares.filter(function (m) {
+      if (m.young || m.pregnant) return false;
+      var days = m.last ? daysSince(m.last) : null;
+      return days == null || days > 30;
+    }).map(function (m) { return m.name; });
+    if (ready.length) tips.push({ level: 'tip', text: ready.length + ' mare' + (ready.length === 1 ? '' : 's') + ' not in foal and not bred in 30+ days: ' + ready.slice(0, 8).join(', ') + (ready.length > 8 ? ' and ' + (ready.length - 8) + ' more' : '') + '.' });
+
+    // missing data
+    var gaps = [];
+    ownedHorses(state).forEach(function (h) {
+      if (h.meta.status === 'Sold' || h.meta.status === 'Retired') return;
+      var missing = [];
+      if (h.info.geneticPotential == null) missing.push('genetic potential');
+      if (!h.info.confTraits) missing.push('conformation traits');
+      if (!h.info.health) missing.push('health check');
+      if (!(bestConformation(h.meta).best > 0)) missing.push('a show score');
+      if (missing.length) gaps.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), missing: missing });
+    });
+    if (gaps.length) tips.push({ level: 'info', text: gaps.length + ' of your horses are missing data (e.g. ' + gaps[0].name + ': ' + gaps[0].missing.join(', ') + '). Open each horse on Horse Reality once and its page is read automatically.' });
+
+    // goals
+    var goalHits = [], nearMiss = [];
+    ownedHorses(state).forEach(function (h) {
+      var c = goalCheck(state, h.lifeNumber);
+      if (!c.active) return;
+      if (c.met) { goalHits.push(h); return; }
+      var s = c.sections;
+      var bad = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad'; });
+      var unknown = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'na' && x.text === 'no data yet'; });
+      if (bad.length === 1 && !unknown.length) nearMiss.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, why: bad[0].label + ' ' + bad[0].text });
+    });
+    if (nearMiss.length) tips.push({ level: 'tip', text: nearMiss.length + ' horse' + (nearMiss.length === 1 ? ' misses' : 's miss') + ' your goals by only one box: ' + nearMiss.slice(0, 5).map(function (n) { return n.name + ' (' + n.why + ')'; }).join('; ') + '.' });
+
+    // pairing ideas: your adult mares x your active stallions, best average genetic potential with low inbreeding
+    var pairs = [];
+    var studs = stallions.filter(function (s) { return s.status === 'Active' && s.lifeNumber && state.horseInfo[s.lifeNumber] && state.horseInfo[s.lifeNumber].geneticPotential != null; });
+    mares.filter(function (m) { return !m.young && !m.pregnant && state.horseInfo[m.life].geneticPotential != null; }).forEach(function (m) {
+      studs.forEach(function (s) {
+        var gp = (Number(state.horseInfo[m.life].geneticPotential) + Number(state.horseInfo[s.lifeNumber].geneticPotential)) / 2;
+        var common = commonAncestors(ancestorMap(state, m.life, 3), ancestorMap(state, s.lifeNumber, 3));
+        pairs.push({ mare: m.name, stallion: s.name, gp: Math.round(gp * 10) / 10, coi: Math.round(estimateCoi(common) * 100) / 100 });
+      });
+    });
+    pairs = pairs.filter(function (p) { return p.coi < 6.25; }).sort(function (a, b) { return b.gp - a.gp || a.coi - b.coi; }).slice(0, 5);
+
+    // standouts
+    var best = ownedHorses(state).map(function (h) {
+      var meta = state.horseMeta[h.lifeNumber] || {};
+      var bt = Math.max(Number(meta.btBest) || 0, breedTotal(h.info.geneticPotential, bestConformation(meta).best));
+      return { name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, bt: bt, conf: bestConformation(meta).best, gp: h.info.geneticPotential };
+    });
+    var topBT = best.filter(function (x) { return x.bt > 0; }).sort(function (a, b) { return b.bt - a.bt; }).slice(0, 5);
+    var topConf = best.filter(function (x) { return x.conf > 0; }).sort(function (a, b) { return b.conf - a.conf; }).slice(0, 5);
+
+    return { overall: overall, stallions: stallions, months: monthList, mares: mares, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, nearMiss: nearMiss.length, gaps: gaps.length };
+  }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.
   function purchaseOf(state, lifeNumber) {
@@ -721,6 +877,7 @@
   global.HRLib = {
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
+    analytics: analytics,
     goalsOf: goalsOf,
     healthCounts: healthCounts,
     goalSections: goalSections,

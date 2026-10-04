@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.19.7 | 2026-10-03 | Open in Ledger finds the picture box even when the page keeps it in a hidden (shadow) section | Draft |
 | 1.19.6 | 2026-10-03 | Open in Ledger button tooltip and console show the running version | Draft |
 | 1.19.5 | 2026-10-03 | Open in Ledger is a pill inside the horse picture (beside the status pills, or in the corner when there are none) | Draft |
 | 1.19.4 | 2026-10-03 | Ledger tab: made clickable on the site tab strip, and added to horses with no tabs in the same place | Draft |

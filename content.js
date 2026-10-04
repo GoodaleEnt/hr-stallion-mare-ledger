@@ -1284,6 +1284,30 @@
   try { LEDGER_VERSION = chrome.runtime.getManifest().version; } catch (e) {}
   try { console.info('HR Ledger content script v' + (LEDGER_VERSION || '?')); } catch (e) {}
   var areaFailed = false, pillHiddenTicks = 0;
+  // The horse page's content can live inside open shadow roots, where document.querySelector
+  // can't see it, so these search the page and every open shadow root below it.
+  function deepQuery(selector, root) {
+    root = root || document;
+    var hit = root.querySelector(selector);
+    if (hit) return hit;
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].shadowRoot) {
+        hit = deepQuery(selector, all[i].shadowRoot);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
+  function deepQueryAll(selector, root) {
+    root = root || document;
+    var out = Array.prototype.slice.call(root.querySelectorAll(selector));
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].shadowRoot) out = out.concat(deepQueryAll(selector, all[i].shadowRoot));
+    }
+    return out;
+  }
   function openInLedger(id) {
     if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
       window.HRMobileOverlay.show();
@@ -1293,19 +1317,19 @@
     chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
   }
   function removeLedgerButton() {
-    document.querySelectorAll('#' + LEDGER_PILL_ID + ', #' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
+    deepQueryAll('#' + LEDGER_PILL_ID + ', #' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
   }
   function injectLedgerButton() {
     var life = parseHorseIdFromUrl();
     if (!life) { removeLedgerButton(); return; }
 
     // 1) in the picture's status-pill area (top-left), or 2) in that corner of the picture itself
-    var area = areaFailed ? null : document.querySelector('div.horse-status');
-    var picture = document.getElementById('top');
+    var area = areaFailed ? null : deepQuery('div.horse-status');
+    var picture = deepQuery('#top');
     var home = area || picture;
     if (home) {
       document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
-      var pill = document.getElementById(LEDGER_PILL_ID);
+      var pill = deepQuery('#' + LEDGER_PILL_ID);
       if (pill && pill.parentNode === home) {
         pill.setAttribute('data-life', life);
         // the status area can exist but draw nothing; if our pill is invisible there, use the picture corner
@@ -1341,7 +1365,7 @@
       home.appendChild(pill);
       return;
     }
-    document.querySelectorAll('#' + LEDGER_PILL_ID).forEach(function (el) { el.remove(); });
+    deepQueryAll('#' + LEDGER_PILL_ID).forEach(function (el) { el.remove(); });
 
     // 3) no picture box found: a vertical tab on the right edge of the screen
     var edge = document.getElementById(LEDGER_BTN_ID);

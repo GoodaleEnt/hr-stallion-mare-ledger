@@ -760,6 +760,7 @@
           '<div class="row"><span>Foals born</span><span class="v mono">' + (m.counts['Foal Born'] || 0) + '</span></div>' +
           purchaseRowsHtml(m.mareLifeNumber) +
           highScoreRowsHtml(m.mareLifeNumber) +
+          mareStatusRowHtml(m.mareLifeNumber) +
         '</div>';
       });
       html += '</div>';
@@ -852,6 +853,7 @@
     '</div>';
 
     html += geneDetailsHtml(m.mareLifeNumber);
+    html += mareStatusPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
 
     html += '<div class="stats-bar">' +
@@ -1011,6 +1013,25 @@
     if (s) s.status = (status === 'Sold' || status === 'Retired') ? status : 'Active';
     persist();
   }
+  // Active / Sold / Retired menu (keeps any other herd status as its own option).
+  function statusSelectHtml(life, id) {
+    var cur = lifeStatus(life);
+    var opts = ['Active', 'Sold', 'Retired'];
+    if (opts.indexOf(cur) === -1) opts.push(cur);
+    return '<select' + (id ? ' id="' + id + '"' : '') + ' class="pill-select ' + L.herdStatusClass(cur) + '" data-action="herd-status" data-life="' + L.esc(life) + '" aria-label="Status">' +
+      opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + L.esc(o) + '</option>'; }).join('') + '</select>';
+  }
+  function mareStatusRowHtml(life) {
+    if (!life) return '';
+    return '<div class="row"><span>Status</span><span class="v">' + statusSelectHtml(life) + '</span></div>';
+  }
+  function mareStatusPanelHtml(life) {
+    if (!life) return '';
+    return '<div class="card" style="padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">' +
+      '<label for="mare-status" style="color:var(--text-muted);font-size:13px;">Status</label>' + statusSelectHtml(life, 'mare-status') +
+      '<span class="notes-line" style="margin:0;">Sold mares move to Other Horses; retired mares move to the Retired tab.</span></div>';
+  }
+
   // every horse the ledger knows with this status, as { lifeNumber, info, meta }
   function horsesWithStatus(status) {
     var lives = {};

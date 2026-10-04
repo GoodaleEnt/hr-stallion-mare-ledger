@@ -372,6 +372,7 @@
     html += geneDetailsHtml(selectedPassportLife);
     html += healthPanelHtml(selectedPassportLife);
     html += purchaseDetailsHtml(selectedPassportLife);
+    html += saleDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
     // record even though this raw passport cache doesn't know that — link
@@ -859,6 +860,7 @@
     html += mareStatusPanelHtml(m.mareLifeNumber);
     html += healthPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
+    html += saleDetailsHtml(m.mareLifeNumber);
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + m.records.length + '</div><div class="label">Breedings</div></div>' +
@@ -996,7 +998,7 @@
   // ---------- Analytics ----------
   function pct(x) { return x == null ? '\u2014' : Math.round(x * 100) + '%'; }
   // Click a table heading to sort by it; click again to reverse. Empty values sort last.
-  var anSort = { stallions: { key: 'breedings', dir: -1 }, mares: { key: 'breedings', dir: -1 }, young: { key: 'name', dir: 1 } };
+  var anSort = { sold: { key: 'date', dir: -1 }, stallions: { key: 'breedings', dir: -1 }, mares: { key: 'breedings', dir: -1 }, young: { key: 'name', dir: 1 } };
   var AN_TEXT_KEYS = { name: true, kind: true, status: true };
   function sortHead(table, key, label, cls, title) {
     var s = anSort[table];
@@ -1142,6 +1144,25 @@
       html += '</tbody></table></div>';
     }
     html += '</div>';
+
+    // horses you have sold
+    var ss = a.soldSummary;
+    html += '<div class="an-card" style="margin-top:18px;"><h3>Sold horses</h3>';
+    if (!a.sold.length) {
+      html += '<p class="notes-line" style="margin:0;">No sold horses yet. Sales are picked up from your bank page, or mark a horse Sold and enter the price on its page.</p>';
+    } else {
+      html += '<p style="margin:0 0 8px;"><strong>' + ss.count + '</strong> sold' + (ss.withPrice ? ' for <strong>' + L.esc(L.moneyLine(ss.revenue)) + '</strong>' : '') +
+        (ss.avg ? ' (average ' + L.esc(L.fmtMoney(Math.round(ss.avg))) + ' HRC)' : '') +
+        (ss.profitKnown ? '; profit on the ' + ss.profitKnown + ' with a known cost: <strong style="color:var(--' + (ss.profit >= 0 ? 'success' : 'danger') + ');">' + (ss.profit >= 0 ? '+' : '-') + L.esc(L.fmtMoney(Math.abs(ss.profit))) + ' HRC</strong>' : '') + '.</p>';
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr>' + sortHead('sold', 'name', 'Horse') + sortHead('sold', 'date', 'Sold') + sortHead('sold', 'price', 'Sold for', 'num') + sortHead('sold', 'cost', 'Paid', 'num', 'Price paid plus shipping') + sortHead('sold', 'profit', 'Profit', 'num') + sortHead('sold', 'buyer', 'Buyer') + '</tr></thead><tbody>';
+      sortList('sold', a.sold, { name: function (x) { return String(x.name || ''); }, date: function (x) { return x.date || null; }, price: function (x) { return x.price; }, cost: function (x) { return x.cost; }, profit: function (x) { return x.profit; }, buyer: function (x) { return x.buyer || null; } }).forEach(function (x) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button></td><td>' + (x.date ? L.fmtDate(x.date) : '\u2014') + '</td>' +
+          '<td class="num mono">' + (x.price ? L.esc(L.fmtMoney(x.price) + ' ' + x.currency) : '\u2014') + '</td><td class="num mono">' + (x.cost ? L.esc(L.fmtMoney(x.cost)) : '\u2014') + '</td>' +
+          '<td class="num mono"' + (x.profit != null ? ' style="color:var(--' + (x.profit >= 0 ? 'success' : 'danger') + ');"' : '') + '>' + (x.profit != null ? (x.profit >= 0 ? '+' : '-') + L.esc(L.fmtMoney(Math.abs(x.profit))) : '\u2014') + '</td><td>' + L.esc(x.buyer || '\u2014') + '</td></tr>';
+      });
+      html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Paid = price plus shipping when you bought the horse (blank if you bred it). Profit is shown only when the sale and purchase used the same currency.</p>';
+    }
+    html += '</div>';
     return html;
   }
 
@@ -1232,7 +1253,7 @@
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
         goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
-        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + (info.sold ? ' <span class="tag">Sold</span>' : '') + '</span></div>' +
+        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + (info.sold ? ' <span class="tag">Sold</span>' + saleTagsHtml(info.lifeNumber) : '') + '</span></div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
       '</div>';
@@ -1699,6 +1720,51 @@
       '<div class="goal-strip" style="margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">' + cells + '</div></div>';
   }
 
+  // ---------- sale (read from the bank page, or entered by hand) ----------
+  function saleLineText(life) {
+    var sa = L.saleOf(state, life);
+    if (!sa) return '';
+    return L.fmtMoney(sa.price) + ' ' + sa.currency + (sa.date ? ' \u00b7 ' + L.fmtDate(sa.date) : '') + (sa.buyer ? ' \u00b7 to ' + sa.buyer : '');
+  }
+  function saleTagsHtml(life) {
+    var sa = L.saleOf(state, life);
+    if (!sa) return '';
+    var out = '<span class="tag mono" title="' + L.esc(saleLineText(life)) + '">Sold for ' + L.esc(L.fmtMoney(sa.price) + ' ' + sa.currency) + (sa.date ? ' \u00b7 ' + L.esc(L.fmtDate(sa.date)) : '') + '</span>';
+    var pr = L.profitOf(state, life);
+    if (pr) {
+      out += '<span class="tag mono" style="color:var(--' + (pr.profit >= 0 ? 'success' : 'danger') + ');" title="Sold for minus what you paid, including shipping (' + L.esc(L.fmtMoney(pr.cost) + ' ' + pr.currency) + ')">' + (pr.profit >= 0 ? 'Profit +' : 'Loss ') + L.esc(L.fmtMoney(Math.abs(pr.profit)) + ' ' + pr.currency) + '</span>';
+    }
+    return out;
+  }
+  function setHorseSale(life, field, value) {
+    if (!life || !field) return;
+    var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+    meta.sale = Object.assign({}, meta.sale);
+    if (field === 'price') {
+      var n = parseFloat(value);
+      if (isFinite(n) && n > 0) meta.sale.price = n; else delete meta.sale.price;
+    } else {
+      meta.sale[field] = value;
+    }
+    persist();
+    // entering a sale price means the horse has been sold
+    if (field === 'price' && meta.sale.price && meta.status !== 'Sold') setLifeStatus(life, 'Sold');
+  }
+  function saleDetailsHtml(life) {
+    if (!life) return '';
+    var meta = (state.horseMeta[life] && state.horseMeta[life].sale) || {};
+    var id = 'sale-' + L.esc(life);
+    var line = saleLineText(life);
+    return '<details style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Sale \u2014 ' + (line ? L.esc(line) : 'not sold / not recorded') + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' +
+        '<div class="field"><label for="' + id + '-price">Sold for</label><div style="display:flex;gap:8px;"><input id="' + id + '-price" type="number" min="0" step="any" data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="price" value="' + (meta.price ? L.esc(meta.price) : '') + '" placeholder="0" style="flex:1;min-width:0;">' +
+          '<select data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="currency" aria-label="Sale currency">' + L.CURRENCIES.map(function (c) { return '<option' + (c === (meta.currency || 'HRC') ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div></div>' +
+        '<div class="field"><label for="' + id + '-date">Date sold</label><input id="' + id + '-date" type="date" data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="date" value="' + L.esc(meta.date || '') + '"></div>' +
+        '<div class="field"><label for="' + id + '-buyer">Sold to</label><input id="' + id + '-buyer" type="text" data-action="horse-sale" data-life="' + L.esc(life) + '" data-field="buyer" value="' + L.esc(meta.buyer || '') + '" placeholder="buyer\'s username"></div>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Sales are picked up automatically from your bank page. You can also enter or correct one here; entering a price marks the horse Sold.</p>' +
+      '</div></details>';
+  }
+
   // ---------- purchase price & shipping ----------
   function purchaseParts(lifeNumber) {
     var p = L.purchaseOf(state, lifeNumber);
@@ -1838,6 +1904,8 @@
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');
     var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
     if (paidTags) tags.push(paidTags);
+    var saleTags = info.lifeNumber ? saleTagsHtml(info.lifeNumber) : '';
+    if (saleTags) tags.push(saleTags);
     var scoreTags = info.lifeNumber ? highScoreTagsHtml(info.lifeNumber) : '';
     if (scoreTags) tags.push(scoreTags);
     if (info.training) tags.push('<span class="tag">' + L.esc(info.training) + '</span>');
@@ -1952,6 +2020,7 @@
     html += geneDetailsHtml(s.lifeNumber);
     html += healthPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
+    html += saleDetailsHtml(s.lifeNumber);
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + breedings.length + '</div><div class="label">Breedings</div></div>' +
@@ -2223,6 +2292,7 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; render(); }
+      else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }
       else if (action === 'herd-status') { setLifeStatus(t.getAttribute('data-life'), t.value); }

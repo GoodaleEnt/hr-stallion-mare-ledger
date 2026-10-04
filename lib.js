@@ -713,6 +713,33 @@
       sections: s
     };
   }
+  // ---------- sales ----------
+  // state.horseMeta[life].sale = { price, currency, date, buyer, recordedAt }. A horse
+  // counts as sold when its herd status is Sold or, for a stallion, its record is.
+  function isSoldLife(state, life) {
+    if (!life) return false;
+    var m = state.horseMeta && state.horseMeta[life];
+    if (m && m.status === 'Sold') return true;
+    var s = (state.stallions || []).find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(life); });
+    return !!(s && s.status === 'Sold');
+  }
+  function saleOf(state, life) {
+    var m = state.horseMeta && state.horseMeta[life];
+    var sa = m && m.sale;
+    if (!sa || !(Number(sa.price) > 0)) return null;
+    return { price: Number(sa.price), currency: sa.currency || 'HRC', date: sa.date || '', buyer: sa.buyer || '' };
+  }
+  // sale price minus what was paid (price + shipping); null unless all the amounts share a currency
+  function profitOf(state, life) {
+    var sa = saleOf(state, life), p = purchaseOf(state, life);
+    if (!sa || !p) return null;
+    var cost = p.price + p.shipping;
+    if (!cost) return null;
+    if (p.price && p.currency !== sa.currency) return null;
+    if (p.shipping && p.shippingCurrency !== sa.currency) return null;
+    return { cost: cost, profit: sa.price - cost, currency: sa.currency };
+  }
+
   // ---------- analytics: numbers and suggestions drawn from what is already saved ----------
   // Nothing here makes a network request. A breeding that worked is stored as a
   // "Succeeded" row and later also as a "Foal Born" row, so a success is counted
@@ -727,8 +754,9 @@
     }
     function latest(a, b) { return b && (!a || b > a) ? b : a; }
 
+    function myHorses() { return ownedHorses(state).filter(function (h) { return !isSoldLife(state, h.lifeNumber); }); }
     var stallions = (state.stallions || []).filter(function (s) {
-      if (s.owned === false) return false;
+      if (s.owned === false || s.status === 'Sold') return false;
       var si = s.lifeNumber && state.horseInfo ? state.horseInfo[s.lifeNumber] : null;
       return !(si && isYoungInfo(si));
     }).map(function (s) {
@@ -790,7 +818,7 @@
       var info = state.horseInfo[life];
       var meta = (state.horseMeta && state.horseMeta[life]) || {};
       if (!info || info.sex !== 'mare' || !myName || String(info.ownerName || '').trim().toLowerCase() !== myName) return;
-      if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased') return;
+      if (isSoldLife(state, life) || meta.status === 'Retired' || meta.status === 'Deceased') return;
       var m = { life: life, name: info.name || ('#' + life), young: isYoungInfo(info), breedings: 0, foals: 0, last: '', pregnant: !!(info.pregnancy && String(info.pregnancy.status || '').indexOf('Pregnant') === 0) };
       Object.keys(allBreedings).forEach(function (sid) {
         (allBreedings[sid] || []).forEach(function (r) {
@@ -805,7 +833,7 @@
 
     // under 3: listed as colts (young stallions) and fillies (young mares)
     var youngList = [];
-    ownedHorses(state).forEach(function (h) {
+    myHorses().forEach(function (h) {
       var info = h.info;
       if ((info.sex !== 'stallion' && info.sex !== 'mare') || !isYoungInfo(info)) return;
       if (h.meta.status === 'Sold' || h.meta.status === 'Retired' || h.meta.status === 'Deceased') return;
@@ -846,8 +874,8 @@
 
     // missing data
     var gaps = [];
-    ownedHorses(state).forEach(function (h) {
-      if (h.meta.status === 'Sold' || h.meta.status === 'Retired') return;
+    myHorses().forEach(function (h) {
+      if (h.meta.status === 'Retired') return;
       var missing = [];
       if (h.info.geneticPotential == null) missing.push('genetic potential');
       if (!h.info.confTraits) missing.push('conformation traits');
@@ -859,7 +887,7 @@
 
     // goals
     var goalHits = [], nearMiss = [];
-    ownedHorses(state).forEach(function (h) {
+    myHorses().forEach(function (h) {
       var c = goalCheck(state, h.lifeNumber);
       if (!c.active) return;
       if (c.met) { goalHits.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber }); return; }
@@ -911,7 +939,7 @@
     pairs = pairs.filter(function (p) { return p.coi < 6.25; }).sort(function (a, b) { return b.score - a.score; }).slice(0, 5);
 
     // standouts
-    var best = ownedHorses(state).map(function (h) {
+    var best = myHorses().map(function (h) {
       var meta = state.horseMeta[h.lifeNumber] || {};
       var bt = Math.max(Number(meta.btBest) || 0, breedTotal(h.info.geneticPotential, bestConformation(meta).best));
       return { name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, bt: bt, conf: bestConformation(meta).best, gp: h.info.geneticPotential };
@@ -919,7 +947,28 @@
     var topBT = best.filter(function (x) { return x.bt > 0; }).sort(function (a, b) { return b.bt - a.bt; }).slice(0, 5);
     var topConf = best.filter(function (x) { return x.conf > 0; }).sort(function (a, b) { return b.conf - a.conf; }).slice(0, 5);
 
-    return { overall: overall, stallions: stallions, months: monthList, mares: mares, young: youngList, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, goalHitList: goalHits, nearMiss: nearMiss.length, nearMissList: nearMiss, gaps: gaps.length };
+    // horses you have sold: what they fetched, what they cost, the difference
+    var soldLives = {};
+    Object.keys(state.horseMeta || {}).forEach(function (l) { if (isSoldLife(state, l)) soldLives[l] = true; });
+    (state.stallions || []).forEach(function (s) { if (s.lifeNumber && s.status === 'Sold') soldLives[s.lifeNumber] = true; });
+    var soldList = Object.keys(soldLives).map(function (l) {
+      var info = (state.horseInfo && state.horseInfo[l]) || {};
+      var rec = (state.stallions || []).find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(l); });
+      var sa = saleOf(state, l), pr = profitOf(state, l);
+      return {
+        life: l, name: info.name || (rec && rec.name) || ('#' + l),
+        date: sa ? sa.date : '', price: sa ? sa.price : null, currency: sa ? sa.currency : '', buyer: sa ? sa.buyer : '',
+        cost: pr ? pr.cost : null, profit: pr ? pr.profit : null
+      };
+    }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    var soldSummary = { count: soldList.length, withPrice: 0, revenue: {}, profit: 0, profitKnown: 0 };
+    soldList.forEach(function (x) {
+      if (x.price) { soldSummary.withPrice++; soldSummary.revenue[x.currency || 'HRC'] = (soldSummary.revenue[x.currency || 'HRC'] || 0) + x.price; }
+      if (x.profit != null && x.currency === 'HRC') { soldSummary.profit += x.profit; soldSummary.profitKnown++; }
+    });
+    soldSummary.avg = soldSummary.withPrice && soldSummary.revenue.HRC ? soldSummary.revenue.HRC / soldList.filter(function (x) { return x.price && x.currency === 'HRC'; }).length : null;
+
+    return { sold: soldList, soldSummary: soldSummary, overall: overall, stallions: stallions, months: monthList, mares: mares, young: youngList, tips: tips, pairs: pairs, topBT: topBT, topConf: topConf, goalHits: goalHits.length, goalHitList: goalHits, nearMiss: nearMiss.length, nearMissList: nearMiss, gaps: gaps.length };
   }
   // What was paid for a horse (and shipping), recorded in
   // state.horseMeta[life].purchase = { price, currency, shipping, shippingCurrency }.
@@ -934,6 +983,9 @@
   global.HRLib = {
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
+    isSoldLife: isSoldLife,
+    saleOf: saleOf,
+    profitOf: profitOf,
     analytics: analytics,
     goalsOf: goalsOf,
     healthCounts: healthCounts,

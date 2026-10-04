@@ -154,6 +154,34 @@
     var cur = (m[2] || '').toUpperCase();
     return { amount: isNaN(amount) ? 0 : amount, currency: (HRLib.CURRENCIES || []).indexOf(cur) > -1 ? cur : fallback };
   }
+  // Sales appear as INcoming bank rows naming one of your horses (not a stud fee).
+  // The amount column is what you were paid. The wording isn't relied on beyond
+  // "sold"/"bought" plus a link to a horse; the first /user/ link is taken as the buyer.
+  function scrapeSales() {
+    var out = [];
+    document.querySelectorAll('tr.bank-table').forEach(function (row) {
+      var cells = row.querySelectorAll('td');
+      if (cells.length < 4 || cleanText(cells[0]) !== 'IN') return;
+      var text = cleanText(cells[2]);
+      if (text.indexOf('used your stud service to breed') > -1) return;
+      if (!/sold|bought/i.test(text)) return;
+      var horseA = null, buyerA = null;
+      cells[2].querySelectorAll('a').forEach(function (a) {
+        var href = a.href || '';
+        if (!horseA && lifeNumberFromUrl(href)) horseA = a;
+        else if (!buyerA && href.indexOf('/user/') > -1) buyerA = a;
+      });
+      if (!horseA) return;
+      var price = parseInt(cleanText(cells[1]).replace(/[^0-9]/g, ''), 10);
+      if (!price) return;
+      var when = cleanText(cells[3]);
+      out.push({
+        lifeNumber: lifeNumberFromUrl(horseA.href), name: parseHorseLabel(horseA), price: price,
+        currency: currencyFromCell(cells[1]), date: parseRowDate(when), buyer: buyerA ? cleanText(buyerA) : ''
+      });
+    });
+    return out;
+  }
   function scrapePurchases() {
     var out = [];
     document.querySelectorAll('tr.bank-table').forEach(function (row) {
@@ -476,10 +504,11 @@
     var bank = scrapeBankRows();
     var failedCoverings = scrapeFailedCoverings();
     var purchases = scrapePurchases();
-    if (!offspring.length && !bank.length && !failedCoverings.length && !purchases.length) return;
+    var sales = scrapeSales();
+    if (!offspring.length && !bank.length && !failedCoverings.length && !purchases.length && !sales.length) return;
 
     HRStorage.getState(function (state) {
-      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0, purchasesSaved = 0;
+      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0, purchasesSaved = 0, salesSaved = 0;
       var offspringStallionId = null;
 
       // Bank transactions are the one page that PROVES the stud is yours
@@ -569,7 +598,19 @@
         if (changed) purchasesSaved++;
       });
 
-      if (added || updated || newStuds || failuresMarked || purchasesSaved) {
+      // A horse you sold: record the price and date and mark it Sold. A sale already
+      // recorded is never overwritten (so restoring a horse to Active sticks).
+      sales.forEach(function (sa) {
+        var meta = state.horseMeta[sa.lifeNumber] = Object.assign({}, state.horseMeta[sa.lifeNumber]);
+        if (meta.sale && meta.sale.price) return;
+        meta.sale = { price: sa.price, currency: sa.currency, date: sa.date, buyer: sa.buyer, recordedAt: Date.now() };
+        meta.status = 'Sold';
+        var rec = state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(sa.lifeNumber); });
+        if (rec) rec.status = 'Sold';
+        salesSaved++;
+      });
+
+      if (added || updated || newStuds || failuresMarked || purchasesSaved || salesSaved) {
         HRStorage.setState(state, function () {
           var parts = [];
           if (added) parts.push(added + ' new');
@@ -577,6 +618,7 @@
           if (newStuds) parts.push(newStuds + ' new stud' + (newStuds === 1 ? '' : 's'));
           if (failuresMarked) parts.push(failuresMarked + ' marked failed');
           if (purchasesSaved) parts.push(purchasesSaved + ' purchase' + (purchasesSaved === 1 ? '' : 's') + ' recorded');
+          if (salesSaved) parts.push(salesSaved + ' sale' + (salesSaved === 1 ? '' : 's') + ' recorded');
           if (parts.length) showToast('HR Ledger: ' + parts.join(', '));
         });
       }

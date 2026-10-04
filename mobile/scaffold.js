@@ -181,6 +181,8 @@
     '.an-card h3{ margin:0 0 8px; font-size:16px; }',
     '.an-table{ width:100%; border-collapse:collapse; font-size:13px; }',
     '.an-table th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); padding:4px 6px; }',
+    '.an-table th.sortable{ cursor:pointer; user-select:none; white-space:nowrap; }',
+    '.an-table th.sortable:hover{ color:var(--text); }',
     '.an-table td{ padding:6px; border-top:1px solid var(--border); }',
     '.an-table td.num, .an-table th.num{ text-align:right; }',
     '.an-bars{ display:flex; align-items:flex-end; gap:6px; height:120px; margin-top:6px; }',

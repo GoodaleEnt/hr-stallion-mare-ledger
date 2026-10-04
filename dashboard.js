@@ -995,6 +995,25 @@
 
   // ---------- Analytics ----------
   function pct(x) { return x == null ? '\u2014' : Math.round(x * 100) + '%'; }
+  // Click a table heading to sort by it; click again to reverse. Empty values sort last.
+  var anSort = { stallions: { key: 'breedings', dir: -1 }, mares: { key: 'breedings', dir: -1 }, young: { key: 'name', dir: 1 } };
+  var AN_TEXT_KEYS = { name: true, kind: true, status: true };
+  function sortHead(table, key, label, cls, title) {
+    var s = anSort[table];
+    return '<th class="' + (cls || '') + ' sortable" data-action="an-sort" data-table="' + table + '" data-key="' + key + '" title="' + L.esc(title || 'Sort by ' + label) + '">' + label + (s.key === key ? (s.dir > 0 ? ' \u25b2' : ' \u25bc') : '') + '</th>';
+  }
+  function sortList(table, list, getters) {
+    var s = anSort[table], get = getters[s.key] || function () { return null; };
+    return list.slice().sort(function (a, b) {
+      var x = get(a), y = get(b);
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (typeof x === 'string') return s.dir * x.localeCompare(y);
+      return s.dir * (x - y);
+    });
+  }
+  function totalEarned(e) { return Object.keys(e || {}).reduce(function (n, c) { return n + e[c]; }, 0); }
   function renderAnalytics() {
     var html = topHeaderHtml();
     var a = L.analytics(state);
@@ -1084,8 +1103,8 @@
     if (!a.stallions.length) {
       html += '<p class="notes-line" style="margin:0;">No stallions yet.</p>';
     } else {
-      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Stallion</th><th class="num">Breedings</th><th class="num">Success</th><th class="num">Failed</th><th class="num">Pending</th><th class="num">Foals</th><th class="num" title="Average foal score, out of 100">Avg foal /100</th><th class="num" title="Highest foal score, out of 100">Best foal /100</th><th class="num">Earned</th><th>Last bred</th></tr></thead><tbody>';
-      a.stallions.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (s) {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr>' + sortHead('stallions', 'name', 'Stallion') + sortHead('stallions', 'breedings', 'Breedings', 'num') + sortHead('stallions', 'successRate', 'Success', 'num') + sortHead('stallions', 'failed', 'Failed', 'num') + sortHead('stallions', 'pending', 'Pending', 'num') + sortHead('stallions', 'foals', 'Foals', 'num') + sortHead('stallions', 'avgScore', 'Avg foal /100', 'num', 'Average foal score, out of 100') + sortHead('stallions', 'bestScore', 'Best foal /100', 'num', 'Highest foal score, out of 100') + sortHead('stallions', 'earned', 'Earned', 'num') + sortHead('stallions', 'last', 'Last bred') + '</tr></thead><tbody>';
+      sortList('stallions', a.stallions, { name: function (s) { return String(s.name || ''); }, breedings: function (s) { return s.breedings; }, successRate: function (s) { return s.successRate; }, failed: function (s) { return s.failed; }, pending: function (s) { return s.pending; }, foals: function (s) { return s.foals; }, avgScore: function (s) { return s.avgScore; }, bestScore: function (s) { return s.bestScore; }, earned: function (s) { return totalEarned(s.earned) || null; }, last: function (s) { return s.last || null; } }).forEach(function (s) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-stallion" data-id="' + L.esc(s.id) + '">' + L.esc(s.name) + '</button></td>' +
           '<td class="num mono">' + s.breedings + '</td><td class="num mono">' + pct(s.successRate) + '</td><td class="num mono">' + s.failed + '</td><td class="num mono">' + s.pending + '</td><td class="num mono">' + s.foals + '</td>' +
           '<td class="num mono">' + (s.avgScore != null ? Math.round(s.avgScore * 10) / 10 : '\u2014') + '</td><td class="num mono">' + (s.bestScore != null ? s.bestScore : '\u2014') + '</td>' +
@@ -1101,8 +1120,8 @@
     if (!adultMares.length) {
       html += '<p class="notes-line" style="margin:0;">No adult mares (3+) of yours cached yet.</p>';
     } else {
-      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Mare</th><th class="num">Breedings</th><th class="num">Foals</th><th>Last bred</th><th>Status</th></tr></thead><tbody>';
-      adultMares.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (m) {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr>' + sortHead('mares', 'name', 'Mare') + sortHead('mares', 'breedings', 'Breedings', 'num') + sortHead('mares', 'foals', 'Foals', 'num') + sortHead('mares', 'last', 'Last bred') + sortHead('mares', 'status', 'Status') + '</tr></thead><tbody>';
+      sortList('mares', adultMares, { name: function (m) { return String(m.name || ''); }, breedings: function (m) { return m.breedings; }, foals: function (m) { return m.foals; }, last: function (m) { return m.last || null; }, status: function (m) { return m.pregnant ? 'In foal' : 'Open'; } }).forEach(function (m) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(m.life) + '">' + L.esc(m.name) + '</button></td>' +
           '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (m.pregnant ? 'In foal' : 'Open') + '</td></tr>';
       });
@@ -1115,8 +1134,8 @@
     if (!a.young.length) {
       html += '<p class="notes-line" style="margin:0;">No colts or fillies of yours cached yet.</p>';
     } else {
-      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Horse</th><th></th><th>Age</th><th class="num">GP</th><th class="num">Top conformation</th><th class="num">Breed Total</th></tr></thead><tbody>';
-      a.young.forEach(function (y) {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr>' + sortHead('young', 'name', 'Horse') + sortHead('young', 'kind', 'Colt / Filly') + sortHead('young', 'ageMonths', 'Age') + sortHead('young', 'gp', 'GP', 'num') + sortHead('young', 'conf', 'Top conformation', 'num') + sortHead('young', 'bt', 'Breed Total', 'num') + '</tr></thead><tbody>';
+      sortList('young', a.young, { name: function (y) { return String(y.name || ''); }, kind: function (y) { return y.kind; }, ageMonths: function (y) { return y.ageMonths; }, gp: function (y) { return y.gp != null ? Number(y.gp) : null; }, conf: function (y) { return y.conf; }, bt: function (y) { return y.bt; } }).forEach(function (y) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(y.life) + '">' + L.esc(y.name) + '</button></td><td><span class="tag">' + y.kind + '</span></td><td>' + L.esc(y.age || '\u2014') + '</td>' +
           '<td class="num mono">' + (y.gp != null ? L.esc(y.gp) : '\u2014') + '</td><td class="num mono">' + (y.conf != null ? Math.round(y.conf * 1000) / 1000 : '\u2014') + '</td><td class="num mono">' + (y.bt ? Math.round(y.bt * 1000) / 1000 : '\u2014') + '</td></tr>';
       });
@@ -2001,6 +2020,12 @@
       else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
       else if (action === 'close-passport') { selectedPassportLife = null; render(); }
       else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
+      else if (action === 'an-sort') {
+        var anTable = t.getAttribute('data-table'), anKey = t.getAttribute('data-key');
+        if (anSort[anTable] && anSort[anTable].key === anKey) anSort[anTable].dir = -anSort[anTable].dir;
+        else anSort[anTable] = { key: anKey, dir: AN_TEXT_KEYS[anKey] ? 1 : -1 };
+        render();
+      }
       else if (action === 'restore-horse') { setLifeStatus(t.getAttribute('data-life'), 'Active'); }
       else if (action === 'untrack-horse') { setHorseMeta(t.getAttribute('data-life'), { tracked: false }); }
       else if (action === 'toggle-archive') { showArchive = !showArchive; render(); }

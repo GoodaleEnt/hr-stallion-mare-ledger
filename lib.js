@@ -814,6 +814,7 @@
       youngList.push({
         life: h.lifeNumber, name: info.name || ('#' + h.lifeNumber), kind: info.sex === 'stallion' ? 'Colt' : 'Filly',
         age: info.ageText || formatAgeMonths(effectiveAgeMonths(info)),
+        ageMonths: effectiveAgeMonths(info),
         gp: info.geneticPotential != null ? info.geneticPotential : null,
         conf: conf > 0 ? conf : null,
         bt: Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf)) || null

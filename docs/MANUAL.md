@@ -159,7 +159,7 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 - **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred. These list horses aged 3 and over only.
 - **Colts & Fillies:** horses under 3 are listed separately, a young stallion as a **Colt** and a young mare as a **Filly**, with age, genetic potential, top conformation and Breed Total.
 
-Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
+Click any column heading in the stallion, mare or Colts & Fillies tables to sort by it; click it again to reverse the order (a small arrow shows the direction). Empty values always sort to the bottom. Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
 
 ## Foal Calculator
 

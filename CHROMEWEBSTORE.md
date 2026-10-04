@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.17.8 | 2026-10-03 | Analytics tables sort by clicking the column headings | Draft |
 | 1.17.7 | 2026-10-03 | Foal scores above 100 are ignored (they were misread) | Draft |
 | 1.17.6 | 2026-10-03 | Foal score columns labelled as out of 100 | Draft |
 | 1.17.5 | 2026-10-03 | Analytics tables show 3+ year olds only; under-3s listed as colts and fillies | Draft |

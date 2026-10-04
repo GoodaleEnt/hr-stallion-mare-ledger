@@ -1110,6 +1110,60 @@
     });
   }
 
+  // ---------- removing a horse from the ledger ----------
+  // Deletes everything saved about a horse: its page data and tags, its stallion record with all the breedings
+  // under him, the breeding rows where she is the mare, and foal rows for a foal that is this horse. With
+  // ignoreName set, the horse also goes on state.settings.ignored so the ledger doesn't save it again until it is
+  // allowed back (purgeIgnored repeats the removal if any page brings it back).
+  function horseRemovalCounts(state, life) {
+    life = String(life || '');
+    var c = { stallion: 0, breedingsUnder: 0, breedingsAsMare: 0, foalRows: 0, hasData: !!((state.horseInfo || {})[life] || (state.horseMeta || {})[life]) };
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === life; });
+    if (rec) { c.stallion = 1; c.breedingsUnder = (state.breedings[rec.id] || []).length; }
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      if (rec && sid === rec.id) return;
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (String(b.mareLifeNumber) === life) c.breedingsAsMare++;
+        else if (b.status === 'Foal Born' && foalLifeOf(b.foalUrl) === life) c.foalRows++;
+      });
+    });
+    return c;
+  }
+  function removeHorse(state, life, ignoreName) {
+    life = String(life || '');
+    if (!life) return 0;
+    var n = 0;
+    if (state.horseInfo && state.horseInfo[life]) { delete state.horseInfo[life]; n++; }
+    if (state.horseMeta && state.horseMeta[life]) { delete state.horseMeta[life]; n++; }
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === life; });
+    if (rec) {
+      delete state.breedings[rec.id];
+      state.stallions = state.stallions.filter(function (s) { return s !== rec; });
+      n++;
+    }
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      var before = (state.breedings[sid] || []).length;
+      state.breedings[sid] = (state.breedings[sid] || []).filter(function (b) {
+        if (String(b.mareLifeNumber) === life) return false;
+        if (b.status === 'Foal Born' && foalLifeOf(b.foalUrl) === life) return false;
+        return true;
+      });
+      n += before - state.breedings[sid].length;
+    });
+    if (ignoreName != null) {
+      if (!state.settings) state.settings = {};
+      state.settings.ignored = Object.assign({}, state.settings.ignored);
+      state.settings.ignored[life] = String(ignoreName || '#' + life);
+    }
+    return n;
+  }
+  function purgeIgnored(state) {
+    var ignored = (state.settings && state.settings.ignored) || {};
+    var n = 0;
+    Object.keys(ignored).forEach(function (life) { n += removeHorse(state, life, null); });
+    return n;
+  }
+
   // ---------- sales ----------
   // state.horseMeta[life].sale = { price, currency, date, buyer, recordedAt }. A horse
   // counts as sold when its herd status is Sold or, for a stallion, its record is.
@@ -1391,6 +1445,9 @@
     mareBreedStatus: mareBreedStatus,
     goalMisses: goalMisses,
     recordFoalsFromList: recordFoalsFromList,
+    horseRemovalCounts: horseRemovalCounts,
+    removeHorse: removeHorse,
+    purgeIgnored: purgeIgnored,
     recordFoalFromHorse: recordFoalFromHorse,
     foalLifeOf: foalLifeOf,
     saleOf: saleOf,

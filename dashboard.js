@@ -375,6 +375,7 @@
     html += geneDetailsHtml(selectedPassportLife);
     html += healthPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
+    html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
@@ -847,6 +848,24 @@
     return html;
   }
 
+  // ---------- remove a horse from the ledger ----------
+  function removeHorsePanelHtml(life, name) {
+    if (!life) return '';
+    return '<div class="card profile-block" style="padding:12px 16px;margin:8px 0 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">' +
+      '<button type="button" class="btn btn-sm" style="border-color:var(--danger);color:var(--danger);" data-action="remove-horse" data-life="' + L.esc(life) + '" data-name="' + L.esc(name || '') + '">Remove from ledger</button>' +
+      '<span class="notes-line" style="margin:0;">Deletes everything saved about this horse and stops the ledger saving it again. You can allow it back later under <em>Other Horses \u2192 Removed horses</em>.</span></div>';
+  }
+  function removedHorsesHtml() {
+    var ignored = (state.settings && state.settings.ignored) || {};
+    var lives = Object.keys(ignored);
+    if (!lives.length) return '';
+    return '<details style="margin:16px 0;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Removed horses (' + lives.length + ') \u2014 not saved by the ledger</summary>' +
+      '<div class="card" style="padding:10px 14px;margin-top:8px;">' + lives.map(function (l) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-top:1px solid var(--border);"><span>' + L.esc(ignored[l]) + ' <span class="mono sub">#' + L.esc(l) + '</span></span>' +
+          '<button type="button" class="btn btn-sm" data-action="allow-horse" data-life="' + L.esc(l) + '">Allow again</button></div>';
+      }).join('') + '</div></details>';
+  }
+
   // ---------- stud fees of any stallion in the ledger (other players' too) ----------
   // Rows [label, text] from what was read on his page / Breed page, plus the last fee you paid him.
   function studTermRows(life) {
@@ -981,6 +1000,7 @@
     html += healthPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
+    html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + m.records.length + '</div><div class="label">Breedings</div></div>' +
@@ -1364,7 +1384,7 @@
       .concat(soldHorses.map(function (h) { return Object.assign({ lifeNumber: h.lifeNumber }, h.info, { sold: true }); }));
     html += '<div class="section-head"><h2>Other Horses</h2></div>';
     if (!horses.length) {
-      return html + '<div class="empty"><h3>No other horses yet</h3><p>Open a horse that isn\'t yours on Horse Reality and choose "Add to ledger" in the box that appears.</p></div>';
+      return html + removedHorsesHtml() + '<div class="empty"><h3>No other horses yet</h3><p>Open a horse that isn\'t yours on Horse Reality and choose "Add to ledger" in the box that appears.</p></div>';
     }
     html += '<div class="card">';
     horses.forEach(function (info) {
@@ -1378,7 +1398,7 @@
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
       '</div>';
     });
-    return html + '</div>';
+    return html + '</div>' + removedHorsesHtml();
   }
 
   // ---------- Foal Calculator ----------
@@ -2169,6 +2189,7 @@
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
+    html += removeHorsePanelHtml(s.lifeNumber, s.name);
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + breedings.length + '</div><div class="label">Breedings</div></div>' +
@@ -2244,6 +2265,26 @@
         if (anSort[anTable] && anSort[anTable].key === anKey) anSort[anTable].dir = -anSort[anTable].dir;
         else anSort[anTable] = { key: anKey, dir: AN_TEXT_KEYS[anKey] ? 1 : -1 };
         render();
+      }
+      else if (action === 'remove-horse') {
+        var rmLife = t.getAttribute('data-life'), rmName = t.getAttribute('data-name') || ('#' + rmLife);
+        var cnt = L.horseRemovalCounts(state, rmLife);
+        var parts = [];
+        if (cnt.stallion) parts.push('his stallion record with ' + cnt.breedingsUnder + ' breeding record' + (cnt.breedingsUnder === 1 ? '' : 's') + ' under him');
+        if (cnt.breedingsAsMare) parts.push(cnt.breedingsAsMare + ' breeding record' + (cnt.breedingsAsMare === 1 ? '' : 's') + ' where she is the mare');
+        if (cnt.foalRows) parts.push(cnt.foalRows + ' foal row' + (cnt.foalRows === 1 ? '' : 's') + ' for this horse');
+        askConfirm('Remove ' + rmName + ' (#' + rmLife + ') from your ledger? This deletes its saved page data and tags' + (parts.length ? ', ' + parts.join(', ') : '') + '. The ledger will not save it again unless you allow it under Other Horses \u2192 Removed horses. Export a backup first if you are not sure \u2014 this cannot be undone.', function () {
+          L.removeHorse(state, rmLife, rmName);
+          selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+          persist();
+        });
+      }
+      else if (action === 'allow-horse') {
+        var allowLife = t.getAttribute('data-life');
+        var ign = Object.assign({}, state.settings.ignored);
+        delete ign[allowLife];
+        state.settings.ignored = ign;
+        persist();
       }
       else if (action === 'restore-horse') { setLifeStatus(t.getAttribute('data-life'), 'Active'); }
       else if (action === 'untrack-horse') { setHorseMeta(t.getAttribute('data-life'), { tracked: false }); }
@@ -2496,7 +2537,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state);
+    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state);
     if (L.adoptOwnedStallions(state) || scoresChanged) { persist(openFromHash); return; }
     recompute();
     render();

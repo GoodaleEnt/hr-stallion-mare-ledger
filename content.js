@@ -713,6 +713,8 @@
   var usernameNudged = false;
   function mergeHorseInfo(horseInfo) {
     HRStorage.getState(function (state) {
+      // a horse you removed from the ledger is not saved again (until you allow it under Removed horses)
+      if (state.settings && state.settings.ignored && state.settings.ignored[horseInfo.lifeNumber]) return;
       var infoRefreshed = false, passportCached = false, newStud = false;
       var infoStallionId = null;
 
@@ -1177,7 +1179,7 @@
 
   function healOwnedStubs() {
     HRStorage.getState(function (state) {
-      var btChanged = HRLib.refreshBreedTotals(state) + HRLib.dedupeFoals(state);
+      var btChanged = HRLib.refreshBreedTotals(state) + HRLib.dedupeFoals(state) + HRLib.purgeIgnored(state);
       var fixed = HRLib.adoptOwnedStallions(state);
       if (btChanged && !fixed) HRStorage.setState(state);
       if (fixed) {

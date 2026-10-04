@@ -25,6 +25,7 @@
   var calcMare = '';
   var calcStallion = '';
   var listFilterText = '';
+  var compareA = '', compareB = '';
   var UI_KEY = 'hrLedgerUi';
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
@@ -135,6 +136,8 @@
     persist();
   }
   function deleteStallionRec(id) {
+    var delRec = state.stallions.find(function (s) { return s.id === id; });
+    if (delRec) L.trashPush(state, { kind: 'stallion', name: delRec.name, data: JSON.parse(JSON.stringify({ stallion: delRec, breedings: state.breedings[id] || [] })) });
     state.stallions = state.stallions.filter(function (s) { return s.id !== id; });
     delete state.breedings[id];
     persist();
@@ -153,6 +156,8 @@
     persist();
   }
   function deleteBreeding(sid, id) {
+    var delRow = (state.breedings[sid] || []).find(function (b) { return b.id === id; });
+    if (delRow) L.trashPush(state, { kind: 'breeding', name: (delRow.mareName || 'Breeding') + (delRow.date ? ' ' + delRow.date : ''), data: JSON.parse(JSON.stringify({ sid: sid, row: delRow })) });
     state.breedings[sid] = (state.breedings[sid] || []).filter(function (b) { return b.id !== id; });
     persist();
   }
@@ -389,18 +394,11 @@
     var app = document.getElementById('app');
     if (!app) return;
     app.querySelectorAll('.stallion-card[data-action], .herd-row').forEach(function (el) {
-      el.style.display = !q || (el.textContent || '').toLowerCase().indexOf(q) > -1 ? '' : 'none';
+      var life = el.getAttribute('data-life') || (el.querySelector('[data-life]') && el.querySelector('[data-life]').getAttribute('data-life')) || '';
+      if (!life && el.getAttribute('data-id')) { var srec = state.stallions.find(function (x) { return x.id === el.getAttribute('data-id'); }); life = srec && srec.lifeNumber || ''; }
+      var note = life && state.horseMeta[life] && state.horseMeta[life].notes || '';
+      el.style.display = !q || ((el.textContent || '') + ' ' + note).toLowerCase().indexOf(q) > -1 ? '' : 'none';
     });
-  }
-  // The attention strip on the Stallions tab.
-  function attentionStripHtml() {
-    var a = L.analytics(state), items = a.tips.slice(0, 4).map(function (t) { return { level: t.level, text: t.text }; });
-    var stale = L.staleOwned(state);
-    if (stale.length) items.push({ level: 'info', text: stale.length + ' of your horses haven\'t been refreshed in 30+ days (' + stale.slice(0, 3).join(', ') + (stale.length > 3 ? ' and more' : '') + '). Open their pages on Horse Reality to update them.' });
-    if (!items.length) return '';
-    return '<details class="an-card" style="margin-bottom:16px;" open><summary style="cursor:pointer;font-weight:600;">Needs attention (' + items.length + ')</summary><div style="margin-top:8px;">' +
-      items.map(function (t) { return '<div class="an-tip ' + t.level + '">' + L.esc(t.text) + '</div>'; }).join('') +
-      '<button type="button" class="link-btn" data-action="show-tab" data-tab="analytics" style="font-size:13px;">See all in Analytics \u2192</button></div></details>';
   }
 
   function renderPassportDetail() {
@@ -607,7 +605,6 @@
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
       '</div>';
 
-    html += attentionStripHtml();
     html += '<div class="section-head"><h2>Your Stallions</h2>' +
       '<div style="display:flex;gap:8px;">' +
         '<button class="btn btn-sm" data-action="export-backup" title="Save your entire ledger as a JSON file">Export Backup</button>' +
@@ -846,6 +843,7 @@
       '<div class="stat-tile"><div class="num mono">' + foalsBorn + '</div><div class="label">Foals born</div></div>' +
       '</div>';
 
+    html += breedingCalendarHtml();
     html += '<div class="section-head"><h2>My Mares</h2></div>';
 
     if (!maresIndex.length) {
@@ -935,15 +933,26 @@
   // ---------- remove a horse from the ledger ----------
   function removeHorsePanelHtml(life, name) {
     if (!life) return '';
-    return '<div class="card profile-block" style="padding:12px 16px;margin:8px 0 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">' +
+    return horseNotesHtml(life) + '<div class="card profile-block" style="padding:12px 16px;margin:8px 0 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">' +
+      (state.horseInfo[life] ? '<button type="button" class="btn btn-sm" data-action="copy-ad" data-life="' + L.esc(life) + '" title="Copies a short sales listing for this horse">Copy sales ad</button>' : '') +
       '<button type="button" class="btn btn-sm" style="border-color:var(--danger);color:var(--danger);" data-action="remove-horse" data-life="' + L.esc(life) + '" data-name="' + L.esc(name || '') + '">Remove from ledger</button>' +
       '<span class="notes-line" style="margin:0;">Deletes everything saved about this horse and stops the ledger saving it again. You can allow it back later under <em>Other Horses \u2192 Removed horses</em>.</span></div>';
+  }
+  function trashHtml() {
+    var tr = (state.trash || []).slice().reverse();
+    if (!tr.length) return '';
+    var kinds = { horse: 'horse', stallion: 'stallion record', breeding: 'breeding record' };
+    return '<details style="margin:16px 0;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Recently deleted (' + tr.length + ') \u2014 kept for 30 days, then gone for good</summary>' +
+      '<div class="card" style="padding:10px 14px;margin-top:8px;">' + tr.map(function (t) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-top:1px solid var(--border);"><span>' + L.esc(t.name || 'Unnamed') + ' <span class="sub">(' + (kinds[t.kind] || t.kind) + ', deleted ' + L.esc(new Date(t.deletedAt).toISOString().slice(0, 10)) + ')</span></span>' +
+          '<button type="button" class="btn btn-sm" data-action="trash-restore" data-id="' + L.esc(t.id) + '">Restore</button></div>';
+      }).join('') + '</div></details>';
   }
   function removedHorsesHtml() {
     var ignored = (state.settings && state.settings.ignored) || {};
     var lives = Object.keys(ignored);
-    if (!lives.length) return '';
-    return '<details style="margin:16px 0;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Removed horses (' + lives.length + ') \u2014 not saved by the ledger</summary>' +
+    if (!lives.length) return trashHtml();
+    return trashHtml() + '<details style="margin:16px 0;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Removed horses (' + lives.length + ') \u2014 not saved by the ledger</summary>' +
       '<div class="card" style="padding:10px 14px;margin-top:8px;">' + lives.map(function (l) {
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-top:1px solid var(--border);"><span>' + L.esc(ignored[l]) + ' <span class="mono sub">#' + L.esc(l) + '</span></span>' +
           '<button type="button" class="btn btn-sm" data-action="allow-horse" data-life="' + L.esc(l) + '">Allow again</button></div>';
@@ -1371,6 +1380,7 @@
     html += '</div>';
 
     html += sellIdeasHtml();
+    html += feeWatchHtml() + moneyCardHtml() + compareCardHtml();
     var fa = L.foalAccuracy(state);
     html += '<div class="an-card" style="margin-top:18px;"><h3>Foal results vs. the parents</h3>';
     if (!fa.count) {
@@ -1402,7 +1412,120 @@
       html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Paid = price plus shipping when you bought the horse (blank if you bred it). Profit is shown only when the sale and purchase used the same currency.</p>';
     }
     html += '</div>';
+    html += exportCardHtml();
     return html;
+  }
+
+  // ---------- spreadsheet export ----------
+  function csvDownload(filename, rows) {
+    var text = rows.map(function (r) {
+      return r.map(function (v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',');
+    }).join('\r\n');
+    var blob = new Blob(['\ufeff' + text], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = filename + '-' + L.todayStr() + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+  function csvRows(kind) {
+    var rows = [];
+    if (kind === 'herd') {
+      rows.push(['Name', 'Life number', 'Sex', 'Breed', 'Age', 'Genetic potential', 'Top conformation', 'Breed Total', 'Status', 'Role', 'Project', 'Notes']);
+      L.ownedHorses(state).forEach(function (h) {
+        var m = state.horseMeta[h.lifeNumber] || {}, conf = L.bestConformation(m).best;
+        rows.push([h.info.name, h.lifeNumber, h.info.sex, h.info.breed, h.info.ageText || '', h.info.geneticPotential, conf || '', Math.max(Number(m.btBest) || 0, L.breedTotal(h.info.geneticPotential, conf)) || '', m.status || 'Active', m.role || '', m.project || '', m.notes || '']);
+      });
+    } else if (kind === 'breedings') {
+      rows.push(['Stallion', 'Mare', 'Mare life number', 'Date bred', 'Status', 'Price', 'Currency', 'Foal', 'Foal score', 'Date born']);
+      state.stallions.forEach(function (st) {
+        (state.breedings[st.id] || []).forEach(function (b) {
+          rows.push([st.name, b.mareName, b.mareLifeNumber, b.date, b.status, b.price, b.currency, b.foalName, b.foalScore, b.dateBorn]);
+        });
+      });
+    } else {
+      rows.push(['Horse', 'Life number', 'Date sold', 'Sold for', 'Currency', 'Buyer', 'Paid (price + shipping)', 'Profit']);
+      Object.keys(state.horseMeta || {}).forEach(function (l) {
+        var sa = L.saleOf(state, l);
+        if (!sa) return;
+        var pr = L.profitOf(state, l);
+        rows.push([(state.horseInfo[l] && state.horseInfo[l].name) || ('#' + l), l, sa.date, sa.price, sa.currency, sa.buyer, pr ? pr.cost : '', pr ? pr.profit : '']);
+      });
+    }
+    return rows;
+  }
+
+  // ---------- breeding calendar (My Mares tab): foals due and mares ready ----------
+  function breedingCalendarHtml() {
+    var due = L.foalsDue(state), ready = L.readyMares(state);
+    if (!due.length && !ready.length) return '';
+    var html = '<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:18px;">';
+    html += '<div class="an-card"><h3>Foals due</h3>' + (due.length ? due.map(function (f) {
+      return '<div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding:6px 0;"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(f.life) + '">' + L.esc(f.name) + '</button>' + (f.stallion ? ' <span class="sub">by ' + L.esc(f.stallion) + '</span>' : '') + '</span>' +
+        '<span class="mono" style="' + (f.days != null && f.days <= 3 ? 'color:var(--warn);font-weight:600;' : '') + '">' + L.esc(f.due || 'due date not read yet') + '</span></div>';
+    }).join('') : '<p class="notes-line" style="margin:0;">No mares in foal right now.</p>') + '</div>';
+    html += '<div class="an-card"><h3>Mares ready to breed</h3>' + (ready.length ? ready.slice(0, 8).map(function (r) {
+      return '<div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding:6px 0;"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(r.life) + '">' + L.esc(r.name) + '</button></span>' +
+        '<span class="sub">' + (r.days == null ? 'never bred' : r.days + ' day' + (r.days === 1 ? '' : 's') + ' since last') + ' <button type="button" class="link-btn" data-action="calc-open" data-mare="' + L.esc(r.life) + '" data-stallion="">pick a stallion \u2192</button></span></div>';
+    }).join('') : '<p class="notes-line" style="margin:0;">Every mare is covered or in foal.</p>') + '</div>';
+    return html + '</div>';
+  }
+
+  // ---------- money, compare and fee watch (Analytics) ----------
+  function moneyCardHtml() {
+    var ms = L.moneySummary(state), t = ms.totals;
+    function f(n) { return L.esc(L.fmtMoney(n)); }
+    var any = t.earned || t.paid || t.sold || t.bought;
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Money (HRC)</h3>';
+    if (!any) return html + '<p class="notes-line" style="margin:0;">Fees and sales appear once the ledger has read your bank page.</p></div>';
+    html += '<div class="stats-bar" style="margin-bottom:12px;">' +
+      '<div class="stat-tile"><div class="num mono">' + f(t.earned) + '</div><div class="label">Stud fees earned</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + f(t.paid) + '</div><div class="label">Stud fees paid</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + f(t.sold) + '</div><div class="label">Horses sold</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + f(t.bought) + '</div><div class="label">Horses bought</div></div>' +
+      '<div class="stat-tile"><div class="num mono" style="color:var(--' + (t.net >= 0 ? 'success' : 'danger') + ');">' + (t.net >= 0 ? '+' : '-') + f(Math.abs(t.net)) + '</div><div class="label">Net, all time</div></div></div>';
+    html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Month</th><th class="num">Earned</th><th class="num">Paid</th><th class="num">Sold</th><th class="num">Net</th></tr></thead><tbody>' +
+      ms.months.filter(function (m) { return m.earned || m.paid || m.sold; }).reverse().map(function (m) {
+        var net = m.earned + m.sold - m.paid;
+        return '<tr><td>' + L.esc(m.m) + '</td><td class="num mono">' + f(m.earned) + '</td><td class="num mono">' + f(m.paid) + '</td><td class="num mono">' + f(m.sold) + '</td><td class="num mono" style="color:var(--' + (net >= 0 ? 'success' : 'danger') + ');">' + (net >= 0 ? '+' : '-') + f(Math.abs(net)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">Last 12 months by the date of each breeding or sale. Horses bought are in the all-time total only, because the purchase date is not recorded. Other currencies are left out.</p></div>';
+    return html;
+  }
+  function feeWatchHtml() {
+    var ch = L.feeChanges(state, 14);
+    if (!ch.length) return '';
+    return '<div class="an-card" style="margin-top:18px;"><h3>Stud fee changes (last 14 days)</h3>' + ch.map(function (c) {
+      return '<div class="an-tip ' + (c.pct > 0 ? 'info' : 'tip') + '"><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(c.life) + '">' + L.esc(c.name) + '</button>: public fee ' + (c.pct > 0 ? 'up' : 'down') + ' ' + Math.abs(c.pct) + '% (' + L.esc(L.fmtMoney(c.from)) + ' \u2192 ' + L.esc(L.fmtMoney(c.to)) + ' HRC) on ' + L.esc(L.fmtDate(c.date)) + '</div>';
+    }).join('') + '</div>';
+  }
+  function compareCardHtml() {
+    var lives = Object.keys(state.horseInfo || {}).sort(function (a, b) { return String(state.horseInfo[a].name || '').localeCompare(String(state.horseInfo[b].name || '')); });
+    function sel(id, action, cur) {
+      return '<select id="' + id + '" data-action="' + action + '"><option value="">Choose a horse\u2026</option>' + lives.map(function (l) {
+        return '<option value="' + L.esc(l) + '"' + (l === cur ? ' selected' : '') + '>' + L.esc(state.horseInfo[l].name || ('#' + l)) + ' (#' + L.esc(l) + ')</option>';
+      }).join('') + '</select>';
+    }
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Compare two horses</h3><div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:10px;">' + sel('compare-a', 'compare-a', compareA) + sel('compare-b', 'compare-b', compareB) + '</div>';
+    if (compareA && compareB && state.horseInfo[compareA] && state.horseInfo[compareB]) {
+      html += statsCompareHtml(compareA, compareB).replace('Parent stats', 'Side by side') + traitsCompareHtml(compareA, compareB);
+      var ga = savedGenesText(compareA), gb = savedGenesText(compareB);
+      var ta = state.horseInfo[compareA].testedColours || '', tb = state.horseInfo[compareB].testedColours || '';
+      if (ta || tb || ga || gb) html += '<p class="mono notes-line">' + L.esc(state.horseInfo[compareA].name || compareA) + ': ' + L.esc([ta, ga].filter(Boolean).join(' \u00b7 ') || '\u2014') + '<br>' + L.esc(state.horseInfo[compareB].name || compareB) + ': ' + L.esc([tb, gb].filter(Boolean).join(' \u00b7 ') || '\u2014') + '</p>';
+    }
+    return html + '</div>';
+  }
+  function exportCardHtml() {
+    return '<div class="an-card" style="margin-top:18px;"><h3>Export to a spreadsheet</h3><div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+      '<button type="button" class="btn btn-sm" data-action="csv-export" data-kind="herd">My herd (CSV)</button>' +
+      '<button type="button" class="btn btn-sm" data-action="csv-export" data-kind="breedings">All breedings (CSV)</button>' +
+      '<button type="button" class="btn btn-sm" data-action="csv-export" data-kind="sales">Sales (CSV)</button></div></div>';
+  }
+
+  // ---------- notes on a horse ----------
+  function horseNotesHtml(life) {
+    if (!life || !state.horseInfo[life]) return '';
+    var note = (state.horseMeta[life] && state.horseMeta[life].notes) || '';
+    return '<div class="card profile-block" style="padding:12px 16px;margin:8px 0 8px;"><label for="note-' + L.esc(life) + '" style="font-weight:600;">Notes</label>' +
+      '<textarea id="note-' + L.esc(life) + '" data-action="update-note" data-life="' + L.esc(life) + '" rows="2" style="width:100%;margin-top:6px;" placeholder="Anything you want to remember about this horse (saved when you click away)">' + L.esc(note) + '</textarea></div>';
   }
 
   // ---------- sell ideas: the suggestion form, horses to sell and what to ask ----------
@@ -2050,7 +2173,29 @@
       if (sec.gold) text = sec.label === 'Health' ? sec.goldText + (hasGoal ? ' \u00b7 ' + sec.text : '') : (hasGoal ? sec.text : sec.goldText);
       return '<div class="goal-sec ' + (sec.gold ? 'gold' : sec.state) + '" title="' + L.esc(sec.label + ': ' + text) + '"><span class="gl">' + L.esc(sec.label) + '</span>' + L.esc(text) + '</div>';
     }
-    return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.bt) + box(c.sections.traits) + box(c.sections.health) + box(c.sections.fertility) + '</div>';
+    return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.gp) + box(c.sections.bt) + box(c.sections.traits) + box(c.sections.health) + box(c.sections.fertility) + '</div>';
+  }
+  // Named sets of goals (for example one per breed or project) that can be swapped in with one click.
+  function goalSetsHtml() {
+    var sets = (state.settings && state.settings.goalSets) || {};
+    var names = Object.keys(sets);
+    return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+      '<strong style="font-size:13px;">Goal sets</strong>' +
+      (names.length ? '<select data-action="goalset-load" aria-label="Load a saved goal set"><option value="">Load a set\u2026</option>' + names.map(function (n) { return '<option value="' + L.esc(n) + '">' + L.esc(n) + '</option>'; }).join('') + '</select>' +
+        '<select id="goalset-del" aria-label="Delete a saved goal set"><option value="">Delete a set\u2026</option>' + names.map(function (n) { return '<option value="' + L.esc(n) + '">' + L.esc(n) + '</option>'; }).join('') + '</select><button type="button" class="btn btn-sm" data-action="goalset-delete">Delete</button>' : '') +
+      '<input id="goalset-name" type="text" placeholder="Name this set (e.g. Appaloosa)" style="max-width:220px;"><button type="button" class="btn btn-sm" data-action="goalset-save">Save current goals as set</button></div>';
+  }
+  // Suggestions on when to raise the goals and to what, from the herd and recent foals.
+  function goalAdviceHtml() {
+    var a = L.goalAdvice(state);
+    if (!a.tips.length && !a.review.length) return '';
+    var kinds = { start: 'Set', raise: 'Raise', lower: 'Lower' };
+    return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Goal suggestions</strong>' +
+      a.review.map(function (t) { return '<div class="an-tip info" style="margin-top:6px;">' + L.esc(t) + '</div>'; }).join('') +
+      a.tips.map(function (t) {
+        return '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;"><strong>' + kinds[t.kind] + ' ' + L.esc(t.label) + (t.current != null ? ' from ' + L.esc(t.current) : '') + ' to ' + L.esc(t.suggested) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(t.why) + '</span></span>' +
+          '<button type="button" class="btn btn-sm" data-action="goal-apply" data-field="' + t.key + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
+      }).join('') + '</div>';
   }
   function goalsPanelHtml() {
     var g = L.goalsOf(state);
@@ -2070,11 +2215,13 @@
       return '<div class="field"><label for="goal-' + key + '">' + label + '</label><select id="goal-' + key + '" data-action="update-goal" data-field="' + key + '" style="width:100%;">' +
         options.map(function (o) { return '<option value="' + o[0] + '"' + (String(g[key] == null ? '' : g[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
     }
+    var adv = L.goalAdvice(state), goalTipCount = adv.tips.length + adv.review.length;
     return '<details class="goals-panel"' + (goalsOpen ? ' open' : '') + '><summary>Highlight goals' +
-      (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
-      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows five boxes above its picture (Conformation, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
+      (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + (goalTipCount ? ' \u00b7 ' + goalTipCount + ' suggestion' + (goalTipCount === 1 ? '' : 's') : '') + '</summary>' +
+      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows six boxes above its picture (Conformation, Genetic Potential, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
       '<div class="goals-grid">' +
         field('Min top conformation', 'minConf', 'any') +
+        field('Min Genetic Potential (GP)', 'minGP', 'any') +
         field('Min Breed Total (BT)', 'minBT', 'any') +
       '</div>' +
       '<p class="notes-line" style="margin:10px 0 0;"><strong>Conformation traits</strong> \u2014 the worst rating you will accept, and how many traits may be at that rating. Nothing may be rated worse.</p>' +
@@ -2087,7 +2234,7 @@
         selectField('Worst health rating accepted', 'healthWorst', [['', 'no limit'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']]) +
         selectField('How many at that rating (of 5)', 'healthWorstMax', [['', 'none (0)'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']]) +
         selectField('Min fertility', 'minFert', [['', 'no limit'], ['poor', 'Poor'], ['fair', 'Fair'], ['average', 'Average'], ['good', 'Good'], ['excellent', 'Excellent']]) +
-      '</div></details>';
+      '</div>' + goalAdviceHtml() + goalSetsHtml() + '</details>';
   }
 
   // ---------- health & fertility (read from the horse's Health box) ----------
@@ -2466,7 +2613,45 @@
       if (!t) return;
       var action = t.getAttribute('data-action');
 
-      if (action === 'calc-open') {
+      if (action === 'copy-ad') {
+        var adTxt = L.adText(state, t.getAttribute('data-life'));
+        var done = function () { var old = t.textContent; t.textContent = 'Copied \u2713'; setTimeout(function () { t.textContent = old; }, 1600); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(adTxt).then(done, function () { window.prompt('Copy this ad:', adTxt); });
+        else window.prompt('Copy this ad:', adTxt);
+      }
+      else if (action === 'csv-export') { csvDownload('hr-ledger-' + t.getAttribute('data-kind'), csvRows(t.getAttribute('data-kind'))); }
+      else if (action === 'goal-apply') {
+        var ga = Object.assign({}, state.settings.goals);
+        ga[t.getAttribute('data-field')] = t.getAttribute('data-value');
+        state.settings.goals = ga;
+        state.settings.goalsUpdatedAt = Date.now();
+        goalsOpen = true;
+        persist();
+      }
+      else if (action === 'trash-restore') {
+        if (L.restoreTrash(state, t.getAttribute('data-id'))) persist();
+      }
+      else if (action === 'goalset-save') {
+        var gsn = (document.getElementById('goalset-name').value || '').trim();
+        if (!gsn) { document.getElementById('goalset-name').focus(); return; }
+        var gs = Object.assign({}, state.settings.goalSets);
+        gs[gsn] = Object.assign({}, state.settings.goals);
+        state.settings.goalSets = gs;
+        goalsOpen = true;
+        persist();
+      }
+      else if (action === 'goalset-delete') {
+        var gdn = document.getElementById('goalset-del').value;
+        if (!gdn) return;
+        askConfirm('Delete the goal set "' + gdn + '"? Your current goals stay as they are.', function () {
+          var gs2 = Object.assign({}, state.settings.goalSets);
+          delete gs2[gdn];
+          state.settings.goalSets = gs2;
+          goalsOpen = true;
+          persist();
+        });
+      }
+      else if (action === 'calc-open') {
         var om = t.getAttribute('data-mare'), os = t.getAttribute('data-stallion');
         if (om) calcMare = om;
         if (os) calcStallion = os;
@@ -2768,6 +2953,17 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'update-note') {
+        var nl = t.getAttribute('data-life');
+        state.horseMeta[nl] = Object.assign({}, state.horseMeta[nl], { notes: t.value.trim() });
+        persist();
+      }
+      else if (action === 'goalset-load') {
+        var gl = (state.settings.goalSets || {})[t.value];
+        if (gl) { state.settings.goals = Object.assign({}, gl); state.settings.goalsUpdatedAt = Date.now(); goalsOpen = true; persist(); }
+      }
+      else if (action === 'compare-a') { compareA = t.value; render(); }
+      else if (action === 'compare-b') { compareB = t.value; render(); }
       else if (action === 'plan-toggle') {
         var pt = (state.settings.plan || []).map(function (p) { return Object.assign({}, p); });
         var pi = parseInt(t.getAttribute('data-i'), 10);
@@ -2803,6 +2999,7 @@
         var goals = Object.assign({}, state.settings.goals);
         goals[t.getAttribute('data-field')] = t.value.trim();
         state.settings.goals = goals;
+        state.settings.goalsUpdatedAt = Date.now();
         goalsOpen = true;
         persist();
       }
@@ -2847,7 +3044,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state);
+    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state) + L.purgeTrash(state);
     if (L.adoptOwnedStallions(state) || scoresChanged) { persist(openFromHash); return; }
     recompute();
     render();

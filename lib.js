@@ -657,7 +657,7 @@
     var healthWorst = ['good', 'average', 'fair', 'poor'].indexOf(g.healthWorst) > -1 ? g.healthWorst : null;
     return {
       minFert: FERT_RANK[fert] != null ? fert : null,
-      minConf: num(g.minConf), minBT: num(g.minBT),
+      minConf: num(g.minConf), minBT: num(g.minBT), minGP: num(g.minGP),
       traitWorst: traitWorst, traitWorstMax: num(g.traitWorstMax),
       healthWorst: healthWorst, healthWorstMax: num(g.healthWorstMax)
     };
@@ -726,11 +726,11 @@
     if (String((info && info.fertility) || '').toLowerCase().trim() === 'excellent') { fertility.gold = true; fertility.goldText = 'Excellent'; }
     // Fertility can only be tested from age 3: for a younger horse it is not part of the goals
     if (isYoungInfo(info)) fertility = { label: 'Fertility', state: 'na', text: 'tested from age 3', skip: true };
-    return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits, health: health, fertility: fertility };
+    return { conf: minSection('Conformation', g.minConf, conf), gp: minSection('Genetic Potential', g.minGP, Number(info.geneticPotential) || 0), bt: minSection('Breed Total', g.minBT, bt), traits: traits, health: health, fertility: fertility };
   }
   function goalCheck(state, life) {
     var s = goalSections(state, life);
-    var list = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.text !== 'no goal' && !x.skip; });
+    var list = [s.conf, s.gp, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.text !== 'no goal' && !x.skip; });
     return {
       active: list.length > 0,
       met: list.length > 0 && list.every(function (x) { return x.state === 'ok'; }),
@@ -742,7 +742,7 @@
     var c = goalCheck(state, life);
     if (!c.active) return [];
     var s = c.sections;
-    return [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad' && !x.skip; }).map(function (x) { return x.label; });
+    return [s.conf, s.gp, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad' && !x.skip; }).map(function (x) { return x.label; });
   }
 
   // ---------- where a mare stands: covered, or in foal ----------
@@ -1151,10 +1151,62 @@
     });
     return c;
   }
+  // ---------- recently deleted (undo) ----------
+  // Removing a horse, a stallion or a breeding record keeps a copy for 30 days under state.trash so it can be put back.
+  function trashPush(state, entry) {
+    if (!state.trash) state.trash = [];
+    entry.id = uid(); entry.deletedAt = Date.now();
+    state.trash.push(entry);
+    if (state.trash.length > 60) state.trash = state.trash.slice(-60);
+  }
+  function purgeTrash(state) {
+    if (!state.trash) return 0;
+    var cutoff = Date.now() - 30 * 86400000, before = state.trash.length;
+    state.trash = state.trash.filter(function (t) { return t.deletedAt >= cutoff; });
+    return before - state.trash.length;
+  }
+  function restoreTrash(state, id) {
+    var i = (state.trash || []).findIndex(function (t) { return t.id === id; });
+    if (i < 0) return false;
+    var t = state.trash[i], d = t.data || {};
+    if (t.kind === 'horse') {
+      if (d.horseInfo) state.horseInfo[t.life] = d.horseInfo;
+      if (d.horseMeta) state.horseMeta[t.life] = d.horseMeta;
+      if (d.stallion && !state.stallions.some(function (s) { return s.id === d.stallion.id; })) {
+        state.stallions.push(d.stallion);
+        state.breedings[d.stallion.id] = d.breedingsUnder || [];
+      }
+      (d.rows || []).forEach(function (r) {
+        if (!state.breedings[r.sid]) state.breedings[r.sid] = [];
+        state.breedings[r.sid].push(r.row);
+      });
+      if (state.settings && state.settings.ignored) { var ign = Object.assign({}, state.settings.ignored); delete ign[t.life]; state.settings.ignored = ign; }
+    } else if (t.kind === 'stallion') {
+      if (d.stallion && !state.stallions.some(function (s) { return s.id === d.stallion.id; })) state.stallions.push(d.stallion);
+      state.breedings[d.stallion.id] = d.breedings || [];
+    } else if (t.kind === 'breeding') {
+      if (!state.breedings[d.sid]) state.breedings[d.sid] = [];
+      state.breedings[d.sid].push(d.row);
+    }
+    state.trash.splice(i, 1);
+    return true;
+  }
   function removeHorse(state, life, ignoreName) {
     life = String(life || '');
     if (!life) return 0;
     var n = 0;
+    if (ignoreName != null) {
+      var snap = { horseInfo: state.horseInfo && state.horseInfo[life], horseMeta: state.horseMeta && state.horseMeta[life], rows: [] };
+      var srec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === life; });
+      if (srec) { snap.stallion = srec; snap.breedingsUnder = state.breedings[srec.id] || []; }
+      Object.keys(state.breedings || {}).forEach(function (sid) {
+        if (srec && sid === srec.id) return;
+        (state.breedings[sid] || []).forEach(function (b) {
+          if (String(b.mareLifeNumber) === life || (b.status === 'Foal Born' && foalLifeOf(b.foalUrl) === life)) snap.rows.push({ sid: sid, row: b });
+        });
+      });
+      trashPush(state, { kind: 'horse', life: life, name: String(ignoreName || '#' + life), data: JSON.parse(JSON.stringify(snap)) });
+    }
     if (state.horseInfo && state.horseInfo[life]) { delete state.horseInfo[life]; n++; }
     if (state.horseMeta && state.horseMeta[life]) { delete state.horseMeta[life]; n++; }
     var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === life; });
@@ -1227,7 +1279,7 @@
     var isMare = info.sex === 'mare';
     out.kind = isMare ? 'stallions' : 'mares';
     var goals = goalsOf(state);
-    out.hasGoal = goals.minBT != null || goals.minConf != null;
+    out.hasGoal = goals.minBT != null || goals.minConf != null || goals.minGP != null;
     var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var myConf = bestConformation(meta).best;
@@ -1266,7 +1318,7 @@
       }
       var fert = String(sI.fertility || '').toLowerCase().trim();
       var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
-      var fits = coi < 6.25 && (goals.minBT == null || (estBT != null && estBT >= goals.minBT)) && (goals.minConf == null || (conf != null && conf >= goals.minConf));
+      var fits = coi < 6.25 && (goals.minBT == null || (estBT != null && estBT >= goals.minBT)) && (goals.minConf == null || (conf != null && conf >= goals.minConf)) && (goals.minGP == null || gp >= goals.minGP);
       var otherMet = goalCheck(state, cl).met;
       var mine = !!myName && String(ci.ownerName || '').trim().toLowerCase() === myName;
       var reasons = [];
@@ -1284,6 +1336,183 @@
     out.mine = list.filter(function (x) { return x.mine; }).slice(0, limit || 10);
     out.other = list.filter(function (x) { return !x.mine; }).slice(0, limit || 10);
     return out;
+  }
+
+  // ---------- goal advice: when to raise your goals, and to what ----------
+  // Looks at the horses you own (3 and older, not sold or retired) and at recent foals. A numeric goal (conformation,
+  // Genetic Potential, Breed Total) that most of the herd already meets is too easy, so it suggests the level the top
+  // third of the herd starts at; one nobody meets suggests something within reach; one that is not set gets a starting
+  // value. Nothing changes until you apply a suggestion.
+  function goalAdvice(state) {
+    var g = goalsOf(state);
+    var herd = ownedHorses(state).filter(function (h) {
+      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isYoungInfo(h.info) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion';
+    });
+    function valuesOf(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
+    function pct(arr, p) { if (!arr.length) return 0; var i = Math.min(arr.length - 1, Math.max(0, Math.round((arr.length - 1) * p))); return arr[i]; }
+    var metrics = [
+      { key: 'minGP', label: 'Genetic Potential', dec: 0, vals: valuesOf(function (h) { return Number(h.info.geneticPotential) || 0; }) },
+      { key: 'minConf', label: 'Top conformation', dec: 1, vals: valuesOf(function (h) { return bestConformation((state.horseMeta && state.horseMeta[h.lifeNumber]) || {}).best; }) },
+      { key: 'minBT', label: 'Breed Total', dec: 1, vals: valuesOf(function (h) { return horseBT(state, h.lifeNumber); }) }
+    ];
+    function round(n, dec) { var f = Math.pow(10, dec); return Math.round(n * f) / f; }
+    var out = { tips: [], review: [], herdSize: herd.length };
+    metrics.forEach(function (m) {
+      var n = m.vals.length;
+      if (n < 4) return;
+      var cur = g[m.key], target = round(pct(m.vals, 0.65), m.dec), median = round(pct(m.vals, 0.5), m.dec), best = m.vals[n - 1];
+      if (cur == null) {
+        out.tips.push({ key: m.key, label: m.label, kind: 'start', current: null, suggested: target, why: 'No goal set. The top third of your ' + n + ' horses starts at ' + target + ' (median ' + median + ', best ' + round(best, m.dec) + ').' });
+        return;
+      }
+      var meet = m.vals.filter(function (v) { return v >= cur; }).length;
+      if (meet / n >= 0.6) {
+        var next = Math.max(target, round(cur + (m.dec ? 0.5 : 5), m.dec));
+        out.tips.push({ key: m.key, label: m.label, kind: 'raise', current: cur, suggested: next, why: meet + ' of ' + n + ' horses (' + Math.round(meet / n * 100) + '%) already meet ' + cur + ', so the goal is not picking out your best. The top third of your herd starts at ' + target + '.' });
+      } else if (meet === 0 && n >= 5) {
+        out.tips.push({ key: m.key, label: m.label, kind: 'lower', current: cur, suggested: median, why: 'None of your ' + n + ' horses meet ' + cur + ' (best is ' + round(best, m.dec) + ', median ' + median + '). A goal within reach, like the median, keeps the highlights useful.' });
+      }
+    });
+    // foals: recent foal scores that beat the conformation goal
+    var cutoff = Date.now() - 180 * 86400000, scores = [];
+    (state.stallions || []).forEach(function (s) {
+      (state.breedings[s.id] || []).forEach(function (b) {
+        var d = Date.parse(b.dateBorn || b.date || '');
+        if (b.status === 'Foal Born' && b.foalScore > 0 && b.foalScore <= 100 && d && d >= cutoff) scores.push(b.foalScore);
+      });
+    });
+    if (scores.length >= 3 && g.minConf != null) {
+      var avg = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
+      if (avg >= g.minConf + 2 && !out.tips.some(function (t) { return t.key === 'minConf' && t.kind === 'raise'; })) {
+        out.tips.push({ key: 'minConf', label: 'Top conformation', kind: 'raise', current: g.minConf, suggested: round(avg - 1, 1), why: 'Your ' + scores.length + ' foals from the last 6 months average ' + round(avg, 1) + ', well above the goal of ' + g.minConf + '.' });
+      }
+    }
+    // when to look again
+    var at = state.settings && state.settings.goalsUpdatedAt;
+    if (at) {
+      var days = Math.floor((Date.now() - at) / 86400000), since = 0;
+      (state.stallions || []).forEach(function (s) {
+        (state.breedings[s.id] || []).forEach(function (b) { var d = Date.parse(b.dateBorn || b.date || ''); if (b.status === 'Foal Born' && d && d > at) since++; });
+      });
+      if (days >= 90) out.review.push('You last changed your goals ' + days + ' days ago. Goals are worth a look every three months or so.');
+      if (since >= 3) out.review.push(since + ' foals have been born since you last changed your goals. A good moment to check them.');
+    } else if (Object.keys(g).some(function (k) { return g[k] != null; })) {
+      out.review.push('The ledger does not know when you last changed your goals. It will start counting from your next change.');
+    }
+    return out;
+  }
+
+  // ---------- breeding calendar: foals due, mares ready, money, fee changes ----------
+  // Days until the foal is due, from the site's due text ("Due in 5 days", "Due tomorrow"...). null if it can't be read.
+  function dueDays(text) {
+    var t = String(text || '');
+    var m = /(\d+)\s*day/i.exec(t);
+    if (m) return parseInt(m[1], 10);
+    if (/hour|today|soon/i.test(t)) return 0;
+    if (/tomorrow/i.test(t)) return 1;
+    return null;
+  }
+  function foalsDue(state) {
+    var out = [];
+    ownedHorses(state).forEach(function (h) {
+      if (h.info.sex !== 'mare' || isSoldLife(state, h.lifeNumber) || isArchivedHorse(h)) return;
+      var st = mareBreedStatus(state, h.lifeNumber);
+      if (st.status !== 'pregnant') return;
+      out.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), due: st.due, days: dueDays(st.due), stallion: st.stallion });
+    });
+    return out.sort(function (a, b) { return (a.days == null ? 999 : a.days) - (b.days == null ? 999 : b.days); });
+  }
+  // Your adult mares that are not covered or in foal, longest-open first.
+  function readyMares(state) {
+    var out = [];
+    ownedHorses(state).forEach(function (h) {
+      if (h.info.sex !== 'mare' || isYoungInfo(h.info) || isSoldLife(state, h.lifeNumber) || isArchivedHorse(h) || h.meta.status === 'Companion') return;
+      if (mareBreedStatus(state, h.lifeNumber).status) return;
+      var last = null;
+      Object.keys(state.breedings || {}).forEach(function (sid) {
+        (state.breedings[sid] || []).forEach(function (b) {
+          if (String(b.mareLifeNumber) !== h.lifeNumber) return;
+          var d = b.status === 'Foal Born' ? (b.dateBorn || b.date) : b.date;
+          if (d && (!last || d > last)) last = d;
+        });
+      });
+      out.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), last: last, days: last ? Math.floor(daysSince(last)) : null });
+    });
+    return out.sort(function (a, b) { return (b.days == null ? 9999 : b.days) - (a.days == null ? 9999 : a.days); });
+  }
+  // HRC income and spending by month (last 12 months) plus all-time totals. Other currencies are left out.
+  function moneySummary(state) {
+    var months = {}, totals = { earned: 0, paid: 0, sold: 0, bought: 0 };
+    var now = new Date(), keys = [];
+    for (var i = 11; i >= 0; i--) {
+      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var k = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+      keys.push(k); months[k] = { m: k, earned: 0, paid: 0, sold: 0 };
+    }
+    (state.stallions || []).forEach(function (s) {
+      (state.breedings[s.id] || []).forEach(function (b) {
+        if (!(b.price > 0) || (b.currency || 'HRC') !== 'HRC') return;
+        var kind = s.owned === false ? (isMyMare(state, String(b.mareLifeNumber)) ? 'paid' : '') : 'earned';
+        if (!kind) return;
+        totals[kind] += b.price;
+        var mk = String(b.date || '').slice(0, 7);
+        if (months[mk]) months[mk][kind] += b.price;
+      });
+    });
+    Object.keys(state.horseMeta || {}).forEach(function (l) {
+      var m = state.horseMeta[l];
+      if (m.sale && m.sale.price > 0 && (m.sale.currency || 'HRC') === 'HRC') {
+        totals.sold += m.sale.price;
+        var mk = String(m.sale.date || '').slice(0, 7);
+        if (months[mk]) months[mk].sold += m.sale.price;
+      }
+      var p = purchaseOf(state, l);
+      if (p) {
+        if (!p.price || p.currency === 'HRC') totals.bought += p.price;
+        if (p.shipping && p.shippingCurrency === 'HRC') totals.bought += p.shipping;
+      }
+    });
+    totals.net = totals.earned + totals.sold - totals.paid - totals.bought;
+    return { months: keys.map(function (k) { return months[k]; }), totals: totals };
+  }
+  // Stallions whose public HRC fee changed in the last `days` days (from the fee history kept from their pages).
+  function feeChanges(state, days) {
+    var out = [], cutoff = new Date(Date.now() - (days || 14) * 86400000).toISOString().slice(0, 10);
+    Object.keys(state.horseMeta || {}).forEach(function (l) {
+      var log = state.horseMeta[l].studTermsLog;
+      if (!Array.isArray(log) || log.length < 2) return;
+      var last = log[log.length - 1], prev = log[log.length - 2];
+      var a = prev.public && prev.public.HRC, b = last.public && last.public.HRC;
+      if (!a || !b || a === b || last.date < cutoff) return;
+      out.push({ life: l, name: (state.horseInfo[l] && state.horseInfo[l].name) || ('#' + l), from: a, to: b, pct: Math.round((b - a) / a * 100), date: last.date });
+    });
+    return out;
+  }
+  // A short sales ad for a horse, to paste into the market.
+  function adText(state, life) {
+    var info = state.horseInfo && state.horseInfo[life];
+    if (!info) return '';
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var conf = bestConformation(meta).best;
+    var bt = Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf));
+    var lines = [];
+    lines.push((info.name || ('#' + life)) + ' \u2014 ' + [info.breed, info.sex === 'stallion' ? 'stallion' : info.sex === 'mare' ? 'mare' : '', info.ageText || formatAgeMonths(effectiveAgeMonths(info))].filter(Boolean).join(', '));
+    var stats = [];
+    if (info.geneticPotential != null) stats.push('Genetic potential ' + info.geneticPotential);
+    if (info.conformation) stats.push('Conformation ' + info.conformation);
+    if (conf > 0) stats.push('Top conformation score ' + (Math.round(conf * 1000) / 1000));
+    if (bt > 0) stats.push('Breed Total ' + (Math.round(bt * 10) / 10));
+    if (stats.length) lines.push(stats.join(' | '));
+    if (info.confTraits) lines.push('Traits: ' + Object.keys(info.confTraits).map(function (t) { return t + ' ' + info.confTraits[t]; }).join(', '));
+    if (info.health && typeof info.health === 'object') {
+      var hv = Object.keys(info.health).map(function (k) { return k + ' ' + info.health[k]; });
+      if (hv.length) lines.push('Health: ' + hv.join(', '));
+    }
+    if (info.fertility) lines.push('Fertility: ' + info.fertility);
+    if (info.testedColours) lines.push('Tested colours: ' + info.testedColours);
+    if (meta.project) lines.push('Line: ' + meta.project);
+    lines.push('https://www.horsereality.com/horses/' + life + '/');
+    return lines.join('\n');
   }
 
   // ---------- foal results vs. what the parents predicted ----------
@@ -1582,8 +1811,8 @@
       if (!c.active) return;
       if (c.met) { goalHits.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber }); return; }
       var s = c.sections;
-      var bad = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad'; });
-      var unknown = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'na' && x.text === 'no data yet'; });
+      var bad = [s.conf, s.gp, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad'; });
+      var unknown = [s.conf, s.gp, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'na' && x.text === 'no data yet'; });
       if (bad.length === 1 && !unknown.length) nearMiss.push({ name: h.info.name || ('#' + h.lifeNumber), life: h.lifeNumber, missing: bad[0].label, detail: bad[0].text, why: bad[0].label + ' ' + bad[0].text });
     });
     if (nearMiss.length) tips.push({ level: 'tip', text: nearMiss.length + ' horse' + (nearMiss.length === 1 ? ' misses' : 's miss') + ' your goals by only one box: ' + nearMiss.slice(0, 5).map(function (n) { return n.name + ' (' + n.why + ')'; }).join('; ') + '.' });
@@ -1675,6 +1904,16 @@
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
     foalAccuracy: foalAccuracy,
+    foalsDue: foalsDue,
+    goalAdvice: goalAdvice,
+    readyMares: readyMares,
+    moneySummary: moneySummary,
+    feeChanges: feeChanges,
+    adText: adText,
+    dueDays: dueDays,
+    trashPush: trashPush,
+    purgeTrash: purgeTrash,
+    restoreTrash: restoreTrash,
     staleOwned: staleOwned,
     sellFormOf: sellFormOf,
     breedTotal: breedTotal,

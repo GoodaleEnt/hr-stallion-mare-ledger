@@ -153,13 +153,25 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 ## Handy extras
 
 - **Filter box:** every list tab (Stallions, My Mares, Colts & Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
-- **Needs attention:** the Stallions tab opens with a short strip of what needs doing (covering results waiting, idle stallions, mares not in foal, horses whose data is over 30 days old). **See all in Analytics** has the rest.
 - **Open in Foal Calculator:** pairing ideas on Analytics and the stallions on a mare's Breeding suggestions page have a button that opens the Foal Calculator with both parents already chosen.
 - **Max stud fee:** the Foal Calculator suggestions have a "Max stud fee (HRC)" box that hides other players' stallions that cost more.
 - **Breeding plan:** in the Foal Calculator, add the chosen pairing to your plan and tick it off when it's done.
 - **Foal results vs. the parents:** Analytics compares each foal's score with its parents' average top conformation.
 - **Mark For Sale:** each Sell ideas row has a button that sets the horse's status to For Sale.
 - **Backup reminder:** if you haven't exported a backup for 30 days, a bar at the top offers to export one (or to remind you in a week).
+
+## Goal suggestions
+
+Besides conformation and Breed Total, you can set a **minimum Genetic Potential**; it has its own box on every horse. Under the goal boxes, **Goal suggestions** looks at the horses you own (3 and older) and your recent foals and tells you when to change a goal and to what: it suggests a starting value if a goal isn't set, a higher one when 60% or more of your herd already meets it (the level the top third of your herd starts at), or a reachable one when nobody meets it. Click **Apply** to use a suggestion. It also reminds you to review your goals every three months or after three or more new foals.
+
+## Breeding calendar, money and more
+
+- **My Mares** starts with **Foals due** (soonest first) and **Mares ready to breed** (longest open first).
+- The toolbar icon badge counts coverings to review plus foals due within a week.
+- **Analytics** adds **Money (HRC)**, **Stud fee changes**, **Compare two horses** and **Export to a spreadsheet** (herd, breedings or sales as CSV).
+- Every horse page has a **Notes** box (the filter box searches it) and a **Copy sales ad** button.
+- **Goal sets** (in Highlight goals) save named sets of goals, such as one per breed, to swap in with one click.
+- **Recently deleted** (Other Horses tab) keeps removed horses, stallions and breeding records for 30 days with a **Restore** button.
 
 ## Removing a horse
 

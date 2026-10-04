@@ -10,12 +10,14 @@ var REVIEW_DAYS = 6;
 
 function refreshReviewBadge() {
   HRStorage.getState(function (state) {
-    var count = HRLib.findReviewCandidates(state, REVIEW_DAYS).length;
+    var review = HRLib.findReviewCandidates(state, REVIEW_DAYS).length;
+    var due = HRLib.foalsDue(state).filter(function (f) { return f.days != null && f.days <= 7; }).length;
+    var count = review + due;
     chrome.action.setBadgeText({ text: count ? String(count) : '' });
     chrome.action.setBadgeBackgroundColor({ color: '#d97706' });
     chrome.action.setTitle({
       title: count
-        ? 'HR Stallion & Mare Ledger — ' + count + ' covering' + (count === 1 ? '' : 's') + ' ready to review'
+        ? 'HR Stallion & Mare Ledger — ' + (review ? review + ' covering' + (review === 1 ? '' : 's') + ' ready to review' : '') + (review && due ? ', ' : '') + (due ? due + ' foal' + (due === 1 ? '' : 's') + ' due this week' : '')
         : 'Open HR Stallion & Mare Ledger'
     });
   });

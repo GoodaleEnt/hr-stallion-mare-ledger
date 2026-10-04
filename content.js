@@ -622,7 +622,7 @@
         var meta = state.horseMeta[pu.lifeNumber] = Object.assign({}, state.horseMeta[pu.lifeNumber]);
         var rec = meta.purchase = Object.assign({}, meta.purchase);
         var changed = false;
-        if (pu.price && !rec.price) { rec.price = pu.price; rec.currency = pu.currency; changed = true; }
+        if (pu.price && !rec.price) { rec.price = pu.price; rec.currency = pu.currency; rec.recordedAt = Date.now(); changed = true; }
         if (pu.shipping && !rec.shipping) { rec.shipping = pu.shipping; rec.shippingCurrency = pu.shippingCurrency; changed = true; }
         if (changed) purchasesSaved++;
       });

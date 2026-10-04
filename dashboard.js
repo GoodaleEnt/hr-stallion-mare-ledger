@@ -607,7 +607,6 @@
       '<div class="stat-tile"><div class="num mono">' + activeMares.length + '</div><div class="label">Active mares</div>' + goalTallyHtml(mareTally) + '</div>' +
       '<div class="stat-tile"><div class="num mono">' + activeColts.length + '</div><div class="label">Active colts</div>' + goalTallyHtml(coltTally) + '</div>' +
       '<div class="stat-tile"><div class="num mono">' + activeFillies.length + '</div><div class="label">Active fillies</div>' + goalTallyHtml(fillyTally) + '</div>' +
-      '<div class="stat-tile"><div class="num mono">' + uniqueMareCount + '</div><div class="label">Mares bred (all)</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + totalBreedings + '</div><div class="label">Breedings logged</div></div>' +
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
       '</div>';

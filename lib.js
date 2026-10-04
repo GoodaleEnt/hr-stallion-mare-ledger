@@ -439,7 +439,7 @@
     if (id === 'E') return al.indexOf('E') > -1 ? 'black-based' : 'red (chestnut) base';
     if (id === 'A') return al.indexOf('A') > -1 ? 'agouti (bay if black-based)' : 'no agouti (black if black-based)';
     if (id === 'CR') { c = copies(al, 'CR'); return c === 0 ? 'no cream' : (c === 1 ? 'one cream copy' : 'double cream'); }
-    if (id === 'D') return al.indexOf('D') > -1 ? 'dun' : (al.indexOf('nd1') > -1 ? 'non-dun, primitive markings' : 'non-dun');
+    if (id === 'D') return al.indexOf('D') > -1 ? 'dun' : (al.indexOf('nd1') > -1 ? 'pseudo dun (nd1, primitive markings)' : 'non-dun');
     if (id === 'G') return al.indexOf('G') > -1 ? 'grey' : 'not grey';
     if (id === 'LP') { c = copies(al, 'LP'); return c === 0 ? 'no leopard complex' : (c === 1 ? 'one LP copy' : 'two LP copies'); }
     if (id === 'PATN1') { c = copies(al, 'PATN1'); return c === 0 ? 'no PATN1' : (c === 1 ? 'one PATN1 copy' : 'two PATN1 copies'); }
@@ -457,6 +457,7 @@
     var parts = [];
     if (g.CR && copies(g.CR, 'CR')) parts.push(copies(g.CR, 'CR') === 1 ? 'one cream copy' : 'double cream');
     if (g.D && g.D.indexOf('D') > -1) parts.push('Dun');
+    else if (g.D && g.D.indexOf('nd1') > -1) parts.push('Pseudo Dun');
     EXTRA_LOCI.forEach(function (l) {
       var al = g[l.id];
       if (!al || l.only) return;
@@ -472,12 +473,16 @@
     var names = {
       chestnut: ['Chestnut', 'Palomino', 'Cremello'],
       bay: ['Bay', 'Buckskin', 'Perlino'],
-      black: ['Black', 'Smoky Black', 'Smoky Cream'],
-      blackBased: ['Bay or Black', 'Buckskin or Smoky Black', 'Perlino or Smoky Cream']
+      black: ['Black', 'Smokey Black', 'Smokey Cream'],
+      blackBased: ['Bay or Black', 'Buckskin or Smokey Black', 'Perlino or Smokey Cream']
     };
+    // A dun coat without cream has its own names; with cream it is added to the cream name.
+    var dunNames = { chestnut: 'Red Dun', bay: 'Dun', black: 'Grulla', blackBased: 'Dun or Grulla' };
     var base = g.E.indexOf('E') === -1 ? 'chestnut' : (!g.A ? 'blackBased' : (g.A.indexOf('A') > -1 ? 'bay' : 'black'));
-    var name = names[base][g.CR ? copies(g.CR, 'CR') : 0];
-    if (g.D && g.D.indexOf('D') > -1) name += ' Dun';
+    var cream = g.CR ? copies(g.CR, 'CR') : 0;
+    var name = names[base][cream];
+    if (g.D && g.D.indexOf('D') > -1) name = cream ? name + ' Dun' : dunNames[base];
+    else if (g.D && g.D.indexOf('nd1') > -1) name += ' Pseudo Dun';
     var blackBased = g.E.indexOf('E') > -1;
     EXTRA_LOCI.forEach(function (l) {
       var al = g[l.id];

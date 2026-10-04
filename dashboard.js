@@ -1266,7 +1266,7 @@
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
         goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
-        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + (info.sold ? ' <span class="tag">Sold</span>' + saleTagsHtml(info.lifeNumber) : '') + '</span></div>' +
+        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span>' + (info.sold ? '<div class="name-tags"><span class="tag">Sold</span>' + saleTagsHtml(info.lifeNumber) + '</div>' : '') + '</div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
       '</div>';

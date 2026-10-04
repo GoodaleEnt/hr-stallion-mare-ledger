@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.17.6 | 2026-10-03 | Foal score columns labelled as out of 100 | Draft |
 | 1.17.5 | 2026-10-03 | Analytics tables show 3+ year olds only; under-3s listed as colts and fillies | Draft |
 | 1.17.4 | 2026-10-03 | Pairing ideas also weigh conformation scores and conformation traits | Draft |
 | 1.17.3 | 2026-10-03 | Analytics lists the horses that meet the goals and those that miss by one, with what is missing | Draft |

@@ -1009,7 +1009,7 @@
       '<div class="stat-tile"><div class="num mono">' + o.foals + '</div><div class="label">Foals born</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + o.pending + '</div><div class="label">Pending</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + L.esc(L.moneyLine(o.earned)) + '</div><div class="label">Stud fees earned</div></div>' +
-      '<div class="stat-tile"><div class="num mono">' + (o.avgScore != null ? Math.round(o.avgScore * 10) / 10 : '\u2014') + '</div><div class="label">Avg foal score</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + (o.avgScore != null ? Math.round(o.avgScore * 10) / 10 : '\u2014') + '</div><div class="label">Avg foal score (of 100)</div></div>' +
     '</div>';
 
     // suggestions
@@ -1084,14 +1084,14 @@
     if (!a.stallions.length) {
       html += '<p class="notes-line" style="margin:0;">No stallions yet.</p>';
     } else {
-      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Stallion</th><th class="num">Breedings</th><th class="num">Success</th><th class="num">Failed</th><th class="num">Pending</th><th class="num">Foals</th><th class="num">Avg foal</th><th class="num">Best foal</th><th class="num">Earned</th><th>Last bred</th></tr></thead><tbody>';
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Stallion</th><th class="num">Breedings</th><th class="num">Success</th><th class="num">Failed</th><th class="num">Pending</th><th class="num">Foals</th><th class="num" title="Average foal score, out of 100">Avg foal /100</th><th class="num" title="Highest foal score, out of 100">Best foal /100</th><th class="num">Earned</th><th>Last bred</th></tr></thead><tbody>';
       a.stallions.slice().sort(function (x, y) { return y.breedings - x.breedings; }).forEach(function (s) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-stallion" data-id="' + L.esc(s.id) + '">' + L.esc(s.name) + '</button></td>' +
           '<td class="num mono">' + s.breedings + '</td><td class="num mono">' + pct(s.successRate) + '</td><td class="num mono">' + s.failed + '</td><td class="num mono">' + s.pending + '</td><td class="num mono">' + s.foals + '</td>' +
           '<td class="num mono">' + (s.avgScore != null ? Math.round(s.avgScore * 10) / 10 : '\u2014') + '</td><td class="num mono">' + (s.bestScore != null ? s.bestScore : '\u2014') + '</td>' +
           '<td class="num mono">' + L.esc(L.moneyLine(s.earned)) + '</td><td>' + (s.last ? L.fmtDate(s.last) : '\u2014') + '</td></tr>';
       });
-      html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Success rate = foals and in-foal results out of every covering with a known result (pending ones are left out).</p>';
+      html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Success rate = foals and in-foal results out of every covering with a known result (pending ones are left out). Foal scores are out of 100.</p>';
     }
     html += '</div>';
 

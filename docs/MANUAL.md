@@ -62,7 +62,7 @@ Studs that show up here only because they were needed to track one of *your mare
 
 ## The Open in Ledger button
 
-On every horse's page on Horse Reality there is a green **Open in Ledger** button at the bottom-left of the screen. Click it to jump straight to that horse in the ledger: your stallions open on their stallion page, any other horse on its profile (your mares open on their mare page). If the dashboard is already open it is brought to the front instead of opening a second copy. If the ledger hasn't saved that horse yet, the dashboard opens with its life number in the search box. On mobile, the button opens the Ledger overlay on the same horse.
+On every horse's page on Horse Reality there is a green **Open in Ledger** button. On a mare it sits directly under the page's own **Cover** (Breed) button; on a horse without one it floats at the bottom-left of the screen. Click it to jump straight to that horse in the ledger: your stallions open on their stallion page, any other horse on its profile (your mares open on their mare page). If the dashboard is already open it is brought to the front instead of opening a second copy. If the ledger hasn't saved that horse yet, the dashboard opens with its life number in the search box. On mobile, the button opens the Ledger overlay on the same horse.
 
 ## Looking up any horse
 

@@ -1271,15 +1271,78 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
-  // A small "Open in Ledger" button on every horse page. On desktop it asks the
-  // extension to open (or focus) the dashboard on this horse's profile; on mobile
-  // it opens the on-page overlay on the same profile.
+  // An "Open in Ledger" button on every horse page. It sits directly under the
+  // page's own Cover / Breed button when there is one (mares); otherwise it floats
+  // at the bottom-left of the screen. On desktop it asks the extension to open (or
+  // focus) the dashboard on this horse's profile; on mobile it opens the overlay.
   var LEDGER_BTN_ID = 'hr-ledger-open-btn';
+  var LEDGER_WRAP_ID = 'hr-ledger-open-wrap';
+  // Looks through the page, including open shadow roots, for the site's own
+  // Cover / Breed button (a short button or link whose label starts with that word).
+  function findCoverButton(root) {
+    var els = root.querySelectorAll('button, a, input[type=button], input[type=submit]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.id === LEDGER_BTN_ID || (el.closest && el.closest('nav, header, footer, .leftnav, .sidemenu, #bbmenu'))) continue;
+      var text = ((el.textContent || el.value || '') + '').replace(/\s+/g, ' ').trim();
+      if (text.length > 0 && text.length <= 24 && /^(cover|breed)\b/i.test(text)) return el;
+    }
+    var all = root.querySelectorAll('*');
+    for (var j = 0; j < all.length; j++) {
+      if (all[j].shadowRoot) {
+        var found = findCoverButton(all[j].shadowRoot);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  function openInLedger(id) {
+    if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
+      window.HRMobileOverlay.show();
+      window.HRLedgerOpenProfile(id);
+      return;
+    }
+    chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
+  }
+  function removeLedgerButton() {
+    var w = document.getElementById(LEDGER_WRAP_ID);
+    if (w) w.remove();
+    document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
+  }
   function injectLedgerButton() {
     var life = parseHorseIdFromUrl();
-    var existing = document.getElementById(LEDGER_BTN_ID);
-    if (!life) { if (existing) existing.remove(); return; }
-    if (existing) { existing.setAttribute('data-life', life); return; }
+    if (!life) { removeLedgerButton(); return; }
+    var anchor = findCoverButton(document);
+    var wrap = null;
+    var floating = document.getElementById(LEDGER_BTN_ID);
+    if (anchor) {
+      // already directly under the Cover button (this may be inside a shadow root)? nothing to do
+      var next = anchor.nextElementSibling;
+      if (next && next.id === LEDGER_WRAP_ID && next.firstChild && next.firstChild.getAttribute('data-life') === life) return;
+      removeLedgerButton();
+      var rootNode = anchor.getRootNode();
+      if (rootNode && rootNode.getElementById) {
+        var stale = rootNode.getElementById(LEDGER_WRAP_ID);
+        if (stale) stale.remove();
+      }
+      wrap = document.createElement('div');
+      wrap.id = LEDGER_WRAP_ID;
+      wrap.style.cssText = 'display:block;width:100%;flex:1 1 100%;margin:8px 0 0;';
+      var inline = document.createElement('button');
+      inline.type = 'button';
+      inline.id = LEDGER_BTN_ID;
+      inline.textContent = 'Open in Ledger';
+      inline.title = 'Open this horse in HR Stallion & Mare Ledger';
+      inline.setAttribute('data-life', life);
+      inline.style.cssText = 'cursor:pointer;background:#46592C;color:#fff;border:none;border-radius:6px;padding:8px 14px;font:600 14px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.25);';
+      inline.addEventListener('click', function () { openInLedger(inline.getAttribute('data-life')); });
+      wrap.appendChild(inline);
+      anchor.insertAdjacentElement('afterend', wrap);
+      return;
+    }
+    // no Cover button on this page: floating button, bottom-left
+    if (document.getElementById(LEDGER_WRAP_ID)) { removeLedgerButton(); floating = null; }
+    if (floating) { floating.setAttribute('data-life', life); return; }
     var host = document.body || document.documentElement;
     if (!host) return;
     var btn = document.createElement('button');
@@ -1290,18 +1353,10 @@
     btn.setAttribute('data-life', life);
     btn.style.cssText = [
       'position:fixed', 'left:16px', 'bottom:16px', 'z-index:2147483000', 'cursor:pointer',
-      'background:#46592C', 'color:#fff', 'border:none', 'border-radius:999px', 'padding:9px 16px',
-      'font:600 14px system-ui,sans-serif', 'box-shadow:0 4px 14px rgba(0,0,0,.3)'
+      'background:#46592C', 'color:#fff', 'border:none', 'border-radius:999px', 'padding:10px 18px',
+      'font:600 15px system-ui,sans-serif', 'box-shadow:0 4px 14px rgba(0,0,0,.3)'
     ].join(';');
-    btn.addEventListener('click', function () {
-      var id = btn.getAttribute('data-life');
-      if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
-        window.HRMobileOverlay.show();
-        window.HRLedgerOpenProfile(id);
-        return;
-      }
-      chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
-    });
+    btn.addEventListener('click', function () { openInLedger(btn.getAttribute('data-life')); });
     host.appendChild(btn);
   }
 

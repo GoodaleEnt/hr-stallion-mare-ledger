@@ -110,46 +110,9 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 1.20.0 | 2026-10-03 | For Sale status: big dollar sign behind the card and a For sale tag on the profile; fertility ignored for horses under 3 | Draft |
-| 1.19.7 | 2026-10-03 | Open in Ledger finds the picture box even when the page keeps it in a hidden (shadow) section | Draft |
-| 1.19.6 | 2026-10-03 | Open in Ledger button tooltip and console show the running version | Draft |
-| 1.19.5 | 2026-10-03 | Open in Ledger is a pill inside the horse picture (beside the status pills, or in the corner when there are none) | Draft |
-| 1.19.4 | 2026-10-03 | Ledger tab: made clickable on the site tab strip, and added to horses with no tabs in the same place | Draft |
-| 1.19.3 | 2026-10-03 | Open in Ledger is a side tab on every horse page (joins the site's own side tabs where they exist) | Draft |
-| 1.19.2 | 2026-10-03 | Open in Ledger button sits under the Cover button on mares | Draft |
-| 1.19.1 | 2026-10-03 | Open in Ledger button re-appears if the site removes it | Draft |
-| 1.19.0 | 2026-10-03 | "Open in Ledger" button on Horse Reality horse pages opens that horse's profile in the dashboard | Draft |
-| 1.18.0 | 2026-10-03 | Sales picked up from the bank page and shown on the horse profile; sold horses left out of Analytics and given their own sold-horse stats | Draft |
-| 1.17.8 | 2026-10-03 | Analytics tables sort by clicking the column headings | Draft |
-| 1.17.7 | 2026-10-03 | Foal scores above 100 are ignored (they were misread) | Draft |
-| 1.17.6 | 2026-10-03 | Foal score columns labelled as out of 100 | Draft |
-| 1.17.5 | 2026-10-03 | Analytics tables show 3+ year olds only; under-3s listed as colts and fillies | Draft |
-| 1.17.4 | 2026-10-03 | Pairing ideas also weigh conformation scores and conformation traits | Draft |
-| 1.17.3 | 2026-10-03 | Analytics lists the horses that meet the goals and those that miss by one, with what is missing | Draft |
-| 1.17.2 | 2026-10-03 | Highlight goals menu is closed by default | Draft |
-| 1.17.1 | 2026-10-03 | Gold Health box (more than 3 Excellent) and gold Fertility box (Excellent) | Draft |
-| 1.17.0 | 2026-10-03 | Analytics tab: stats, charts, per-stallion and per-mare tables, and suggestions | Draft |
-| 1.16.1 | 2026-10-03 | Health "how many" is a 0-5 menu | Draft |
-| 1.16.0 | 2026-10-03 | Traits and Health goals use a worst-rating selector plus how many are accepted | Draft |
-| 1.15.0 | 2026-10-03 | Health and Fertility read from the horse page, shown on each horse page, and added to the highlight goals as two more boxes | Draft |
-| 1.14.2 | 2026-10-03 | Goal boxes span the full width across the top of My Herd, Retired and Other Horses rows | Draft |
-| 1.14.1 | 2026-10-03 | Status menu (Active/Sold/Retired) on mare cards and mare pages | Draft |
-| 1.14.0 | 2026-10-03 | Retired horses move to a Retired tab; sold horses move to Other Horses | Draft |
-| 1.13.2 | 2026-10-03 | Removed the VG trait limit; trait limits sit below the minimums | Draft |
-| 1.13.1 | 2026-10-03 | Trait limits per rating: VG, G+, G, A, BA | Draft |
-| 1.13.0 | 2026-10-03 | Highlight goals: min conformation, min Breed Total and max trait counts, shown as green/red boxes above each horse | Draft |
-| 1.12.0 | 2026-10-03 | Top conformation and Breed Total (BT) highs, with dates, on horse cards and pages | Draft |
-| 1.11.1 | 2026-10-03 | Breeding date survives the site reloading onto the stallion page after you click Breed | Submitted |
-| 1.11.0 | 2026-10-03 | Breeding date recorded automatically when you breed a mare on the Breed page | Included in 1.11.1 |
-| 1.10.1 | 2026-10-03 | Tidy mare names that showed icon markers or only a life number | Included in 1.11.1 |
-| 1.10.0 | 2026-10-03 | Separate Date bred and Date born columns; dates filled from notifications, related records and foal passports; self-bred mares get an approximate date | Included in 1.11.1 |
-| 1.9.0 | 2026-10-03 | Purchase price and transport fee are recorded automatically from the bank page | Included in 1.11.1 |
-| 1.8.5 | 2026-10-03 | Fix: viewing another player's pregnant mare no longer lists her under My Mares | Included in 1.11.1 |
-| 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Included in 1.11.1 |
-| 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Included in 1.11.1 |
-| 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Included in 1.11.1 |
-| 1.8.1 | 2026-10-03 | Docs for Other Horses tab | Included in 1.11.1 |
-| 1.8.0 | 2026-10-03 | Add-to-ledger prompt for other people's horses; Other Horses tab | Included in 1.11.1 |
+| 1.12.0 | 2026-10-04 | Everything built since the published 1.2.1: breeding dates, purchases and sales, Other Horses, Retired, For Sale, Analytics, highlight goals (conformation, Breed Total, traits, health, fertility), the Open in Ledger button | Draft (unpublished) |
+
+**Version policy:** the extension stays at **1.12.x** until this release is published. Until then only the last number goes up (1.12.0, 1.12.1, ...). After it is published, the middle number goes up for the next medium change (1.13.0), the first number for a large one.
 
 ## Review Notes
 

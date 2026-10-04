@@ -128,6 +128,10 @@ Horses marked **Sold, Retired or Deceased** move out of the working list and the
 
 Each horse's card and page shows its **top conformation score** and its **Breed Total (BT)**, with when each was reached. The conformation high is read from the horse's stats page (the show results list, with the show date when the page gives one) and only ever goes up, so it stays after the score drops off the latest-25 list. **Breed Total = ((Genetic Potential ÷ 10) + Top Conformation Score) ÷ 2**, and its high score is kept the same way. A date shown as "seen" means the ledger first noticed the score that day because the page didn't give the show date.
 
+### Retired and sold horses
+
+Set a horse's **Status** to **Retired** (on My Herd, on its own page, or on a stallion's status menu) and it leaves the Stallions, My Mares, Colts & Fillies and My Herd lists and appears on the **Retired** tab instead. Set a horse's status to **Sold** and it moves to **Other Horses**, tagged *Sold*. Nothing is deleted: change the status back to Active (or press **Restore** on a sold horse) and it returns to its usual place. A retired stallion's earnings still count in your totals.
+
 ### Highlight goals
 
 Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and a maximum number of conformation traits at each of these ratings: **G+** (Good+), **G** (Good), **A** (Average) and **BA** (Below average). There's no limit for Very good (VG), since you always want as many of those as possible. Leave a box empty to ignore it.

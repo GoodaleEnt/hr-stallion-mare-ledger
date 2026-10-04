@@ -81,7 +81,7 @@
       });
     }
     maresIndex = Object.keys(map).map(function (k) { return map[k]; })
-      .filter(function (m) { return isAdultHorse(m.mareLifeNumber); });
+      .filter(function (m) { return isAdultHorse(m.mareLifeNumber) && !movedOut(m.mareLifeNumber); });
     maresIndex.forEach(function (m) {
       m.records.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
       var counts = { Pending: 0, Succeeded: 0, Failed: 0 };
@@ -211,6 +211,7 @@
     else if (activeTab === 'young') html = renderYoungList();
     else if (activeTab === 'herd') html = renderHerdList();
     else if (activeTab === 'others') html = renderOthersList();
+    else if (activeTab === 'retired') html = renderRetiredList();
     else if (activeTab === 'calc') html = renderCalculator();
     else html = renderStallionsList();
     app.innerHTML = html;
@@ -337,6 +338,7 @@
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
         '<button class="tab-btn' + (activeTab === 'young' ? ' active' : '') + '" data-action="show-tab" data-tab="young">Colts &amp; Fillies</button>' +
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
+        '<button class="tab-btn' + (activeTab === 'retired' ? ' active' : '') + '" data-action="show-tab" data-tab="retired">Retired</button>' +
         '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
@@ -347,7 +349,7 @@
     var info = state.horseInfo[selectedPassportLife];
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
-    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : '← Back to search') + '</button>';
+    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : activeTab === 'retired' ? '← Back to retired' : '← Back to search') + '</button>';
     html += goalStripHtml(selectedPassportLife);
     html += '<div class="detail-head"><div class="name-row">' +
       (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
@@ -426,6 +428,7 @@
       .filter(function (h) {
         if (h.sex !== 'stallion' && h.sex !== 'mare') return false;
         if ((h.ownerName || '').trim().toLowerCase() !== myName) return false;
+        if (movedOut(h.lifeNumber)) return false;
         return L.isYoungInfo(h);
       })
       .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
@@ -532,13 +535,14 @@
     if (importingBreeding) html += renderImportForm(null);
     if (addingStallion) html += renderStallionForm();
 
-    if (ownedStallions.length === 0 && !addingStallion) {
+    var shownStallions = ownedStallions.filter(function (s) { return !movedOut(s.lifeNumber); });
+    if (shownStallions.length === 0 && !addingStallion) {
       html += '<div class="empty"><h3>No stallions yet</h3>' +
         '<p>Browse to your bank page or a stallion\'s offspring page on Horse Reality and they\'ll appear here automatically — or add one by hand.</p>' +
         '<button class="btn btn-primary" data-action="toggle-add-stallion">+ Add Stallion</button></div>';
-    } else if (ownedStallions.length) {
+    } else if (shownStallions.length) {
       html += '<div class="stallion-grid">';
-      ownedStallions.forEach(function (s) {
+      shownStallions.forEach(function (s) {
         var a = aggregates[s.id] || { count: 0, totals: {} };
         var pubFee = L.feeObj(s, 'Public'), privFee = L.feeObj(s, 'Private');
         html += '<div class="card stallion-card' + goalClass(s.lifeNumber) + '" data-action="open-stallion" data-id="' + s.id + '">' +
@@ -938,7 +942,7 @@
       return html;
     }
 
-    var horses = L.ownedHorses(state);
+    var horses = L.ownedHorses(state).filter(function (h) { return !movedOut(h.lifeNumber); });
     if (!horses.length) {
       html += '<div class="empty"><h3>No horses of yours cached yet</h3>' +
         '<p>Open your own horses\' pages on Horse Reality — each one you visit is added here automatically once the page shows "' + L.esc(myName) + '" as its owner.</p></div>';
@@ -983,12 +987,63 @@
     return html;
   }
 
+  // ---------- Retired / Sold: horses that leave the working lists ----------
+  // A horse's status can be set on its herd row/page (horseMeta.status) or, for
+  // a stallion, on the Stallions tab (record status). Either one counts. Retired
+  // horses move to the Retired tab; Sold horses move to Other Horses. Nothing is
+  // deleted - setting the status back to Active returns the horse.
+  function lifeStatus(life) {
+    var m = state.horseMeta && state.horseMeta[life];
+    if (m && m.status && m.status !== 'Active') return m.status;
+    var s = state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(life); });
+    if (s && s.status && s.status !== 'Active') return s.status;
+    return 'Active';
+  }
+  function movedOut(life) {
+    if (!life) return false;
+    var st = lifeStatus(life);
+    return st === 'Retired' || st === 'Sold';
+  }
+  function setLifeStatus(life, status) {
+    if (!life) return;
+    state.horseMeta[life] = Object.assign({}, state.horseMeta[life], { status: status });
+    var s = state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(life); });
+    if (s) s.status = (status === 'Sold' || status === 'Retired') ? status : 'Active';
+    persist();
+  }
+  // every horse the ledger knows with this status, as { lifeNumber, info, meta }
+  function horsesWithStatus(status) {
+    var lives = {};
+    Object.keys(state.horseMeta || {}).forEach(function (l) { lives[l] = true; });
+    state.stallions.forEach(function (s) { if (s.lifeNumber && s.owned !== false) lives[s.lifeNumber] = true; });
+    return Object.keys(lives).filter(function (l) { return lifeStatus(l) === status; }).map(function (l) {
+      var s = state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(l); });
+      var info = state.horseInfo[l] || { lifeNumber: l, name: s ? s.name : '#' + l, breed: s ? s.breed : '', sex: s ? 'stallion' : '', imageUrl: s ? s.imageUrl : '' };
+      var meta = L.herdMeta(state, l);
+      meta.status = status;
+      return { lifeNumber: l, info: info, meta: meta };
+    }).sort(function (a, b) { return String(a.info.name || '').localeCompare(String(b.info.name || '')); });
+  }
+  function renderRetiredList() {
+    var html = topHeaderHtml();
+    var horses = horsesWithStatus('Retired');
+    html += '<div class="section-head"><h2>Retired</h2></div>';
+    if (!horses.length) {
+      return html + '<div class="empty"><h3>No retired horses</h3><p>Set a horse\'s Status to Retired (on My Herd, its page, or a stallion\'s Stallions card) and it moves here. Set it back to Active to return it.</p></div>';
+    }
+    return html + herdListHtml(horses);
+  }
+
   // ---------- Other Horses ----------
   // Horses added from the on-page prompt that someone else owns. They stay
   // out of My Herd; the search box above also finds them.
   function renderOthersList() {
     var html = topHeaderHtml();
-    var horses = L.trackedOtherHorses(state);
+    var soldHorses = horsesWithStatus('Sold');
+    var soldLives = {};
+    soldHorses.forEach(function (h) { soldLives[h.lifeNumber] = true; });
+    var horses = L.trackedOtherHorses(state).filter(function (h) { return !soldLives[h.lifeNumber]; })
+      .concat(soldHorses.map(function (h) { return Object.assign({ lifeNumber: h.lifeNumber }, h.info, { sold: true }); }));
     html += '<div class="section-head"><h2>Other Horses</h2></div>';
     if (!horses.length) {
       return html + '<div class="empty"><h3>No other horses yet</h3><p>Open a horse that isn\'t yours on Horse Reality and choose "Add to ledger" in the box that appears.</p></div>';
@@ -1000,9 +1055,9 @@
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
         '<div>' + goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div></div>' +
-        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span></div>' +
+        '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + (info.sold ? ' <span class="tag">Sold</span>' : '') + '</span></div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
-        '<div><button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button></div>' +
+        '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
       '</div>';
     });
     return html + '</div>';
@@ -1749,6 +1804,7 @@
       else if (action === 'open-passport') { selectedPassportLife = t.getAttribute('data-life'); selectedId = null; selectedMareKey = null; render(); }
       else if (action === 'close-passport') { selectedPassportLife = null; render(); }
       else if (action === 'clear-search') { horseSearchQuery = ''; render(); }
+      else if (action === 'restore-horse') { setLifeStatus(t.getAttribute('data-life'), 'Active'); }
       else if (action === 'untrack-horse') { setHorseMeta(t.getAttribute('data-life'), { tracked: false }); }
       else if (action === 'toggle-archive') { showArchive = !showArchive; render(); }
       else if (action === 'nav-stallion') {
@@ -1928,6 +1984,10 @@
       else if (action === 'update-stallion-status') {
         var sid3 = t.getAttribute('data-id');
         var newStatus = t.value;
+        var stRec = state.stallions.find(function (x) { return x.id === sid3; });
+        if (stRec && stRec.lifeNumber) {
+          state.horseMeta[stRec.lifeNumber] = Object.assign({}, state.horseMeta[stRec.lifeNumber], { status: newStatus === 'Sold' || newStatus === 'Retired' ? newStatus : 'Active' });
+        }
         updateStallionRec(sid3, { status: newStatus });
         if (newStatus === 'Retired' && state.settings.autoDeleteRetired) {
           deleteStallionRec(sid3);
@@ -1938,7 +1998,7 @@
       else if (action === 'calc-stallion') { calcStallion = t.value; render(); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }
-      else if (action === 'herd-status') { setHorseMeta(t.getAttribute('data-life'), { status: t.value }); }
+      else if (action === 'herd-status') { setLifeStatus(t.getAttribute('data-life'), t.value); }
       else if (action === 'herd-scores') { setHorseMeta(t.getAttribute('data-life'), { confScores: parseScores(t.value) }); }
       else if (action === 'herd-role') { setHorseMeta(t.getAttribute('data-life'), { role: t.value }); }
       else if (action === 'herd-project') { setHorseMeta(t.getAttribute('data-life'), { project: t.value.trim() }); }

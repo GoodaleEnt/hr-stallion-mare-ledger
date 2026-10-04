@@ -593,6 +593,11 @@
     var activeMares = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber); });
     var stallionTally = goalTally(activeStallions.map(function (s) { return s.lifeNumber; }));
     var mareTally = goalTally(activeMares.map(function (m) { return m.mareLifeNumber; }));
+    var youngNow = getYoungHorses();
+    var activeColts = youngNow.filter(function (h) { return h.sex === 'stallion'; });
+    var activeFillies = youngNow.filter(function (h) { return h.sex === 'mare'; });
+    var coltTally = goalTally(activeColts.map(function (h) { return h.lifeNumber; }));
+    var fillyTally = goalTally(activeFillies.map(function (h) { return h.lifeNumber; }));
 
     var html = topHeaderHtml();
     html += renderDebugPanel();
@@ -600,6 +605,8 @@
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + activeStallions.length + '</div><div class="label">Active stallions</div>' + goalTallyHtml(stallionTally) + '</div>' +
       '<div class="stat-tile"><div class="num mono">' + activeMares.length + '</div><div class="label">Active mares</div>' + goalTallyHtml(mareTally) + '</div>' +
+      '<div class="stat-tile"><div class="num mono">' + activeColts.length + '</div><div class="label">Active colts</div>' + goalTallyHtml(coltTally) + '</div>' +
+      '<div class="stat-tile"><div class="num mono">' + activeFillies.length + '</div><div class="label">Active fillies</div>' + goalTallyHtml(fillyTally) + '</div>' +
       '<div class="stat-tile"><div class="num mono">' + uniqueMareCount + '</div><div class="label">Mares bred (all)</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + totalBreedings + '</div><div class="label">Breedings logged</div></div>' +
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
@@ -891,8 +898,8 @@
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + young.length + '</div><div class="label">Under 3yo</div></div>' +
-      '<div class="stat-tile"><div class="num mono">' + colts.length + '</div><div class="label">Colts</div></div>' +
-      '<div class="stat-tile"><div class="num mono">' + fillies.length + '</div><div class="label">Fillies</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + colts.length + '</div><div class="label">Active colts</div>' + goalTallyHtml(goalTally(colts.map(function (h) { return h.lifeNumber; }))) + '</div>' +
+      '<div class="stat-tile"><div class="num mono">' + fillies.length + '</div><div class="label">Active fillies</div>' + goalTallyHtml(goalTally(fillies.map(function (h) { return h.lifeNumber; }))) + '</div>' +
       '</div>';
 
     html += '<div class="section-head"><h2>Colts &amp; Fillies</h2></div>';

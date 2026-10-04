@@ -1223,6 +1223,7 @@
     });
   }
   setupBreedCapture();
+  setupLedgerTabClicks();
   setTimeout(confirmPendingCoverings, 2500);
 
   // The horse page's "Health" box lists five health traits and, once tested,
@@ -1273,12 +1274,42 @@
 
   // An "Open in Ledger" tab on every horse page. Where the page has Horse Reality's own
   // side tabs (<hr-tab-container sideways="true"> with <hr-tab> items like Dam / Foal) it is
-  // added to them as one more tab; on every other horse page it is drawn as a vertical tab
+  // added to them as one more tab; on a horse without them the same tab strip is created in
+  // the same place. Only if the site never draws it is a plain vertical tab used instead,
   // on the right edge of the screen. On desktop it asks the extension to open (or focus)
   // the dashboard on this horse's profile; on mobile it opens the on-page overlay.
   var LEDGER_BTN_ID = 'hr-ledger-open-btn';
   var LEDGER_TAB_ID = 'hr-ledger-open-tab';
+  var LEDGER_HASH = '#hr-ledger-open';
   var tabHiddenTicks = 0, tabModeFailed = false;
+  // A click anywhere inside a tab strip whose path contains our tab, or a visible tab labelled
+  // "Ledger" (the strip's own copy, which is drawn inside its shadow root), opens the ledger.
+  function setupLedgerTabClicks() {
+    document.addEventListener('click', function (e) {
+      var path = e.composedPath ? e.composedPath() : [];
+      var inStrip = false, hit = false;
+      path.forEach(function (n) {
+        if (!n || n.nodeType !== 1) return;
+        if (n.tagName === 'HR-TAB-CONTAINER') inStrip = true;
+        if (n.id === LEDGER_TAB_ID) hit = true;
+        else if (n.children && n.children.length === 0 && (n.textContent || '').trim() === 'Ledger') hit = true;
+      });
+      if (!inStrip || !hit) return;
+      var id = parseHorseIdFromUrl();
+      if (!id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openInLedger(id);
+    }, true);
+    window.addEventListener('hashchange', checkLedgerHash);
+    checkLedgerHash();
+  }
+  function checkLedgerHash() {
+    if (location.hash !== LEDGER_HASH) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    var id = parseHorseIdFromUrl();
+    if (id) openInLedger(id);
+  }
   function findSideTabs(root) {
     var list = root.querySelectorAll('hr-tab-container');
     for (var i = 0; i < list.length; i++) {
@@ -1304,8 +1335,30 @@
   function removeLedgerTab() {
     document.querySelectorAll('#' + LEDGER_TAB_ID).forEach(function (el) { el.remove(); });
   }
+  // Horses with no Dam / Foal tabs: build the same vertical tab strip the site uses. It goes
+  // right after the horse's info block and takes that block's own Svelte class, so the
+  // site's stylesheet places it exactly where the Dam / Foal tabs normally appear.
+  var LEDGER_STRIP_ID = 'hr-ledger-tabs';
+  function createSideTabs() {
+    var info = document.querySelector('div.horse-info');
+    var parent = info && info.parentElement;
+    if (!parent) return null;
+    var svelte = (String(parent.className).match(/svelte-[a-z0-9]+/) || [''])[0];
+    var strip = document.createElement('hr-tab-container');
+    strip.id = LEDGER_STRIP_ID;
+    if (svelte) strip.className = svelte;
+    strip.setAttribute('size', 'small');
+    strip.setAttribute('sideways', 'true');
+    info.insertAdjacentElement('afterend', strip);
+    return strip;
+  }
+  function removeLedgerStrip() {
+    var own = document.getElementById(LEDGER_STRIP_ID);
+    if (own) own.remove();
+  }
   function removeLedgerButton() {
     removeLedgerTab();
+    removeLedgerStrip();
     document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
   }
   function injectLedgerButton() {
@@ -1313,26 +1366,30 @@
     if (!life) { removeLedgerButton(); return; }
 
     // 1) one more tab among the site's own side tabs
-    var tabs = tabModeFailed ? null : findSideTabs(document);
+    var tabs = tabModeFailed ? null : (findSideTabs(document) || createSideTabs());
     if (tabs) {
       var mine = tabs.querySelector('#' + LEDGER_TAB_ID);
       if (mine && mine.getAttribute('data-life') === life) {
         // if the site never draws a tab we add, give up on this placement and use the edge tab
         var box = mine.getBoundingClientRect();
         if (box.width === 0 && box.height === 0) {
-          if (++tabHiddenTicks >= 3) { tabModeFailed = true; mine.remove(); }
+          if (++tabHiddenTicks >= 3) { tabModeFailed = true; mine.remove(); removeLedgerStrip(); }
         } else {
           tabHiddenTicks = 0;
         }
         if (!tabModeFailed) return;
       } else if (!tabModeFailed) {
-        removeLedgerButton();
+        removeLedgerTab();
         var tab = document.createElement('hr-tab');
         tab.id = LEDGER_TAB_ID;
         tab.setAttribute('text', 'Ledger');
         tab.setAttribute('title', 'Open this horse in HR Stallion & Mare Ledger');
         tab.setAttribute('data-life', life);
-        // handled here so the site's tab logic never sees the click
+        // The site's tab strip draws its own visible tabs from these <hr-tab> items, so a click
+        // lands on the strip, not on this element. Two ways to catch it: the document-level click
+        // listener below (it recognises the Ledger tab in the click's path), and, if the site
+        // "navigates" instead, this marker URL on the same page (see checkLedgerHash).
+        tab.setAttribute('href', location.origin + location.pathname + location.search + LEDGER_HASH);
         tab.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
@@ -1344,6 +1401,7 @@
       }
     } else {
       removeLedgerTab();
+      removeLedgerStrip();
     }
 
     // 2) our own vertical tab on the right edge of the screen

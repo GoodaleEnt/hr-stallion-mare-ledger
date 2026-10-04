@@ -905,7 +905,7 @@
     var life = L.esc(h.lifeNumber);
     var pic = horsePictureUrl(h.lifeNumber);
     return '<div class="herd-row' + goalClass(h.lifeNumber) + '">' +
-      '<div>' + goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div></div>' +
+      goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
       '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span></div>' +
       '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
@@ -1075,7 +1075,7 @@
       var pic = horsePictureUrl(info.lifeNumber);
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
-        '<div>' + goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div></div>' +
+        goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
         '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + (info.sold ? ' <span class="tag">Sold</span>' : '') + '</span></div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +

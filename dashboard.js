@@ -1586,7 +1586,7 @@
       return '<div class="field"><label for="goal-' + key + '">' + label + '</label><select id="goal-' + key + '" data-action="update-goal" data-field="' + key + '" style="width:100%;">' +
         options.map(function (o) { return '<option value="' + o[0] + '"' + (String(g[key] == null ? '' : g[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
     }
-    return '<details class="goals-panel"' + (goalsOpen || any ? ' open' : '') + '><summary>Highlight goals' +
+    return '<details class="goals-panel"' + (goalsOpen ? ' open' : '') + '><summary>Highlight goals' +
       (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
       '<p class="notes-line" style="margin:6px 0 0;">Each horse shows five boxes above its picture (Conformation, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
       '<div class="goals-grid">' +
@@ -2116,6 +2116,11 @@
         render();
       }
     };
+
+    // <details> toggle events don't bubble, so listen in the capture phase.
+    app.addEventListener('toggle', function (e) {
+      if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
+    }, true);
 
     app.onchange = function (e) {
       if (e.target.id === 'restore-file-input') {

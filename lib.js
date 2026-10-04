@@ -611,7 +611,7 @@
     return n;
   }
   // ---------- goals: horses worth a closer look ----------
-  // state.settings.goals = { minConf, minBT, maxG, maxA, maxBA }. A blank goal
+  // state.settings.goals = { minConf, minBT, maxVG, maxGP, maxG, maxA, maxBA }. A blank goal
   // is ignored. Each horse gets three sections - top conformation, Breed Total
   // and conformation traits - each 'ok' (meets the goal), 'bad' (doesn't) or
   // 'na' (no goal set, or no data yet). A horse is highlighted overall when it
@@ -619,15 +619,20 @@
   function goalsOf(state) {
     var g = (state && state.settings && state.settings.goals) || {};
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
-    return { minConf: num(g.minConf), minBT: num(g.minBT), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
+    return { minConf: num(g.minConf), minBT: num(g.minBT), maxVG: num(g.maxVG), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
     if (!t) return null;
-    var c = { G: 0, A: 0, BA: 0 };
+    // Ratings: Very good (VG), Good+ (G+), Good (G), Average (A), Below average (BA).
+    var c = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 };
     Object.keys(t).forEach(function (k) {
-      var r = String(t[k]).toLowerCase();
-      if (r.indexOf('below') === 0) c.BA++; else if (r === 'good') c.G++; else if (r === 'average') c.A++;
+      var r = String(t[k]).toLowerCase().trim();
+      if (r.indexOf('below') === 0 || r === 'ba') c.BA++;
+      else if (r.indexOf('very good') === 0 || r === 'vg') c.VG++;
+      else if (r.indexOf('good') === 0 && r.indexOf('+') > -1) c.GP++;
+      else if (r.indexOf('good') === 0 || r === 'g') c.G++;
+      else if (r.indexOf('average') === 0 || r === 'a') c.A++;
     });
     return c;
   }
@@ -645,7 +650,7 @@
     }
     var counts = traitCounts(info);
     var traits = { label: 'Conformation traits', state: 'na', text: 'no goal' };
-    var limits = [['G', 'Good', g.maxG], ['A', 'Avg', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
+    var limits = [['VG', 'VG', g.maxVG], ['GP', 'G+', g.maxGP], ['G', 'G', g.maxG], ['A', 'A', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
     if (limits.length) {
       if (!counts) {
         traits.text = 'no data yet';

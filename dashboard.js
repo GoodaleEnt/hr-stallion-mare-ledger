@@ -1420,9 +1420,11 @@
       '<div class="goals-grid">' +
         field('Min top conformation', 'minConf', 'any') +
         field('Min Breed Total (BT)', 'minBT', 'any') +
-        field('Max Good traits', 'maxG', '1') +
-        field('Max Average traits', 'maxA', '1') +
-        field('Max Below-average (BA) traits', 'maxBA', '1') +
+        field('Max VG traits (Very good)', 'maxVG', '1') +
+        field('Max G+ traits (Good+)', 'maxGP', '1') +
+        field('Max G traits (Good)', 'maxG', '1') +
+        field('Max A traits (Average)', 'maxA', '1') +
+        field('Max BA traits (Below average)', 'maxBA', '1') +
       '</div></details>';
   }
 

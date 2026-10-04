@@ -1215,10 +1215,12 @@
         var st = HRLib.mareBreedStatus(state, opt.value);
         var label = st.status === 'pregnant' ? '  \u2014  \u2665 IN FOAL' + (st.due ? ' (' + st.due.replace(/^Due /, 'due ') + ')' : '')
           : st.status === 'covered' ? '  \u2014  \u2714 COVERED' + (st.stallion ? ' by ' + st.stallion : '') : '';
+        var misses = st.status ? HRLib.goalMisses(state, opt.value) : [];
+        if (misses.length) label += '  \u2014  \u26a0 BELOW GOALS (' + misses.join(', ') + ')';
         var text = base + label;
         if (opt.textContent !== text) opt.textContent = text;
         opt.style.fontWeight = label ? '700' : '';
-        opt.style.color = st.status === 'pregnant' ? '#b0407a' : st.status === 'covered' ? '#a06a00' : '';
+        opt.style.color = misses.length ? '#b3261e' : st.status === 'pregnant' ? '#b0407a' : st.status === 'covered' ? '#a06a00' : '';
       }
     });
   }

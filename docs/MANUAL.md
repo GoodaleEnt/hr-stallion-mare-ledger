@@ -195,7 +195,7 @@ A mare's foals are picked up three ways: from the **Offspring** tab of one of yo
 
 ## Covered and in-foal mares
 
-A mare's card on **My Mares** shows where she stands: an amber outline and a **✔ Covered** ribbon (with the date) while a covering has been recorded in the last 7 days and has no result yet, and a pink outline with a **♥ In foal** ribbon (with her due date when known) once she is pregnant. The same labels appear as a tag on her own page and in the Status column on Analytics. On Horse Reality's **Breed** page, the mare dropdown also marks them: *♥ IN FOAL (due …)* and *✔ COVERED by …* next to the mare's name, so you can see at a glance who is already bred. Mares with no label are free to breed.
+A mare's card on **My Mares** shows where she stands: an amber outline and a **✔ Covered** ribbon (with the date) while a covering has been recorded in the last 7 days and has no result yet, and a pink outline with a **♥ In foal** ribbon (with her due date when known) once she is pregnant. The same labels appear as a tag on her own page and in the Status column on Analytics. On Horse Reality's **Breed** page, the mare dropdown also marks them: *♥ IN FOAL (due …)* and *✔ COVERED by …* next to the mare's name, so you can see at a glance who is already bred. Mares with no label are free to breed. If you have set **Highlight goals** and a covered or in-foal mare clearly misses one of them (one of her goal boxes is red), her card gets a **red outline** and a **⚠ below goals** note on the ribbon (hover it to see which goal), and the Breed page dropdown adds “⚠ BELOW GOALS (…)” in red. Goals with no data yet are not counted as misses, so open the mare's page once to fill them in.
 
 ## Breeding dates
 

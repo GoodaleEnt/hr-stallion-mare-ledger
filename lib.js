@@ -715,6 +715,14 @@
       sections: s
     };
   }
+  // The goal boxes a horse clearly misses (the red ones). A box with no data yet is not counted as a miss.
+  function goalMisses(state, life) {
+    var c = goalCheck(state, life);
+    if (!c.active) return [];
+    var s = c.sections;
+    return [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.state === 'bad' && !x.skip; }).map(function (x) { return x.label; });
+  }
+
   // ---------- where a mare stands: covered, or in foal ----------
   // 'pregnant' = her page says she is pregnant, or a breeding of hers succeeded and no foal has been
   // recorded for it yet. 'covered' = a covering within the last 7 days that has no result yet (Horse
@@ -1150,6 +1158,7 @@
     isSoldLife: isSoldLife,
     applyStudFee: applyStudFee,
     mareBreedStatus: mareBreedStatus,
+    goalMisses: goalMisses,
     recordFoalsFromList: recordFoalsFromList,
     recordFoalFromHorse: recordFoalFromHorse,
     foalLifeOf: foalLifeOf,

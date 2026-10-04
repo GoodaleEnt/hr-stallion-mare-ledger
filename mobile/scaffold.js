@@ -170,6 +170,8 @@
     '.stallion-card.for-sale{ background-size:contain; background-position:center 92%; }',
     '.stallion-card.mare-covered{ border-color:#d9a21b; box-shadow:0 0 0 2px rgba(217,162,27,.35), var(--shadow); }',
     '.stallion-card.mare-pregnant{ border-color:#c8588f; box-shadow:0 0 0 2px rgba(200,88,143,.35), var(--shadow); }',
+    '.stallion-card.mare-below{ border-color:#b3382c; box-shadow:0 0 0 3px rgba(179,56,44,.4), var(--shadow); }',
+    '.stallion-card.mare-below .mare-ribbon{ border-color:#b3382c; }',
     '.mare-ribbon.covered{ position:static; display:block; text-align:center; margin:0 0 8px; border-radius:8px; padding:4px 8px; background:#f6e4a8; color:#6b4f00; border:1px solid #d9a21b; font-weight:700; z-index:2; }',
     '.mare-ribbon.pregnant{ position:static; display:block; text-align:center; margin:0 0 8px; border-radius:8px; padding:4px 8px; background:#f6dbe9; color:#8a2a5c; border:1px solid #c8588f; font-weight:700; z-index:2; }',
     '.goal-hit{ outline:2px solid var(--accent-2); outline-offset:-2px; }',

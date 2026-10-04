@@ -726,12 +726,14 @@
   }
 
   // corner ribbon and note on a mare's card: covered (waiting for the result) or in foal
-  function mareBreedBadgeHtml(st) {
+  function mareBreedBadgeHtml(st, misses) {
     if (!st || !st.status) return '';
+    var below = misses && misses.length ? ' \u00b7 \u26a0 below goals' : '';
+    var belowTip = misses && misses.length ? ' \u2014 misses your goals: ' + misses.join(', ') : '';
     if (st.status === 'pregnant') {
-      return '<span class="pill corner-badge mare-ribbon pregnant" title="' + L.esc('In foal' + (st.stallion ? ' to ' + st.stallion : '') + (st.due ? ' \u2014 ' + st.due : '')) + '">\u2665 In foal' + (st.due ? ' \u00b7 ' + L.esc(st.due.replace(/^Due /, 'due ')) : '') + '</span>';
+      return '<span class="pill corner-badge mare-ribbon pregnant" title="' + L.esc('In foal' + (st.stallion ? ' to ' + st.stallion : '') + (st.due ? ' \u2014 ' + st.due : '') + belowTip) + '">\u2665 In foal' + (st.due ? ' \u00b7 ' + L.esc(st.due.replace(/^Due /, 'due ')) : '') + below + '</span>';
     }
-    return '<span class="pill corner-badge mare-ribbon covered" title="' + L.esc('Covered' + (st.stallion ? ' by ' + st.stallion : '') + (st.date ? ' on ' + L.fmtDate(st.date) : '') + ' \u2014 waiting for the result') + '">\u2714 Covered' + (st.date ? ' \u00b7 ' + L.esc(L.fmtDate(st.date)) : '') + '</span>';
+    return '<span class="pill corner-badge mare-ribbon covered" title="' + L.esc('Covered' + (st.stallion ? ' by ' + st.stallion : '') + (st.date ? ' on ' + L.fmtDate(st.date) : '') + ' \u2014 waiting for the result' + belowTip) + '">\u2714 Covered' + (st.date ? ' \u00b7 ' + L.esc(L.fmtDate(st.date)) : '') + below + '</span>';
   }
   function renderMaresList() {
     var html = topHeaderHtml();
@@ -762,8 +764,9 @@
       maresIndex.forEach(function (m) {
         var mareInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
         var breedSt = L.mareBreedStatus(state, m.mareLifeNumber);
-        html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
-          mareBreedBadgeHtml(breedSt) +
+        var breedMisses = breedSt.status ? L.goalMisses(state, m.mareLifeNumber) : [];
+        html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + (breedMisses.length ? ' mare-below' : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+          mareBreedBadgeHtml(breedSt, breedMisses) +
           goalStripHtml(m.mareLifeNumber) +
           (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +

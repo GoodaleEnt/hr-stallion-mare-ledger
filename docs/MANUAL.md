@@ -150,6 +150,17 @@ Fertility can only be tested from age 3, so for a horse younger than that the Fe
 
 Every horse card, herd row and horse page then shows five labelled boxes above its picture: **Conformation**, **Breed Total**, **Conformation traits**, **Health** and **Fertility**. A box is green if the horse meets that goal, red if it doesn't, and grey if there's no goal set or no data yet. A horse that meets every goal you set is outlined. A **Health** box turns **gold** when more than 3 of the 5 health traits are Excellent, and the **Fertility** box turns gold when fertility is Excellent, whatever your goals say. On a horse's page, each Excellent rating is gold too. Each horse's own page lists its health and fertility ratings once it has had a vet health check (and, for an adult, a fertility test); they are read from the horse's page on Horse Reality. Trait limits are "at or under": a maximum of 2 BA traits accepts horses with 0, 1 or 2.
 
+## Handy extras
+
+- **Filter box:** every list tab (Stallions, My Mares, Colts & Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
+- **Needs attention:** the Stallions tab opens with a short strip of what needs doing (covering results waiting, idle stallions, mares not in foal, horses whose data is over 30 days old). **See all in Analytics** has the rest.
+- **Open in Foal Calculator:** pairing ideas on Analytics and the stallions on a mare's Breeding suggestions page have a button that opens the Foal Calculator with both parents already chosen.
+- **Max stud fee:** the Foal Calculator suggestions have a "Max stud fee (HRC)" box that hides other players' stallions that cost more.
+- **Breeding plan:** in the Foal Calculator, add the chosen pairing to your plan and tick it off when it's done.
+- **Foal results vs. the parents:** Analytics compares each foal's score with its parents' average top conformation.
+- **Mark For Sale:** each Sell ideas row has a button that sets the horse's status to For Sale.
+- **Backup reminder:** if you haven't exported a backup for 30 days, a bar at the top offers to export one (or to remind you in a week).
+
 ## Removing a horse
 
 Every horse page (stallion, mare, or any other horse) has a **Remove from ledger** button. After you confirm, it deletes everything saved about that horse: its page data and tags, its stallion record with the breedings under him, the breedings where she is the mare, and any foal row for it. The ledger then stops saving that horse when you visit its page. To undo it, open **Other Horses → Removed horses** and click **Allow again**; the horse is saved again the next time you open its page. Export a backup first if you are unsure, because a removal cannot be undone.

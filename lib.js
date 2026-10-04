@@ -1241,6 +1241,11 @@
       if (isSoldLife(state, cl) || cm.status === 'Retired' || cm.status === 'Deceased') return;
       if (ci.geneticPotential == null || info.geneticPotential == null) return;
       if (!isMare && mareBreedStatus(state, cl).status) return;
+      var maxFee = parseFloat(state.settings && state.settings.calcMaxFee);
+      if (isMare && maxFee > 0 && !(!!myName && String(ci.ownerName || '').trim().toLowerCase() === myName)) {
+        var tm = studTermsOf(state, cl);
+        if (tm && (tm.currency || 'HRC') === 'HRC' && tm.fee > maxFee) return;
+      }
       var cConf = bestConformation(cm).best;
       var gp = (Number(info.geneticPotential) + Number(ci.geneticPotential)) / 2;
       var confs = [myConf, cConf].filter(function (x) { return x > 0; });
@@ -1279,6 +1284,35 @@
     out.mine = list.filter(function (x) { return x.mine; }).slice(0, limit || 10);
     out.other = list.filter(function (x) { return !x.mine; }).slice(0, limit || 10);
     return out;
+  }
+
+  // ---------- foal results vs. what the parents predicted ----------
+  // A foal's score (out of 100) against the average top conformation score of its two parents, for foals whose
+  // parents both have a saved show score. Positive = the foal scored above its parents' average.
+  function foalAccuracy(state) {
+    var rows = [];
+    (state.stallions || []).forEach(function (s) {
+      if (!s.lifeNumber) return;
+      var sConf = bestConformation((state.horseMeta && state.horseMeta[s.lifeNumber]) || {}).best;
+      (state.breedings[s.id] || []).forEach(function (b) {
+        if (b.status !== 'Foal Born' || !(b.foalScore > 0 && b.foalScore <= 100)) return;
+        var mConf = bestConformation((state.horseMeta && state.horseMeta[b.mareLifeNumber]) || {}).best;
+        if (!(sConf > 0 && mConf > 0)) return;
+        var avg = (sConf + mConf) / 2;
+        rows.push({ foal: b.foalName || 'Foal', mare: b.mareName || '', stallion: s.name, date: b.dateBorn || b.date || '', score: b.foalScore, parentsAvg: Math.round(avg * 10) / 10, diff: Math.round((b.foalScore - avg) * 10) / 10 });
+      });
+    });
+    rows.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    var n = rows.length;
+    var sum = rows.reduce(function (t, r) { return t + r.diff; }, 0);
+    return { count: n, avgDiff: n ? Math.round(sum / n * 10) / 10 : null, above: rows.filter(function (r) { return r.diff >= 0; }).length, rows: rows.slice(0, 8) };
+  }
+  // Owned horses whose saved page data is older than 30 days (open their page to refresh it).
+  function staleOwned(state) {
+    var cutoff = Date.now() - 30 * 86400000;
+    return ownedHorses(state).filter(function (h) {
+      return !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.info.capturedAt && h.info.capturedAt < cutoff;
+    }).map(function (h) { return h.info.name || ('#' + h.lifeNumber); });
   }
 
   // ---------- sell ideas: which horses to sell, and what to ask ----------
@@ -1584,7 +1618,7 @@
         }
         var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi;
         pairs.push({
-          mare: m.name, stallion: s.name, gp: Math.round(gp * 10) / 10,
+          mare: m.name, stallion: s.name, mareLife: m.life, stallionLife: s.lifeNumber, gp: Math.round(gp * 10) / 10,
           conf: conf != null ? Math.round(conf * 10) / 10 : null,
           estBT: estBT != null ? Math.round(estBT * 10) / 10 : null,
           coi: Math.round(coi * 100) / 100, shared: shared, fixes: fixes,
@@ -1640,6 +1674,8 @@
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
+    foalAccuracy: foalAccuracy,
+    staleOwned: staleOwned,
     sellFormOf: sellFormOf,
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,

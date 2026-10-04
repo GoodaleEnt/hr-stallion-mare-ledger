@@ -24,6 +24,7 @@
   var suggestLife = null;
   var calcMare = '';
   var calcStallion = '';
+  var listFilterText = '';
   var UI_KEY = 'hrLedgerUi';
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
@@ -181,6 +182,8 @@
   // so the wrong move (a new folder, or clicking Remove) can wipe it.
   // This lets a player save/restore the whole ledger regardless.
   function exportBackup() {
+    state.settings.lastBackupAt = Date.now();
+    HRStorage.setState(state, function () {});
     var json = JSON.stringify(state, null, 2);
     var blob = new Blob([json], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
@@ -237,6 +240,7 @@
       app.appendChild(wrap.firstElementChild);
     }
     wireEvents();
+    applyListFilter();
   }
 
   function renderConfirm() {
@@ -348,6 +352,7 @@
       html += '</div>';
     }
 
+    html += backupReminderHtml();
     html += goalsPanelHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
@@ -359,7 +364,43 @@
         '<button class="tab-btn' + (activeTab === 'analytics' ? ' active' : '') + '" data-action="show-tab" data-tab="analytics">Analytics</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
+    if (['stallions', 'mares', 'young', 'herd', 'retired', 'others'].indexOf(activeTab) > -1) {
+      html += '<div style="margin:-6px 0 16px;"><input id="list-filter" type="search" data-action="list-filter" placeholder="Filter this list by name, breed or status\u2026" value="' + L.esc(listFilterText) + '" style="width:100%;max-width:380px;"></div>';
+    }
     return html;
+  }
+  // Reminder to export a backup: the ledger lives only in this browser.
+  function backupReminderHtml() {
+    var s = state.settings || {};
+    var hasData = (state.stallions || []).length || Object.keys(state.horseInfo || {}).length;
+    if (!hasData) return '';
+    var now = Date.now(), DAY = 86400000;
+    if (s.backupSnoozeUntil && now < s.backupSnoozeUntil) return '';
+    if (s.lastBackupAt && now - s.lastBackupAt < 30 * DAY) return '';
+    var days = s.lastBackupAt ? Math.floor((now - s.lastBackupAt) / DAY) : 0;
+    return '<div class="card" style="padding:10px 14px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-color:var(--accent-2);">' +
+      '<span style="flex:1 1 280px;">' + (s.lastBackupAt ? 'Your last backup was ' + days + ' days ago.' : 'You haven\'t saved a backup yet.') + ' Your ledger lives only in this browser, so export a copy now and then.</span>' +
+      '<button type="button" class="btn btn-sm btn-primary" data-action="export-backup">Export backup</button>' +
+      '<button type="button" class="btn btn-sm" data-action="backup-snooze">Remind me in a week</button></div>';
+  }
+  // Hide the cards / rows that don't match the filter box (the list itself is not re-drawn).
+  function applyListFilter() {
+    var q = listFilterText.trim().toLowerCase();
+    var app = document.getElementById('app');
+    if (!app) return;
+    app.querySelectorAll('.stallion-card[data-action], .herd-row').forEach(function (el) {
+      el.style.display = !q || (el.textContent || '').toLowerCase().indexOf(q) > -1 ? '' : 'none';
+    });
+  }
+  // The attention strip on the Stallions tab.
+  function attentionStripHtml() {
+    var a = L.analytics(state), items = a.tips.slice(0, 4).map(function (t) { return { level: t.level, text: t.text }; });
+    var stale = L.staleOwned(state);
+    if (stale.length) items.push({ level: 'info', text: stale.length + ' of your horses haven\'t been refreshed in 30+ days (' + stale.slice(0, 3).join(', ') + (stale.length > 3 ? ' and more' : '') + '). Open their pages on Horse Reality to update them.' });
+    if (!items.length) return '';
+    return '<details class="an-card" style="margin-bottom:16px;" open><summary style="cursor:pointer;font-weight:600;">Needs attention (' + items.length + ')</summary><div style="margin-top:8px;">' +
+      items.map(function (t) { return '<div class="an-tip ' + t.level + '">' + L.esc(t.text) + '</div>'; }).join('') +
+      '<button type="button" class="link-btn" data-action="show-tab" data-tab="analytics" style="font-size:13px;">See all in Analytics \u2192</button></div></details>';
   }
 
   function renderPassportDetail() {
@@ -566,6 +607,7 @@
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
       '</div>';
 
+    html += attentionStripHtml();
     html += '<div class="section-head"><h2>Your Stallions</h2>' +
       '<div style="display:flex;gap:8px;">' +
         '<button class="btn btn-sm" data-action="export-backup" title="Save your entire ledger as a JSON file">Export Backup</button>' +
@@ -999,7 +1041,7 @@
         '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;justify-content:space-between;">' +
           '<div><span class="tag mono">#' + (i + 1) + '</span> <button type="button" class="link-btn" style="font-size:17px;font-weight:600;" data-action="open-passport" data-life="' + L.esc(s.life) + '">' + L.esc(s.name) + '</button>' +
             (s.yours ? ' <span class="tag">Your stallion</span>' : '') + '</div>' +
-          '<div class="mono" style="font-size:15px;">' + (s.estBT != null ? 'Foal BT ~<strong>' + s.estBT + '</strong>' : 'Avg GP <strong>' + s.gp + '</strong>') + '</div>' +
+          '<div class="mono" style="font-size:15px;">' + (s.estBT != null ? 'Foal BT ~<strong>' + s.estBT + '</strong>' : 'Avg GP <strong>' + s.gp + '</strong>') + ' <button type="button" class="btn btn-sm" data-action="calc-open" data-mare="' + L.esc(life) + '" data-stallion="' + L.esc(s.life) + '">Foal Calculator</button></div>' +
         '</div>' +
         '<ul style="margin:8px 0 0 18px;padding:0;font-size:13.5px;line-height:1.55;">' + s.reasons.map(function (x) { return '<li>' + L.esc(x) + '</li>'; }).join('') + '</ul>' +
       '</div>';
@@ -1229,6 +1271,7 @@
         if (p.fixes.length) notes.push('Covers: ' + p.fixes.map(function (f) { return L.esc(f.trait) + ' (' + f.from + ' is stronger)'; }).join(', '));
         if (p.shared.length) notes.push('Watch: both Below average in ' + p.shared.map(L.esc).join(', '));
         if (p.noScore && p.estBT != null) notes.push('One parent has no show score yet, so the conformation part uses the other parent only');
+        line += ' <button type="button" class="link-btn" style="font-size:12.5px;" data-action="calc-open" data-mare="' + L.esc(p.mareLife || '') + '" data-stallion="' + L.esc(p.stallionLife || '') + '">Open in Foal Calculator \u2192</button>';
         html += '<div class="an-tip tip">' + line + (notes.length ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + notes.join(' \u00b7 ') + '</div>' : '') + '</div>';
       });
       html += '</div>';
@@ -1328,6 +1371,18 @@
     html += '</div>';
 
     html += sellIdeasHtml();
+    var fa = L.foalAccuracy(state);
+    html += '<div class="an-card" style="margin-top:18px;"><h3>Foal results vs. the parents</h3>';
+    if (!fa.count) {
+      html += '<p class="notes-line" style="margin:0;">Needs foals with a score whose two parents both have a saved show score. The foal\'s score is compared with its parents\' average top conformation.</p>';
+    } else {
+      html += '<p style="margin:0 0 8px;"><strong>' + fa.count + '</strong> foal' + (fa.count === 1 ? '' : 's') + ' compared. On average they scored <strong style="color:var(--' + (fa.avgDiff >= 0 ? 'success' : 'danger') + ');">' + (fa.avgDiff >= 0 ? '+' : '') + fa.avgDiff + '</strong> against their parents\' average, and ' + fa.above + ' of ' + fa.count + ' matched or beat it.</p>' +
+        '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Foal</th><th>Parents</th><th class="num">Foal score</th><th class="num">Parents avg</th><th class="num">Difference</th></tr></thead><tbody>' +
+        fa.rows.map(function (r) {
+          return '<tr><td>' + L.esc(r.foal) + '</td><td>' + L.esc(r.mare) + ' \u00d7 ' + L.esc(r.stallion) + '</td><td class="num mono">' + r.score + '</td><td class="num mono">' + r.parentsAvg + '</td><td class="num mono" style="color:var(--' + (r.diff >= 0 ? 'success' : 'danger') + ');">' + (r.diff >= 0 ? '+' : '') + r.diff + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    html += '</div>';
 
     // horses you have sold
     var ss = a.soldSummary;
@@ -1381,7 +1436,7 @@
       r.ideas.slice(0, 15).forEach(function (x) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button><div class="sub">' + x.kind + '</div></td>' +
           '<td>' + x.reasons.map(function (t) { return '<div>' + L.esc(t) + '</div>'; }).join('') + '</td>' +
-          '<td class="num mono">' + (x.bt ? Math.round(x.bt * 10) / 10 : '\u2014') + '</td><td>' + priceCell(x.price) + '</td></tr>';
+          '<td class="num mono">' + (x.bt ? Math.round(x.bt * 10) / 10 : '\u2014') + '</td><td>' + priceCell(x.price) + '<div style="margin-top:4px;"><button type="button" class="btn btn-sm" data-action="mark-sale" data-life="' + L.esc(x.life) + '">Mark For Sale</button></div></td></tr>';
       });
       html += '</tbody></table></div>';
       if (r.ideas.length > 15) html += '<p class="notes-line" style="margin:6px 0 0;">Showing the 15 strongest of ' + r.ideas.length + '.</p>';
@@ -1526,8 +1581,29 @@
       box('sugg', 'Suggestions', f.sugg, other ? 'Only the ' + sex + 's suggested for the horse picked on the other side' : 'Pick a ' + (sex === 'mare' ? 'stallion' : 'mare') + ' first') + '</div>' +
       (f.sugg && !calcSuggestedSet(sex) ? '<div class="notes-line" style="margin:0 0 6px;">Pick a ' + (sex === 'mare' ? 'stallion' : 'mare') + ' first and this shows the ' + sex + 's suggested for it.</div>' : '');
   }
+  // The breeding plan: pairings you have decided on, ticked off when done.
+  function calcPlanHtml() {
+    var plan = (state.settings && state.settings.plan) || [];
+    var both = calcMare && calcStallion && state.horseInfo[calcMare] && state.horseInfo[calcStallion];
+    var already = plan.some(function (p) { return p.mare === calcMare && p.stallion === calcStallion; });
+    var name = function (l) { return (state.horseInfo[l] && state.horseInfo[l].name) || ('#' + l); };
+    var html = '<details class="an-card" style="margin-bottom:14px;"' + (plan.length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:600;">Breeding plan (' + plan.filter(function (p) { return !p.done; }).length + ' to do)</summary><div style="margin-top:8px;">';
+    if (both && !already) html += '<button type="button" class="btn btn-sm btn-primary" data-action="plan-add">Add ' + L.esc(name(calcMare)) + ' \u00d7 ' + L.esc(name(calcStallion)) + ' to the plan</button>';
+    if (!plan.length) html += '<p class="notes-line" style="margin:8px 0 0;">Pick a mare and a stallion, then add the pairing here to keep a list of the coverings you plan to do.</p>';
+    plan.forEach(function (p, i) {
+      var st = L.mareBreedStatus(state, p.mare);
+      html += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);padding:7px 0;' + (p.done ? 'opacity:.6;' : '') + '">' +
+        '<label style="display:inline-flex;gap:6px;align-items:center;flex:1 1 260px;margin:0;"><input type="checkbox" data-action="plan-toggle" data-i="' + i + '"' + (p.done ? ' checked' : '') + '> <span' + (p.done ? ' style="text-decoration:line-through;"' : '') + '>' + L.esc(name(p.mare)) + ' \u00d7 ' + L.esc(name(p.stallion)) + '</span></label>' +
+        (st.status && !p.done ? '<span class="tag">' + (st.status === 'pregnant' ? 'mare is in foal' : 'mare is covered') + '</span>' : '') +
+        '<button type="button" class="btn btn-sm" data-action="calc-open" data-mare="' + L.esc(p.mare) + '" data-stallion="' + L.esc(p.stallion) + '">Open</button>' +
+        '<button type="button" class="btn btn-sm" data-action="plan-remove" data-i="' + i + '">Remove</button></div>';
+    });
+    return html + '</div></details>';
+  }
   // Suggested partners for the mare and/or stallion that is picked.
   function calcSuggestionsHtml() {
+    var fee = state.settings && state.settings.calcMaxFee != null ? state.settings.calcMaxFee : '';
+    var feeBox = '<div class="field" style="max-width:260px;margin:0 0 12px;"><label for="calc-max-fee">Max stud fee for suggestions (HRC)</label><input id="calc-max-fee" type="number" min="0" step="1000" data-action="update-calc-fee" value="' + L.esc(fee) + '" placeholder="no limit"></div>';
     function panel(life) {
       if (!life || !state.horseInfo[life]) return '';
       var r = L.pairIdeas(state, life, 10);
@@ -1548,6 +1624,7 @@
         col('Your ' + r.kind, r.mine) + col('Other players\' ' + r.kind, r.other) + '</div></div>';
     }
     var h = panel(calcMare) + panel(calcStallion);
+    if (h) h = feeBox + h;
     if (!h) return '<p class="notes-line" style="margin:0 0 14px;">Pick a mare or a stallion and the ledger suggests partners from the horses it has saved, split into yours and other players\'.</p>';
     return h;
   }
@@ -1795,6 +1872,7 @@
       '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + '<select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
       '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + '<select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
       '</div>';
+    html += calcPlanHtml();
     html += calcSuggestionsHtml();
     html += calcMareNoticeHtml();
 
@@ -2388,7 +2466,35 @@
       if (!t) return;
       var action = t.getAttribute('data-action');
 
-      if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
+      if (action === 'calc-open') {
+        var om = t.getAttribute('data-mare'), os = t.getAttribute('data-stallion');
+        if (om) calcMare = om;
+        if (os) calcStallion = os;
+        activeTab = 'calc'; selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+        saveUi(); render(); window.scrollTo(0, 0);
+      }
+      else if (action === 'plan-add') {
+        var pl = (state.settings.plan || []).slice();
+        pl.push({ mare: calcMare, stallion: calcStallion, done: false, addedAt: Date.now() });
+        state.settings.plan = pl;
+        persist();
+      }
+      else if (action === 'plan-remove') {
+        var pr = (state.settings.plan || []).slice();
+        pr.splice(parseInt(t.getAttribute('data-i'), 10), 1);
+        state.settings.plan = pr;
+        persist();
+      }
+      else if (action === 'backup-snooze') {
+        state.settings.backupSnoozeUntil = Date.now() + 7 * 86400000;
+        persist();
+      }
+      else if (action === 'mark-sale') {
+        var msl = t.getAttribute('data-life');
+        state.horseMeta[msl] = Object.assign({}, state.horseMeta[msl], { status: 'For Sale' });
+        persist();
+      }
+      else if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-pick-stallion') { calcStallion = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-refresh') {
         HRStorage.getState(function (fresh) {
@@ -2403,6 +2509,7 @@
       }
       else if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
+        listFilterText = '';
         saveUi();
         selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
         render();
@@ -2624,6 +2731,12 @@
     };
 
     // <details> toggle events don't bubble, so listen in the capture phase.
+    app.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'list-filter') {
+        listFilterText = e.target.value;
+        applyListFilter();
+      }
+    });
     app.addEventListener('toggle', function (e) {
       if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
     }, true);
@@ -2655,6 +2768,17 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'plan-toggle') {
+        var pt = (state.settings.plan || []).map(function (p) { return Object.assign({}, p); });
+        var pi = parseInt(t.getAttribute('data-i'), 10);
+        if (pt[pi]) pt[pi].done = t.checked;
+        state.settings.plan = pt;
+        persist();
+      }
+      else if (action === 'update-calc-fee') {
+        state.settings.calcMaxFee = t.value.trim();
+        persist();
+      }
       else if (action === 'calc-filter') {
         var side = t.getAttribute('data-side'), key = t.getAttribute('data-key'), cf = calcFilter[side];
         if (key === 'all') calcFilter[side] = Object.assign(defaultCalcFilter(), t.checked ? {} : { adult: false, young: false, mine: false, other: false });

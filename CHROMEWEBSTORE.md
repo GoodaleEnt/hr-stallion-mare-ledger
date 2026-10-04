@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.15.0 | 2026-10-03 | Health and Fertility read from the horse page, shown on each horse page, and added to the highlight goals as two more boxes | Draft |
 | 1.14.2 | 2026-10-03 | Goal boxes span the full width across the top of My Herd, Retired and Other Horses rows | Draft |
 | 1.14.1 | 2026-10-03 | Status menu (Active/Sold/Retired) on mare cards and mare pages | Draft |
 | 1.14.0 | 2026-10-03 | Retired horses move to a Retired tab; sold horses move to Other Horses | Draft |

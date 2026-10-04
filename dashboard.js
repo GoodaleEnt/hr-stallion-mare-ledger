@@ -368,6 +368,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
+    html += healthPanelHtml(selectedPassportLife);
     html += purchaseDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
@@ -854,6 +855,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
+    html += healthPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
 
     html += '<div class="stats-bar">' +
@@ -1474,7 +1476,7 @@
     function box(sec) {
       return '<div class="goal-sec ' + sec.state + '" title="' + L.esc(sec.label + ': ' + sec.text) + '"><span class="gl">' + L.esc(sec.label) + '</span>' + L.esc(sec.text) + '</div>';
     }
-    return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.bt) + box(c.sections.traits) + '</div>';
+    return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.bt) + box(c.sections.traits) + box(c.sections.health) + box(c.sections.fertility) + '</div>';
   }
   function goalsPanelHtml() {
     var g = L.goalsOf(state);
@@ -1492,7 +1494,7 @@
     }
     return '<details class="goals-panel"' + (goalsOpen || any ? ' open' : '') + '><summary>Highlight goals' +
       (any ? ' — ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
-      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows three boxes above its picture: green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a box empty to ignore it. Trait limits count traits at or under the number you enter.</p>' +
+      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows five boxes above its picture (Conformation, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a box empty to ignore it. Trait limits count traits at or under the number you enter.</p>' +
       '<div class="goals-grid">' +
         field('Min top conformation', 'minConf', 'any') +
         field('Min Breed Total (BT)', 'minBT', 'any') +
@@ -1502,7 +1504,41 @@
         field('Max G traits (Good)', 'maxG', '1') +
         field('Max A traits (Average)', 'maxA', '1') +
         field('Max BA traits (Below average)', 'maxBA', '1') +
+      '</div>' +
+      '<p class="notes-line" style="margin:10px 0 0;"><strong>Health</strong> (the five vet-check traits) \u2014 most you will accept at each rating. Excellent has no limit.</p>' +
+      '<div class="goals-grid">' +
+        field('Max Poor health traits', 'maxHPoor', '1') +
+        field('Max Fair health traits', 'maxHFair', '1') +
+        field('Max Average health traits', 'maxHAvg', '1') +
+        field('Max Good health traits', 'maxHGood', '1') +
+        '<div class="field"><label for="goal-minFert">Min Fertility</label><select id="goal-minFert" data-action="update-goal" data-field="minFert" style="width:100%;">' +
+          ['', 'Poor', 'Fair', 'Average', 'Good', 'Excellent'].map(function (o) { return '<option value="' + o + '"' + ((g.minFert || '') === o.toLowerCase() ? ' selected' : '') + '>' + (o || 'no limit') + '</option>'; }).join('') +
+        '</select></div>' +
       '</div></details>';
+  }
+
+  // ---------- health & fertility (read from the horse's Health box) ----------
+  function healthPanelHtml(life) {
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    if (!info.health && !info.fertility) {
+      return '<div class="card" style="padding:12px 16px;margin-bottom:16px;width:100%;flex:1 1 100%;box-sizing:border-box;"><strong>Health &amp; Fertility</strong> <span class="notes-line" style="margin:0;">\u2014 not recorded yet. Open this horse on Horse Reality once it has had a vet health check (and a fertility test if it\'s an adult).</span></div>';
+    }
+    function ratingClass(v) {
+      var r = String(v || '').toLowerCase();
+      if (r === 'excellent' || r === 'good') return 'ok';
+      if (r === 'poor' || r === 'fair') return 'bad';
+      return 'na';
+    }
+    var cells = '';
+    var order = ['Colic resistance', 'Hoof quality', 'Back problems', 'Respiratory disease', 'Resistance to lameness'];
+    var h = info.health || {};
+    order.concat(Object.keys(h).filter(function (k) { return order.indexOf(k) === -1; })).forEach(function (k) {
+      if (!h[k]) return;
+      cells += '<div class="goal-sec ' + ratingClass(h[k]) + '"><span class="gl">' + L.esc(k) + '</span>' + L.esc(h[k]) + '</div>';
+    });
+    cells += '<div class="goal-sec ' + ratingClass(info.fertility) + '"><span class="gl">Fertility</span>' + L.esc(info.fertility || 'not tested') + '</div>';
+    return '<div class="card" style="padding:12px 16px;margin-bottom:16px;width:100%;flex:1 1 100%;box-sizing:border-box;"><strong>Health &amp; Fertility</strong>' +
+      '<div class="goal-strip" style="margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">' + cells + '</div></div>';
   }
 
   // ---------- purchase price & shipping ----------
@@ -1756,6 +1792,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
+    html += healthPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
 
     html += '<div class="stats-bar">' +

@@ -616,10 +616,22 @@
   // and conformation traits - each 'ok' (meets the goal), 'bad' (doesn't) or
   // 'na' (no goal set, or no data yet). A horse is highlighted overall when it
   // has at least one goal and every set goal is met.
+  var FERT_RANK = { poor: 0, fair: 1, average: 2, good: 3, excellent: 4 };
+  function healthCounts(info) {
+    var h = info && info.health;
+    if (!h) return null;
+    var c = { poor: 0, fair: 0, average: 0, good: 0, excellent: 0 };
+    Object.keys(h).forEach(function (k) {
+      var r = String(h[k]).toLowerCase().trim();
+      if (c[r] != null) c[r]++;
+    });
+    return c;
+  }
   function goalsOf(state) {
     var g = (state && state.settings && state.settings.goals) || {};
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
-    return { minConf: num(g.minConf), minBT: num(g.minBT), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
+    var fert = String(g.minFert || '').toLowerCase();
+    return { minFert: FERT_RANK[fert] != null ? fert : null, maxHPoor: num(g.maxHPoor), maxHFair: num(g.maxHFair), maxHAvg: num(g.maxHAvg), maxHGood: num(g.maxHGood), minConf: num(g.minConf), minBT: num(g.minBT), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
@@ -659,11 +671,32 @@
         traits.text = limits.map(function (x) { return x[1] + ' ' + counts[x[0]] + ' (max ' + x[2] + ')'; }).join(', ');
       }
     }
-    return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits };
+    var hc = healthCounts(info);
+    var health = { label: 'Health', state: 'na', text: 'no goal' };
+    var hLimits = [['poor', 'Poor', g.maxHPoor], ['fair', 'Fair', g.maxHFair], ['average', 'Avg', g.maxHAvg], ['good', 'Good', g.maxHGood]].filter(function (x) { return x[2] != null; });
+    if (hLimits.length) {
+      if (!hc) {
+        health.text = 'no data yet';
+      } else {
+        health.state = hLimits.every(function (x) { return hc[x[0]] <= x[2]; }) ? 'ok' : 'bad';
+        health.text = hLimits.map(function (x) { return x[1] + ' ' + hc[x[0]] + ' (max ' + x[2] + ')'; }).join(', ');
+      }
+    }
+    var fertility = { label: 'Fertility', state: 'na', text: 'no goal' };
+    if (g.minFert) {
+      var fv = String((info && info.fertility) || '').toLowerCase().trim();
+      if (FERT_RANK[fv] == null) {
+        fertility.text = 'no data yet';
+      } else {
+        fertility.state = FERT_RANK[fv] >= FERT_RANK[g.minFert] ? 'ok' : 'bad';
+        fertility.text = info.fertility + ' (min ' + g.minFert.charAt(0).toUpperCase() + g.minFert.slice(1) + ')';
+      }
+    }
+    return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits, health: health, fertility: fertility };
   }
   function goalCheck(state, life) {
     var s = goalSections(state, life);
-    var list = [s.conf, s.bt, s.traits].filter(function (x) { return x.text !== 'no goal'; });
+    var list = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.text !== 'no goal'; });
     return {
       active: list.length > 0,
       met: list.length > 0 && list.every(function (x) { return x.state === 'ok'; }),
@@ -684,6 +717,7 @@
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
     goalsOf: goalsOf,
+    healthCounts: healthCounts,
     goalSections: goalSections,
     goalCheck: goalCheck,
     traitCounts: traitCounts,

@@ -1182,8 +1182,55 @@
   setupBreedCapture();
   setTimeout(confirmPendingCoverings, 2500);
 
+  // The horse page's "Health" box lists five health traits and, once tested,
+  // fertility, as "<strong>Label:</strong> Rating" (Poor / Fair / Average /
+  // Good / Excellent). Saved as horseInfo[id].health and horseInfo[id].fertility.
+  function readHealth() {
+    var health = {}, fertility = '', count = 0;
+    document.querySelectorAll('.half_block').forEach(function (block) {
+      var top = block.querySelector('.top');
+      if (!top || (top.textContent || '').trim().toLowerCase() !== 'health') return;
+      block.querySelectorAll('strong').forEach(function (st) {
+        var label = (st.textContent || '').replace(':', '').trim();
+        var next = st.nextSibling;
+        var value = next && next.nodeType === 3 ? (next.textContent || '').trim() : '';
+        if (!label || !value) return;
+        if (/fertil/i.test(label)) { fertility = value; return; }
+        health[label] = value;
+        count++;
+      });
+    });
+    return count >= 3 || fertility ? { health: count >= 3 ? health : null, fertility: fertility } : null;
+  }
+  function scrapeHealth() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    function tryCapture() {
+      var found = readHealth();
+      if (!found) return false;
+      HRStorage.getState(function (state) {
+        var info = state.horseInfo[id];
+        if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
+        var same = JSON.stringify(info.health || null) === JSON.stringify(found.health || info.health || null) &&
+          (info.fertility || '') === (found.fertility || info.fertility || '');
+        if (same) return;
+        if (found.health) info.health = found.health;
+        if (found.fertility) info.fertility = found.fertility;
+        HRStorage.setState(state);
+      });
+      return true;
+    }
+    if (tryCapture()) return;
+    var observer = new MutationObserver(function () {
+      if (tryCapture()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(function () { observer.disconnect(); }, 60000);
+  }
+
   function onPageReady() {
     healOwnedStubs();
+    scrapeHealth();
     scrapeConfoStats();
     scrapeConformationTraits();
     watchForContent();

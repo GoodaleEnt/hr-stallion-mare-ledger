@@ -1290,12 +1290,14 @@
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
     var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).map(function (life) {
-      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]) };
+      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' } };
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });
     function group(label, list) {
       if (!list.length) return '';
       return '<optgroup label="' + L.esc(label) + '">' + list.map(function (r) {
-        return '<option value="' + L.esc(r.life) + '"' + (r.life === selected ? ' selected' : '') + '>' + L.esc(r.name) + ' (#' + L.esc(r.life) + ')</option>';
+        var tag = r.breed.status === 'pregnant' ? '  \u2014  \u2665 IN FOAL' : r.breed.status === 'covered' ? '  \u2014  \u2714 COVERED' + (r.breed.stallion ? ' by ' + r.breed.stallion : '') : '';
+        var colour = r.breed.status === 'pregnant' ? ' style="color:#b0407a;font-weight:700;"' : r.breed.status === 'covered' ? ' style="color:#a06a00;font-weight:700;"' : '';
+        return '<option value="' + L.esc(r.life) + '"' + colour + (r.life === selected ? ' selected' : '') + '>' + L.esc(r.name) + ' (#' + L.esc(r.life) + ')' + L.esc(tag) + '</option>';
       }).join('') + '</optgroup>';
     }
     return '<option value="">Choose…</option>' +
@@ -1487,6 +1489,24 @@
       '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet — visit their pages to fill them in.</p>';
   }
 
+  // Under the pickers: is the chosen mare already covered, or in foal? And is that the pairing she's already got?
+  function calcMareNoticeHtml() {
+    if (!calcMare || !state.horseInfo[calcMare]) return '';
+    var st = L.mareBreedStatus(state, calcMare);
+    if (!st.status) return '';
+    var name = state.horseInfo[calcMare].name || ('#' + calcMare);
+    var tidy = function (n) { return String(n || '').replace(/^!/, '').replace(/[|]$/, '').trim().toLowerCase(); };
+    var studName = calcStallion && state.horseInfo[calcStallion] ? state.horseInfo[calcStallion].name : '';
+    var same = studName && st.stallion && tidy(studName) === tidy(st.stallion);
+    var box = st.status === 'pregnant'
+      ? { bg: '#f6dbe9', border: '#c8588f', fg: '#8a2a5c', head: '\u2665 ' + L.esc(name) + ' is in foal' + (st.stallion ? ' to ' + L.esc(st.stallion) : '') + (st.due ? ' \u2014 ' + L.esc(st.due.replace(/^Due /, 'due ')) : '') }
+      : { bg: '#f6e4a8', border: '#d9a21b', fg: '#6b4f00', head: '\u2714 ' + L.esc(name) + ' is already covered' + (st.stallion ? ' by ' + L.esc(st.stallion) : '') + (st.date ? ' on ' + L.esc(L.fmtDate(st.date)) : '') + ' \u2014 waiting for the result' };
+    return '<div style="background:' + box.bg + ';border:1px solid ' + box.border + ';color:' + box.fg + ';border-radius:10px;padding:10px 14px;margin:0 0 16px;font-size:14px;">' +
+      '<strong>' + box.head + '</strong>' +
+      (same ? '<div style="margin-top:3px;">This is the pairing she already has.</div>' : (studName ? '<div style="margin-top:3px;">You are comparing her with a different stallion (' + L.esc(studName) + ').</div>' : '')) +
+      '</div>';
+  }
+
   function renderCalculator() {
     var html = topHeaderHtml();
     html += '<div class="section-head"><h2>Foal Calculator</h2></div>';
@@ -1494,6 +1514,7 @@
       '<div class="field"><label for="calc-mare">Mare</label><select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
       '<div class="field"><label for="calc-stallion">Stallion</label><select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
       '</div>';
+    html += calcMareNoticeHtml();
 
     if (!calcMare || !calcStallion || !state.horseInfo[calcMare] || !state.horseInfo[calcStallion]) {
       html += '<div class="empty"><h3>Pick a mare and a stallion</h3>' +

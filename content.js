@@ -272,6 +272,13 @@
   // viewer's local timezone (a "22:00:00Z" timestamp can already read as
   // the next calendar day for players ahead of UTC), and this always runs
   // in the same browser/timezone as the person viewing the dashboard.
+  // The API's birthdate may carry the exact time of birth. Kept as milliseconds when it does, so a horse's age can
+  // follow Horse Reality's own 32-hour months exactly.
+  function parseBirthAt(iso) {
+    if (!iso || !/\d{1,2}:\d{2}/.test(String(iso))) return null;
+    var t = new Date(iso).getTime();
+    return isNaN(t) ? null : t;
+  }
   function formatBirthdate(iso) {
     if (!iso) return '';
     var d = new Date(iso);
@@ -386,6 +393,7 @@
       height: passport.height != null ? (passport.height + ' cm') : '',
       location: location,
       dateOfBirth: formatBirthdate(passport.birthdate),
+      birthAt: parseBirthAt(passport.birthdate),
       ownerName: horse.owner ? horse.owner.name : '',
       ownerUrl: horse.owner ? userProfileUrl(horse.owner.id) : '',
       ownerStable: horse.estate ? horse.estate.name : '',
@@ -678,7 +686,7 @@
         var rec = list.find(function (b) { return HRLib.breedingMatchKey(b) === HRLib.breedingMatchKey(Object.assign({ price: null, date: '' }, row)); });
         if (!life || !rec || rec.dateBorn || todo.some(function (t) { return t.life === life; })) return;
         var info = state.horseInfo[life];
-        if (info && info.dateOfBirth) { rec.dateBorn = info.dateOfBirth; todo.changed = true; return; }
+        if (info && info.dateOfBirth) { rec.dateBorn = info.dateOfBirth; if (info.birthAt) rec.bornAt = info.birthAt; todo.changed = true; return; }
         if (todo.length < FOAL_LOOKUP_CAP) todo.push({ life: life, key: HRLib.breedingMatchKey(rec) });
       });
       if (todo.changed) HRStorage.setState(state);
@@ -686,7 +694,7 @@
       Promise.all(todo.map(function (t) {
         return fetchHorseJson('/api/player/horse/' + t.life + '/passport').then(function (resp) {
           var root = resp && resp.horsePassport ? resp.horsePassport : {};
-          return { life: t.life, key: t.key, birth: root.passport && root.passport.birthdate };
+          return { life: t.life, key: t.key, birth: root.passport && root.passport.birthdate, bornAt: parseBirthAt(root.passport && root.passport.birthdate) };
         }).catch(function () { return null; });
       })).then(function (results) {
         var found = results.filter(function (r) { return r && r.birth; });
@@ -696,7 +704,7 @@
           found.forEach(function (r) {
             var rec = rows.find(function (b) { return HRLib.breedingMatchKey(b) === r.key; });
             var d = new Date(r.birth);
-            if (rec && !isNaN(d.getTime())) rec.dateBorn = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            if (rec && !isNaN(d.getTime())) { rec.dateBorn = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); if (r.bornAt) rec.bornAt = r.bornAt; }
           });
           HRStorage.setState(fresh);
         });
@@ -1020,6 +1028,7 @@
         if (info.ageMonths === months && info.ageText === text) return;
         info.ageMonths = months;
         info.ageText = text;
+        info.ageAt = Date.now();
         info.capturedAt = Date.now();
         HRStorage.setState(state);
       });
@@ -1523,7 +1532,7 @@
         breederName: state.settings.myUsername || '', breederUrl: '',
         price: c.price > 0 ? c.price : null, currency: c.currency || 'HRC', feeType: 'Public',
         transport: c.transport || 0, studOwner: c.studOwner || '', feeSource: c.price > 0 ? 'breed page' : '',
-        date: toIsoDate(Date.now()), status: 'Pending'
+        date: toIsoDate(c.at || Date.now()), coveredAt: c.at || Date.now(), status: 'Pending'
       });
       HRStorage.setState(state, function () {
         showToast('HR Ledger: breeding recorded for ' + (c.mareName || ('#' + c.mareLife)) + (c.price > 0 ? ' (fee ' + c.price + ' ' + (c.currency || 'HRC') + (c.transport ? ' + ' + c.transport + ' transport' : '') + ')' : ''));

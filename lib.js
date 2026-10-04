@@ -106,7 +106,8 @@
   // Players can also pay Delta Points to age a horse up early, which this
   // formula can't see — that's what the manual aged-up override is for.
   var GAME_MS_PER_MONTH = 32 * 3600 * 1000;
-  function ageYears(dateOfBirth) {
+  function ageYears(dateOfBirth, birthAt) {
+    if (birthAt) { var bm = Date.now() - birthAt; return bm < 0 ? null : (bm / GAME_MS_PER_MONTH) / 12; }
     if (!dateOfBirth) return null;
     var d = new Date(dateOfBirth);
     if (isNaN(d.getTime())) return null;
@@ -128,9 +129,17 @@
   //     ages horses on its own accelerated clock, so this is approximate.
   function effectiveAgeMonths(info) {
     if (!info) return null;
-    if (info.ageMonths != null) return info.ageMonths;
+    if (info.ageMonths != null) {
+      // The age read off the page is only true on the day it was read. A game month is 32 real hours, so move it
+      // forward by the time since then. With the official birth time the month boundary is exact; without it the
+      // result can be one month behind.
+      if (!info.ageAt) return info.ageMonths;
+      var elapsed = Math.max(0, Date.now() - info.ageAt);
+      var phase = info.birthAt ? (((info.ageAt - info.birthAt) % GAME_MS_PER_MONTH) + GAME_MS_PER_MONTH) % GAME_MS_PER_MONTH : 0;
+      return info.ageMonths + Math.floor((phase + elapsed) / GAME_MS_PER_MONTH);
+    }
     if (info.manualAgeMonths != null) return info.manualAgeMonths;
-    var y = ageYears(info.dateOfBirth);
+    var y = ageYears(info.dateOfBirth, info.birthAt);
     return y == null ? null : Math.round(y * 12);
   }
   function effectiveAgeYears(info) {
@@ -1439,6 +1448,71 @@
     return out;
   }
 
+  // ---------- from the wiki: times, pregnancy window, label ranges, Clinical Approved ----------
+  var DAY_MS = 86400000;
+  function fmtTime(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function fmtDay(ms) {
+    var d = new Date(ms), mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return mo[d.getMonth()] + ' ' + d.getDate();
+  }
+  // A pregnancy lasts 13.5 to 17 real days (wiki: Life). Given when she was covered (a time, or just a date), the
+  // earliest and latest birth. A date alone leaves a day of slack at the end.
+  function dueWindow(coveredAt, dateOnly) {
+    if (!coveredAt) return null;
+    return { from: coveredAt + 13.5 * DAY_MS, to: coveredAt + 17 * DAY_MS + (dateOnly ? DAY_MS : 0) };
+  }
+  function dueWindowText(w) {
+    if (!w) return '';
+    var a = fmtDay(w.from), b = fmtDay(w.to);
+    return a === b ? a : a + ' \u2013 ' + b;
+  }
+  // The latest covering of a mare that is still Pending or Succeeded: { at, dateOnly }
+  function coveringOf(state, mareLife) {
+    var best = null;
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (String(b.mareLifeNumber) !== String(mareLife) || (b.status !== 'Pending' && b.status !== 'Succeeded')) return;
+        var at = b.coveredAt || (b.date ? new Date(b.date + 'T00:00:00').getTime() : 0);
+        if (!at || isNaN(at)) return;
+        if (!best || at > best.at) best = { at: at, dateOnly: !b.coveredAt };
+      });
+    });
+    return best;
+  }
+  // The hidden number behind each label (wiki: Conformation, Health).
+  var CONF_RANGES = { 'poor': '0\u201339', 'below average': '40\u201359', 'average': '60\u201369', 'good': '70\u201384', 'very good': '85\u2013100' };
+  var HEALTH_RANGES = { 'poor': '0\u201320', 'fair': '21\u201340', 'average': '41\u201360', 'good': '61\u201380', 'excellent': '81\u2013100' };
+  function labelRangeText(kind, label) {
+    var key = String(label || '').toLowerCase().trim();
+    var short = { 'g+': 'good', 'g': 'good', 'good+': 'good', 'good +': 'good', 'vg': 'very good', 'a': 'average', 'ba': 'below average' };
+    if (short[key]) key = short[key];
+    var table = kind === 'health' ? HEALTH_RANGES : CONF_RANGES;
+    var r = table[key];
+    return r ? label + ': the hidden number is ' + r + ' (the average of two inherited values)' : '';
+  }
+  // Clinical Approved: a stallion of 7 or older gets it if all five health stats and fertility are 75+ (wiki: Predicates).
+  // Excellent (81+) always passes; Good (61-80) may or may not; Average or worse (60 or less) can never.
+  function clinicalOutlook(info) {
+    if (!info || info.sex !== 'stallion') return null;
+    var h = info.health && typeof info.health === 'object' ? Object.keys(info.health).map(function (k) { return String(info.health[k]).toLowerCase(); }) : [];
+    var fert = String(info.fertility || '').toLowerCase().trim();
+    var vals = h.concat(fert ? [fert] : []);
+    var out = { status: 'unknown', text: '' };
+    if (/clinical/i.test(String(info.predicates || ''))) return { status: 'has', text: 'Has the Clinical Approved predicate.' };
+    if (h.length < 5 || !fert) return { status: 'unknown', text: 'Needs a health check and a fertility test to tell.' };
+    var rank = { poor: 0, fair: 0, average: 0, good: 1, excellent: 2 };
+    var worst = Math.min.apply(null, vals.map(function (v) { return rank[v] == null ? 0 : rank[v]; }));
+    var goods = vals.filter(function (v) { return v === 'good'; }).length;
+    if (worst === 0) { out.status = 'no'; out.text = 'Can\u2019t qualify: at least one stat is Average or worse, and all six must be 75 or more.'; }
+    else if (goods === 0) { out.status = 'yes'; out.text = 'All six stats are Excellent (81+), so he qualifies once he is 7 and has the clinical check.'; }
+    else { out.status = 'maybe'; out.text = goods + ' of the six stats are Good (61\u201380); each needs 75+ for the predicate, so it can go either way.'; }
+    return out;
+  }
+
   // ---------- breeding calendar: foals due, mares ready, money, fee changes ----------
   // Days until the foal is due, from the site's due text ("Due in 5 days", "Due tomorrow"...). null if it can't be read.
   function dueDays(text) {
@@ -1455,7 +1529,12 @@
       if (h.info.sex !== 'mare' || isSoldLife(state, h.lifeNumber) || isArchivedHorse(h)) return;
       var st = mareBreedStatus(state, h.lifeNumber);
       if (st.status !== 'pregnant') return;
-      out.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), due: st.due, days: dueDays(st.due), stallion: st.stallion });
+      var dueText = st.due, days = dueDays(st.due), estimated = false;
+      if (!dueText) {
+        var cv = coveringOf(state, h.lifeNumber), w = cv && dueWindow(cv.at, cv.dateOnly);
+        if (w) { dueText = 'about ' + dueWindowText(w); days = Math.max(0, Math.ceil((w.from - Date.now()) / DAY_MS)); estimated = true; }
+      }
+      out.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), due: dueText, days: days, stallion: st.stallion, estimated: estimated });
     });
     return out.sort(function (a, b) { return (a.days == null ? 999 : a.days) - (b.days == null ? 999 : b.days); });
   }
@@ -1947,6 +2026,12 @@
     sameBreed: sameBreed,
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
+    fmtTime: fmtTime,
+    dueWindow: dueWindow,
+    dueWindowText: dueWindowText,
+    coveringOf: coveringOf,
+    labelRangeText: labelRangeText,
+    clinicalOutlook: clinicalOutlook,
     goalAdvice: goalAdvice,
     readyMares: readyMares,
     moneySummary: moneySummary,

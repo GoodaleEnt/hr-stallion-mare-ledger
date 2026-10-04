@@ -303,7 +303,7 @@
   // mare — only she does — so this points at her page directly instead of
   // silently trusting the auto-fail sweep that runs next time content.js
   // sees a horsereality.com page.
-  var REVIEW_DAYS = 6;
+  var REVIEW_DAYS = 3; // a covering is settled 48 hours after breeding (wiki: Life)
   function renderNeedsReviewHtml() {
     var candidates = HRLib.findReviewCandidates(state, REVIEW_DAYS);
     if (!candidates.length) return '';
@@ -759,7 +759,8 @@
   function bredDateCellHtml(b) {
     var d = bredDate(b);
     return '<div class="mono" data-label="Date bred"' + (d.inferred ? ' title="Taken from another record for this mare"' : d.approx ? ' title="Approximate: the day this mare was first seen in foal"' : '') + '>' +
-      (d.inferred || d.approx ? '<em>' + L.fmtDate(d.date) + '</em>' : L.fmtDate(d.date)) + '</div>';
+      (d.inferred || d.approx ? '<em>' + L.fmtDate(d.date) + '</em>' : L.fmtDate(d.date)) +
+      (b.coveredAt && !d.inferred ? '<div class="sub" style="font-size:11px;" title="The time you clicked Breed">' + L.esc(L.fmtTime(b.coveredAt)) + '</div>' : '') + '</div>';
   }
   // Foal's birth date: stored on the record, else from the foal's cached passport.
   function bornDate(b) {
@@ -772,7 +773,7 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
   function bornDateCellHtml(b) {
-    return '<div class="mono" data-label="Date born">' + L.fmtDate(bornDate(b)) + '</div>';
+    return '<div class="mono" data-label="Date born">' + L.fmtDate(bornDate(b)) + (b.bornAt ? '<div class="sub" style="font-size:11px;" title="Official time of birth">' + L.esc(L.fmtTime(b.bornAt)) + '</div>' : '') + '</div>';
   }
 
   function renderBreedingRow(b, i, viewMode) {
@@ -1445,10 +1446,10 @@
         rows.push([h.info.name, h.lifeNumber, h.info.sex, h.info.breed, h.info.ageText || '', h.info.geneticPotential, conf || '', Math.max(Number(m.btBest) || 0, L.breedTotal(h.info.geneticPotential, conf)) || '', m.status || 'Active', m.role || '', m.project || '', m.notes || '']);
       });
     } else if (kind === 'breedings') {
-      rows.push(['Stallion', 'Mare', 'Mare life number', 'Date bred', 'Status', 'Price', 'Currency', 'Foal', 'Foal score', 'Date born']);
+      rows.push(['Stallion', 'Mare', 'Mare life number', 'Date bred', 'Time bred', 'Status', 'Price', 'Currency', 'Foal', 'Foal score', 'Date born']);
       state.stallions.forEach(function (st) {
         (state.breedings[st.id] || []).forEach(function (b) {
-          rows.push([st.name, b.mareName, b.mareLifeNumber, b.date, b.status, b.price, b.currency, b.foalName, b.foalScore, b.dateBorn]);
+          rows.push([st.name, b.mareName, b.mareLifeNumber, b.date, b.coveredAt ? L.fmtTime(b.coveredAt) : '', b.status, b.price, b.currency, b.foalName, b.foalScore, b.dateBorn]);
         });
       });
     } else {
@@ -1974,7 +1975,7 @@
   function ratingChipHtml(text) {
     var rank = ratingRank(text);
     var colour = rank === 3 || rank === 4 ? ['var(--success-bg)', 'var(--success)'] : (rank === 1 ? ['var(--danger-bg)', 'var(--danger)'] : ['var(--warn-bg)', 'var(--warn)']);
-    return '<span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:' + colour[0] + ';color:' + colour[1] + ';">' + L.esc(text) + '</span>';
+    return '<span title="' + L.esc(L.labelRangeText('conf', text)) + '" style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:' + colour[0] + ';color:' + colour[1] + ';">' + L.esc(text) + '</span>';
   }
   function traitsCompareHtml(mareLife, studLife) {
     var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
@@ -2348,12 +2349,19 @@
     var h = info.health || {};
     order.concat(Object.keys(h).filter(function (k) { return order.indexOf(k) === -1; })).forEach(function (k) {
       if (!h[k]) return;
-      cells += '<div class="goal-sec ' + ratingClass(h[k]) + '"><span class="gl">' + L.esc(k) + '</span>' + L.esc(h[k]) + '</div>';
+      cells += '<div class="goal-sec ' + ratingClass(h[k]) + '" title="' + L.esc(L.labelRangeText('health', h[k])) + '"><span class="gl">' + L.esc(k) + '</span>' + L.esc(h[k]) + '</div>';
     });
     var youngHorse = L.isYoungInfo(info);
     cells += '<div class="goal-sec ' + (youngHorse ? 'na' : ratingClass(info.fertility)) + '"><span class="gl">Fertility</span>' + L.esc(youngHorse ? 'tested from age 3' : (info.fertility || 'not tested')) + '</div>';
     return '<div class="card" style="padding:12px 16px;margin-bottom:16px;width:100%;flex:1 1 100%;box-sizing:border-box;"><strong>Health &amp; Fertility</strong>' +
-      '<div class="goal-strip" style="margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">' + cells + '</div></div>';
+      '<div class="goal-strip" style="margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">' + cells + '</div>' + clinicalHtml(info) + '</div>';
+  }
+  function clinicalHtml(info) {
+    var c = L.clinicalOutlook(info);
+    if (!c) return '';
+    var months = L.effectiveAgeMonths(info);
+    var when = months != null && months < 84 ? ' He can have the clinical check from age 7.' : '';
+    return '<p class="notes-line" style="margin:8px 0 0;"><strong>Clinical Approved:</strong> ' + L.esc(c.text) + L.esc(when) + '</p>';
   }
 
   // ---------- sale (read from the bank page, or entered by hand) ----------

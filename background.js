@@ -6,7 +6,7 @@ importScripts('lib.js', 'storage.js');
 // for the user to browse back to horsereality.com (which is when the
 // content-script sweep would silently mark it Failed), badge the toolbar
 // icon so there's a chance to click through to the mare's own page first.
-var REVIEW_DAYS = 6;
+var REVIEW_DAYS = 3; // a covering is settled 48 hours after breeding (wiki: Life), so 3 days is ample
 
 function refreshReviewBadge() {
   HRStorage.getState(function (state) {

@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.17.1 | 2026-10-03 | Gold Health box (more than 3 Excellent) and gold Fertility box (Excellent) | Draft |
 | 1.17.0 | 2026-10-03 | Analytics tab: stats, charts, per-stallion and per-mare tables, and suggestions | Draft |
 | 1.16.1 | 2026-10-03 | Health "how many" is a 0-5 menu | Draft |
 | 1.16.0 | 2026-10-03 | Traits and Health goals use a worst-rating selector plus how many are accepted | Draft |

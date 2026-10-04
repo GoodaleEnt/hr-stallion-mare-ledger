@@ -1560,7 +1560,11 @@
     var c = L.goalCheck(state, life);
     if (!c.active) return '';
     function box(sec) {
-      return '<div class="goal-sec ' + sec.state + '" title="' + L.esc(sec.label + ': ' + sec.text) + '"><span class="gl">' + L.esc(sec.label) + '</span>' + L.esc(sec.text) + '</div>';
+      // gold (Health: more than 3 Excellent; Fertility: Excellent) overrides green/red/grey
+      var text = sec.text;
+      var hasGoal = sec.text !== 'no goal' && sec.text !== 'no data yet';
+      if (sec.gold) text = sec.label === 'Health' ? sec.goldText + (hasGoal ? ' \u00b7 ' + sec.text : '') : (hasGoal ? sec.text : sec.goldText);
+      return '<div class="goal-sec ' + (sec.gold ? 'gold' : sec.state) + '" title="' + L.esc(sec.label + ': ' + text) + '"><span class="gl">' + L.esc(sec.label) + '</span>' + L.esc(text) + '</div>';
     }
     return '<div class="goal-strip">' + box(c.sections.conf) + box(c.sections.bt) + box(c.sections.traits) + box(c.sections.health) + box(c.sections.fertility) + '</div>';
   }
@@ -1610,7 +1614,8 @@
     }
     function ratingClass(v) {
       var r = String(v || '').toLowerCase();
-      if (r === 'excellent' || r === 'good') return 'ok';
+      if (r === 'excellent') return 'gold';
+      if (r === 'good') return 'ok';
       if (r === 'poor' || r === 'fair') return 'bad';
       return 'na';
     }

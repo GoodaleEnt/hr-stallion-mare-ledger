@@ -687,6 +687,9 @@
       [['VG', 'VG'], ['GP', 'G+'], ['G', 'G'], ['A', 'A'], ['BA', 'BA']], traitCounts(info), g.traitWorst, g.traitWorstMax);
     var health = worstSection('Health',
       [['excellent', 'Excellent'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']], healthCounts(info), g.healthWorst, g.healthWorstMax);
+    // Gold: more than 3 of the 5 health traits are Excellent.
+    var hcAll = healthCounts(info);
+    if (hcAll && hcAll.excellent > 3) { health.gold = true; health.goldText = hcAll.excellent + ' Excellent'; }
     var fertility = { label: 'Fertility', state: 'na', text: 'no goal' };
     if (g.minFert) {
       var fv = String((info && info.fertility) || '').toLowerCase().trim();
@@ -697,6 +700,8 @@
         fertility.text = info.fertility + ' (min ' + g.minFert.charAt(0).toUpperCase() + g.minFert.slice(1) + ')';
       }
     }
+    // Gold: fertility is Excellent.
+    if (String((info && info.fertility) || '').toLowerCase().trim() === 'excellent') { fertility.gold = true; fertility.goldText = 'Excellent'; }
     return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits, health: health, fertility: fertility };
   }
   function goalCheck(state, life) {

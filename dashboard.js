@@ -2516,6 +2516,18 @@
     if (c.patterns) {
       html += oddsCardHtml('Appaloosa pattern', c.patterns.map(function (o) { return oddsRowHtml(o.label, o.pct); }).join(''));
     }
+    // genes a foal can carry without showing: visible vs carrier vs not present
+    var carried = c.genes.filter(function (g) { return g.vis && g.vis.carrier > 0.05; });
+    if (carried.length) {
+      html += oddsCardHtml('Carried or visible \u2014 genes that can hide', carried.map(function (g) {
+        var parts = [];
+        if (g.vis.visible > 0.05) parts.push('visible ' + pctText(g.vis.visible));
+        parts.push('carrier ' + pctText(g.vis.carrier));
+        if (g.vis.none > 0.05) parts.push('not present ' + pctText(g.vis.none));
+        return oddsRowHtml(g.name, g.vis.visible, parts.join(' \u00b7 '));
+      }).join(''));
+      html += '<p class="notes-line" style="margin:-6px 0 12px;">The bar is the chance the foal <strong>shows</strong> the gene. A carrier has one hidden copy (or a copy that cannot show on its base colour) and can pass it on.</p>';
+    }
     if (c.extras.length) {
       html += oddsCardHtml('Extra genes — chance the foal shows each', c.extras.map(function (g) {
         var split = g.outcomes.map(function (o) { return o.genotype + ' ' + pctText(o.pct); }).join(' · ');

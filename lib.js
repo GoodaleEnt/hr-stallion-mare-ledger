@@ -542,6 +542,33 @@
     return Object.keys(results).map(function (k) { return { label: k, pct: results[k] * 100 }; })
       .sort(function (a, b) { return b.pct - a.pct; });
   }
+  // How a gene will show in the foal: visible, carried without showing, or not present at all (percent chances).
+  // A recessive gene shows with two copies and is carried with one; a gene that needs a base colour (flaxen only shows
+  // on chestnut, silver only on black-based, agouti's a only on black-based) is carried when the base is wrong;
+  // PATN1 only shows together with LP. ctx holds the chance of those base colours / LP.
+  function visibilityOf(l, d, ctx) {
+    var v = 0, c = 0, n = 0;
+    d.forEach(function (o) {
+      var al = o.alleles, p = o.p, k;
+      if (l.id === 'E') {
+        k = copies(al, 'E');
+        if (k === 0) v += p; else if (k === 1) c += p; else n += p;
+      } else if (l.id === 'A') {
+        k = copies(al, 'a');
+        if (k === 2) { var pb = ctx.pBlack == null ? 1 : ctx.pBlack; v += p * pb; c += p * (1 - pb); } else if (k === 1) c += p; else n += p;
+      } else if (l.id === 'D') {
+        if (al.indexOf('D') > -1 || al.indexOf('nd1') > -1) v += p; else n += p;
+      } else if (l.id === 'PATN1') {
+        if (al.indexOf('PATN1') > -1) { var pl = ctx.pLP == null ? 1 : ctx.pLP; v += p * pl; c += p * (1 - pl); } else n += p;
+      } else if (l.recessive) {
+        k = copies(al, l.alleles[1]);
+        if (k === 2) { var pc = l.only === 'chestnut' && ctx.pChest != null ? ctx.pChest : 1; v += p * pc; c += p * (1 - pc); } else if (k === 1) c += p; else n += p;
+      } else if (al.indexOf(l.alleles[0]) > -1) {
+        var pd = l.only === 'blackBased' && ctx.pBlack != null ? ctx.pBlack : 1; v += p * pd; c += p * (1 - pd);
+      } else n += p;
+    });
+    return { visible: v * 100, carrier: c * 100, none: n * 100 };
+  }
   // Odds for a foal of sire x dam, from their "tested colours" strings.
   function colourOutcomes(sireText, damText, sireManual, damManual) {
     // Horse Reality's own tested result wins over a hand-entered one.
@@ -563,8 +590,11 @@
       if (s[l.id] && d[l.id]) dist[l.id] = foalDistribution(l, s[l.id], d[l.id]);
       else if (!l.absent) untested.push(l.name);
     });
+    var ctx = { pChest: null, pBlack: null, pLP: null };
+    if (dist.E) { ctx.pChest = dist.E.reduce(function (t, o) { return t + (o.alleles.indexOf('E') === -1 ? o.p : 0); }, 0); ctx.pBlack = 1 - ctx.pChest; }
+    if (dist.LP) ctx.pLP = dist.LP.reduce(function (t, o) { return t + (o.alleles.indexOf('LP') > -1 ? o.p : 0); }, 0);
     var genes = ALL_LOCI.filter(function (l) { return dist[l.id] && (!l.absent || touched[l.id]); }).map(function (l) {
-      return { id: l.id, name: l.name, outcomes: dist[l.id].map(function (o) {
+      return { id: l.id, name: l.name, vis: visibilityOf(l, dist[l.id], ctx), outcomes: dist[l.id].map(function (o) {
         return { genotype: o.alleles.join(' / '), pct: o.p * 100, effect: geneEffect(l.id, o.alleles) };
       }) };
     });

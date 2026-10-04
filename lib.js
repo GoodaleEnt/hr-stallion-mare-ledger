@@ -1480,14 +1480,15 @@
   }
 
   // ---------- goal advice: when to raise your goals, and to what ----------
-  // Looks at the horses you own (3 and older, not sold or retired) and at recent foals. A numeric goal (conformation,
+  // Looks at the horses you own (not sold or retired; colts count with the stallions and fillies with the mares, and
+  // with separate goals each group is judged on its own) and at recent foals. A numeric goal (conformation,
   // Genetic Potential, Breed Total) that most of the herd already meets is too easy, so it suggests the level the top
   // third of the herd starts at; one nobody meets suggests something within reach; one that is not set gets a starting
   // value. Nothing changes until you apply a suggestion.
   function goalAdvice(state, sex) {
     var g = goalsOf(state, sex);
     var herd = ownedHorses(state).filter(function (h) {
-      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && (!sex || !(state.settings && state.settings.goalsSplit) || h.info.sex === sex) && !isYoungInfo(h.info) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion';
+      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && (!sex || !(state.settings && state.settings.goalsSplit) || h.info.sex === sex) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion';
     });
     function valuesOf(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
     function pct(arr, p) { if (!arr.length) return 0; var i = Math.min(arr.length - 1, Math.max(0, Math.round((arr.length - 1) * p))); return arr[i]; }
@@ -1826,10 +1827,14 @@
       return { h: h, life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), sex: h.info.sex, young: young, bt: horseBT(state, h.lifeNumber),
         conf: bestConformation(meta).best, gp: h.info.geneticPotential, forSale: h.meta.status === 'For Sale' };
     });
-    var adultBTs = herd.filter(function (x) { return !x.young && x.bt > 0; }).map(function (x) { return x.bt; });
-    var med = median(adultBTs);
-    var sortedBTs = adultBTs.slice().sort(function (a, b) { return a - b; });
-    var lowCut = sortedBTs.length >= 4 ? sortedBTs[Math.floor(sortedBTs.length / 4)] : 0;
+    // Each horse is compared with its own group: mares & fillies, or stallions & colts.
+    var GROUP_NAME = { mare: 'mares & fillies', stallion: 'stallions & colts' };
+    var groupStats = {};
+    ['mare', 'stallion'].forEach(function (sx) {
+      var bts = herd.filter(function (x) { return x.sex === sx && x.bt > 0; }).map(function (x) { return x.bt; }).sort(function (a, b) { return a - b; });
+      groupStats[sx] = { med: median(bts), lowCut: bts.length >= 4 ? bts[Math.floor(bts.length / 4)] : 0 };
+    });
+    var med = Math.max(groupStats.mare.med, groupStats.stallion.med);
 
     var ideas = [], forSale = [], held = [];
     herd.forEach(function (x) {
@@ -1838,12 +1843,13 @@
       var kind = x.young ? (x.sex === 'stallion' ? 'Colt' : 'Filly') : (x.sex === 'stallion' ? 'Stallion' : 'Mare');
       if ((x.young && !form.young) || (!x.young && x.sex === 'mare' && !form.mares) || (!x.young && x.sex === 'stallion' && !form.stallions)) return;
       var reasons = [], score = 0;
+      var med = groupStats[x.sex].med, lowCut = groupStats[x.sex].lowCut, gname = GROUP_NAME[x.sex];
       var misses = goalsOn ? goalMisses(state, x.life) : [];
       var met = goalsOn && goalCheck(state, x.life).met;
       if (met) return;
       if (misses.length) { score += misses.length * 3; reasons.push('Misses your goal' + (misses.length === 1 ? '' : 's') + ': ' + misses.join(', ')); }
-      if (!x.young && x.bt > 0 && med > 0 && x.bt < med * 0.92) { score += 2; reasons.push('Breed Total ' + (Math.round(x.bt * 10) / 10) + ' is below your herd median of ' + (Math.round(med * 10) / 10)); }
-      if (!x.young && x.bt > 0 && lowCut && x.bt <= lowCut) { score += 1; reasons.push('In the bottom quarter of your herd by Breed Total'); }
+      if (x.bt > 0 && med > 0 && x.bt < med * 0.92) { score += 2; reasons.push('Breed Total ' + (Math.round(x.bt * 10) / 10) + ' is below your ' + gname + ' median of ' + (Math.round(med * 10) / 10)); }
+      if (x.bt > 0 && lowCut && x.bt <= lowCut) { score += 1; reasons.push('In the bottom quarter of your ' + gname + ' by Breed Total'); }
       if (x.sex === 'mare') {
         var rows = 0;
         Object.keys(state.breedings || {}).forEach(function (sid) {
@@ -1860,7 +1866,7 @@
         if (done.length >= 5 && failed / done.length >= 0.4) { score += 2; reasons.push('Fails ' + Math.round(failed / done.length * 100) + '% of his resolved breedings'); }
         if (!recs.length) { score += 1; reasons.push('No breedings recorded'); }
       }
-      var qualifies = (form.mode === 'misses' && goalsOn) ? misses.length > 0 : (score >= 2 || (!x.young && lowCut && x.bt > 0 && x.bt <= lowCut));
+      var qualifies = (form.mode === 'misses' && goalsOn) ? misses.length > 0 : (score >= 2 || (lowCut && x.bt > 0 && x.bt <= lowCut));
       if (!qualifies) return;
       if (!reasons.length) return;
       ideas.push(Object.assign({ kind: kind, score: score, reasons: reasons, price: price, misses: misses }, x));

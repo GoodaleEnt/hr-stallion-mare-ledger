@@ -254,6 +254,8 @@ Click any column heading in the stallion, mare or Colts & Fillies tables to sort
 
 ## Sell ideas
 
+Suggestions are grouped by sex: mares and fillies are compared with each other, and stallions and colts with each other, for the herd median, the bottom quarter and the goal suggestions. With separate goals switched on, each group is judged against its own goals.
+
 The **Sell ideas** card on the Analytics tab suggests which of your horses to sell and what to ask. Use its form to choose what to look at (mares, stallions, colts and fillies), how to pick (horses missing your highlight goals, or the weakest in your herd) and how to price (quick sale 15% under, fair, or top dollar 15% over). Each suggestion lists the reasons (missed goals, Breed Total below your herd median, never bred, a stallion that fails a lot) and a suggested price with a range. It never suggests a horse that meets all your goals, a Companion, or a mare that is covered or in foal. Prices come from the price per Breed Total point of your most similar past sales, and never go below what you paid; with no sales yet it starts from what you paid. Horses already marked For Sale get a price check too. These are estimates, so check the market before listing.
 
 ## Breeding suggestions

@@ -1280,7 +1280,8 @@
     var existing = document.getElementById(LEDGER_BTN_ID);
     if (!life) { if (existing) existing.remove(); return; }
     if (existing) { existing.setAttribute('data-life', life); return; }
-    if (!document.body) return;
+    var host = document.body || document.documentElement;
+    if (!host) return;
     var btn = document.createElement('button');
     btn.id = LEDGER_BTN_ID;
     btn.type = 'button';
@@ -1301,7 +1302,7 @@
       }
       chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
     });
-    document.body.appendChild(btn);
+    host.appendChild(btn);
   }
 
   function onPageReady() {
@@ -1320,6 +1321,7 @@
 
   var lastHref = location.href;
   setInterval(function () {
+    injectLedgerButton(); // put it back if the site's own scripts removed it
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

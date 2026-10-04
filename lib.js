@@ -350,7 +350,9 @@
   // assumed absent.
   var COLOUR_LOCI = [
     { id: 'E', name: 'Extension (E)', alleles: ['E', 'e'] },
-    { id: 'A', name: 'Agouti (A)', alleles: ['A', 'a'] },
+    // Horse Reality's test shows only A or a. The wild bay (A+) and seal brown (At) alleles are hidden and show up
+    // as A, so they can only be entered by hand. Dominance: A+ > A > At > a.
+    { id: 'A', name: 'Agouti (A)', alleles: ['A+', 'A', 'At', 'a'] },
     // A gene Horse Reality doesn't list for a horse was not tested, and is treated as not there (`absent`).
     // Only Extension and Agouti, which decide the base colour, are left unknown when untested.
     { id: 'CR', name: 'Cream (CR)', alleles: ['CR', 'n'], absent: ['n', 'n'] },
@@ -377,14 +379,23 @@
   ];
   var ALL_LOCI = COLOUR_LOCI.concat(EXTRA_LOCI);
   function extraGenotypeOptions(locus) {
-    var a = locus.alleles;
-    return [a[0] + '/' + a[0], a[0] + '/' + a[1], a[1] + '/' + a[1]];
+    var a = locus.alleles, out = [];
+    for (var i = 0; i < a.length; i++) for (var j = i; j < a.length; j++) out.push(a[i] + '/' + a[j]);
+    return out;
+  }
+  // Genes that can be entered by hand for a horse: the extra genes, plus W20 (white spotting) and the hidden
+  // agouti alleles (A+ wild bay, At seal brown).
+  var MANUAL_LOCI = EXTRA_LOCI.concat(COLOUR_LOCI.filter(function (l) { return l.id === 'W20' || l.id === 'A'; }));
+  // The plain A / a form of an agouti genotype (A+ and At are what the game shows as A).
+  function agoutiPlain(al) { return al.map(function (x) { return x === 'a' ? 'a' : 'A'; }).sort(); }
+  function agoutiCompatible(tested, manual) {
+    return !tested || agoutiPlain(tested).join() === agoutiPlain(manual).join();
   }
   // Hand-entered genotypes for one horse, validated against the gene table.
   function manualGenes(state, lifeNumber) {
     var saved = (state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].genes) || {};
     var out = {};
-    EXTRA_LOCI.forEach(function (l) {
+    MANUAL_LOCI.forEach(function (l) {
       var parts = String(saved[l.id] || '').split('/');
       if (parts.length === 2 && l.alleles.indexOf(parts[0]) > -1 && l.alleles.indexOf(parts[1]) > -1) out[l.id] = parts;
     });
@@ -437,7 +448,7 @@
   function geneEffect(id, al) {
     var c;
     if (id === 'E') return al.indexOf('E') > -1 ? 'black-based' : 'red (chestnut) base';
-    if (id === 'A') return al.indexOf('A') > -1 ? 'agouti (bay if black-based)' : 'no agouti (black if black-based)';
+    if (id === 'A') return al.indexOf('A+') > -1 ? 'wild bay (A+), bay if black-based' : al.indexOf('A') > -1 ? 'bay if black-based' : al.indexOf('At') > -1 ? 'seal brown (At), if black-based' : 'no agouti (black if black-based)';
     if (id === 'CR') { c = copies(al, 'CR'); return c === 0 ? 'no cream' : (c === 1 ? 'one cream copy' : 'double cream'); }
     if (id === 'D') return al.indexOf('D') > -1 ? 'dun' : (al.indexOf('nd1') > -1 ? 'pseudo dun (nd1, primitive markings)' : 'non-dun');
     if (id === 'G') return al.indexOf('G') > -1 ? 'grey' : 'not grey';
@@ -470,15 +481,19 @@
   }
   function baseColourLabel(g) {
     if (!g.E) return modifiersOnlyLabel(g);
+    var hasAgouti = !!g.A && (g.A.indexOf('A') > -1 || g.A.indexOf('A+') > -1 || g.A.indexOf('At') > -1);
+    var base = g.E.indexOf('E') === -1 ? 'chestnut' : (!g.A ? 'blackBased' : (hasAgouti ? 'bay' : 'black'));
+    // Bay comes in three shades: wild bay (A+ present), bay, and seal brown (At only, with At or a).
+    var shade = '';
+    if (base === 'bay') shade = g.A.indexOf('A+') > -1 ? 'wild' : (g.A.indexOf('A') === -1 && g.A.indexOf('At') > -1 ? 'seal' : '');
     var names = {
       chestnut: ['Chestnut', 'Palomino', 'Cremello'],
-      bay: ['Bay', 'Buckskin', 'Perlino'],
+      bay: shade === 'wild' ? ['Wild Bay', 'Wild Buckskin', 'Wild Perlino'] : shade === 'seal' ? ['Seal Brown', 'Brown Buckskin', 'Brown Perlino'] : ['Bay', 'Buckskin', 'Perlino'],
       black: ['Black', 'Smokey Black', 'Smokey Cream'],
       blackBased: ['Bay or Black', 'Buckskin or Smokey Black', 'Perlino or Smokey Cream']
     };
     // A dun coat without cream has its own names; with cream it is added to the cream name.
-    var dunNames = { chestnut: 'Red Dun', bay: 'Dun', black: 'Grulla', blackBased: 'Dun or Grulla' };
-    var base = g.E.indexOf('E') === -1 ? 'chestnut' : (!g.A ? 'blackBased' : (g.A.indexOf('A') > -1 ? 'bay' : 'black'));
+    var dunNames = { chestnut: 'Red Dun', bay: shade === 'wild' ? 'Wild Bay Dun' : shade === 'seal' ? 'Seal Brown Dun' : 'Dun', black: 'Grulla', blackBased: 'Dun or Grulla' };
     var cream = g.CR ? copies(g.CR, 'CR') : 0;
     var name = names[base][cream];
     if (g.D && g.D.indexOf('D') > -1) name = cream ? name + ' Dun' : dunNames[base];
@@ -531,6 +546,9 @@
     });
     var s = Object.assign({}, absent, sM, sP);
     var d = Object.assign({}, absent, dM, dP);
+    // Hidden agouti alleles: a hand-entered genotype replaces the tested A / a when it agrees with it
+    if (sM.A && agoutiCompatible(sP.A, sM.A)) s.A = sM.A;
+    if (dM.A && agoutiCompatible(dP.A, dM.A)) d.A = dM.A;
     var dist = {}, untested = [];
     ALL_LOCI.forEach(function (l) {
       if (s[l.id] && d[l.id]) dist[l.id] = foalDistribution(l, s[l.id], d[l.id]);
@@ -1948,6 +1966,8 @@
     unreadColourTokens: unreadColourTokens,
     colourOutcomes: colourOutcomes,
     EXTRA_LOCI: EXTRA_LOCI,
+    MANUAL_LOCI: MANUAL_LOCI,
+    agoutiPlain: agoutiPlain,
     extraGenotypeOptions: extraGenotypeOptions,
     manualGenes: manualGenes,
     adoptOwnedStallions: adoptOwnedStallions,

@@ -2081,10 +2081,16 @@
     var life = L.esc(lifeNumber);
     var html = '<div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">' + L.esc(title) + ' — ' + L.esc(info.name || ('#' + lifeNumber)) + '</div>' +
       '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">';
-    L.EXTRA_LOCI.forEach(function (l) {
+    L.MANUAL_LOCI.forEach(function (l) {
       var id = 'gene-' + life + '-' + l.id;
-      html += '<div class="field"><label for="' + id + '">' + L.esc(l.name) + '</label>';
-      if (tested[l.id]) {
+      html += '<div class="field"><label for="' + id + '">' + L.esc(l.id === 'A' ? 'Agouti, hidden alleles (A+, At)' : l.name) + '</label>';
+      if (l.id === 'A') {
+        var curA = manual.A ? manual.A.join('/') : '';
+        var opts = L.extraGenotypeOptions(l).filter(function (g) { return !tested.A || L.agoutiPlain(g.split('/')).join() === L.agoutiPlain(tested.A).join(); });
+        html += '<select id="' + id + '" data-action="horse-gene" data-life="' + life + '" data-locus="A">' +
+          '<option value=""' + (curA ? '' : ' selected') + '>' + (tested.A ? 'As tested (' + L.esc(tested.A.join(' / ')) + ')' : 'Not known') + '</option>' +
+          opts.map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === curA ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + '</select>';
+      } else if (tested[l.id]) {
         html += '<select id="' + id + '" disabled><option>' + L.esc(tested[l.id].join(' / ')) + ' (from Horse Reality)</option></select>';
       } else {
         var cur = manual[l.id] ? manual[l.id].join('/') : '';
@@ -2380,7 +2386,7 @@
   // Short text of the hand-entered genes saved on a horse, e.g. "Sooty Sty / sty".
   function savedGenesText(lifeNumber) {
     var manual = L.manualGenes(state, lifeNumber);
-    return L.EXTRA_LOCI.filter(function (l) { return manual[l.id]; }).map(function (l) {
+    return L.MANUAL_LOCI.filter(function (l) { return manual[l.id]; }).map(function (l) {
       return l.name.replace(/ \(.*\)$/, '') + ' ' + manual[l.id].join(' / ');
     }).join(', ');
   }
@@ -2389,7 +2395,7 @@
   function geneDetailsHtml(lifeNumber) {
     if (!lifeNumber || !state.horseInfo[lifeNumber]) return '';
     var saved = savedGenesText(lifeNumber);
-    return '<details class="profile-block" style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen…) — ' +
+    return '<details class="profile-block" style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen, W20, hidden Agouti…) — ' +
       (saved ? L.esc(saved) : 'none entered yet') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;">' +
       geneEditorHtml(lifeNumber, 'Saved on this horse') +
@@ -2401,7 +2407,7 @@
     var studInfo = state.horseInfo[studLife], mareInfo = state.horseInfo[mareLife];
     var c = L.colourOutcomes(studInfo.testedColours, mareInfo.testedColours, L.manualGenes(state, studLife), L.manualGenes(state, mareLife));
     var html = '<div class="section-head"><h2>Colour possibilities</h2></div>';
-    html += '<details style="margin-bottom:14px;"' + (c.genes.length ? '' : ' open') + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Enter extra genes by hand (Sooty, Silver, Flaxen, Champagne, Roan, Tobiano, Sabino)</summary>' +
+    html += '<details style="margin-bottom:14px;"' + (c.genes.length ? '' : ' open') + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Enter extra genes by hand (W20, hidden Agouti A+/At, Sooty, Silver, Flaxen, Champagne, Roan, Tobiano, Sabino)</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:16px;">' +
       geneEditorHtml(mareLife, 'Mare') + geneEditorHtml(studLife, 'Stallion') +
       '<p class="notes-line" style="margin:0;">Horse Reality doesn\'t list these genes, so set them for each parent if you know them. Anything you leave unset counts as not present. Saved per horse and included in backups.</p>' +

@@ -1191,6 +1191,121 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- sell ideas: which horses to sell, and what to ask ----------
+  // Nothing here contacts Horse Reality. Prices come from your own past sales (price per Breed Total point
+  // of the most similar horses you sold, in HRC) and never go below what you paid for the horse.
+  var SELL_PACE = { quick: 0.85, fair: 1, high: 1.15 };
+  function sellFormOf(state) {
+    var f = (state.settings && state.settings.sellForm) || {};
+    return {
+      mares: f.mares !== false, stallions: f.stallions !== false, young: f.young !== false,
+      mode: f.mode === 'weakest' ? 'weakest' : 'misses',
+      pace: SELL_PACE[f.pace] ? f.pace : 'fair'
+    };
+  }
+  function median(list) {
+    var a = list.slice().sort(function (x, y) { return x - y; });
+    if (!a.length) return 0;
+    var m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  }
+  function roundPrice(n) {
+    var step = n >= 10000 ? 500 : n >= 1000 ? 100 : 10;
+    return Math.max(step, Math.round(n / step) * step);
+  }
+  function horseBT(state, life) {
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    return Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, bestConformation(meta).best));
+  }
+  // The price to ask for one horse: { suggested, low, high, basis, comps, floor, belowCost }
+  function priceIdea(state, life, pace, soldComps) {
+    var bt = horseBT(state, life);
+    var pr = profitOf(state, life);
+    var p = purchaseOf(state, life);
+    var cost = p && (!p.price || p.currency === 'HRC') && (!p.shipping || p.shippingCurrency === 'HRC') ? p.price + p.shipping : 0;
+    var mult = SELL_PACE[pace] || 1;
+    var out = { suggested: null, low: null, high: null, basis: '', comps: [], floor: cost || null, belowCost: false };
+    if (bt > 0 && soldComps.length) {
+      var near = soldComps.filter(function (c) { return String(c.life) !== String(life); })
+        .sort(function (a, b) { return Math.abs(a.bt - bt) - Math.abs(b.bt - bt); }).slice(0, 3);
+      if (near.length) {
+        var est = median(near.map(function (c) { return c.price / c.bt; })) * bt * mult;
+        out.suggested = roundPrice(est); out.low = roundPrice(est * 0.85); out.high = roundPrice(est * 1.15);
+        out.comps = near;
+        out.basis = 'your ' + near.length + ' most similar past sale' + (near.length === 1 ? '' : 's') + ' (by Breed Total)';
+      }
+    }
+    if (cost && (out.suggested == null || out.suggested < cost)) {
+      out.belowCost = out.suggested != null;
+      if (out.suggested == null) { out.suggested = roundPrice(cost * mult); out.low = roundPrice(cost); out.high = roundPrice(cost * 1.3); out.basis = 'what you paid (no similar sales of yours yet)'; }
+      else { out.suggested = roundPrice(cost); if (out.low < cost) out.low = roundPrice(cost); if (out.high < out.suggested) out.high = roundPrice(out.suggested * 1.15); }
+    }
+    return out;
+  }
+  function sellIdeas(state) {
+    var form = sellFormOf(state);
+    var goals = goalsOf(state);
+    var goalsOn = Object.keys(goals).some(function (k) { return goals[k] != null; });
+    // past sales that give a price per Breed Total point
+    var comps = [];
+    Object.keys(state.horseMeta || {}).forEach(function (l) {
+      if (!isSoldLife(state, l)) return;
+      var sa = saleOf(state, l), bt = horseBT(state, l);
+      if (sa && sa.currency === 'HRC' && bt > 0) comps.push({ life: l, name: ((state.horseInfo || {})[l] || {}).name || ('#' + l), bt: bt, price: sa.price });
+    });
+    var herd = ownedHorses(state).filter(function (h) {
+      return !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion' &&
+        (h.info.sex === 'mare' || h.info.sex === 'stallion');
+    }).map(function (h) {
+      var young = isYoungInfo(h.info);
+      var meta = (state.horseMeta && state.horseMeta[h.lifeNumber]) || {};
+      return { h: h, life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), sex: h.info.sex, young: young, bt: horseBT(state, h.lifeNumber),
+        conf: bestConformation(meta).best, gp: h.info.geneticPotential, forSale: h.meta.status === 'For Sale' };
+    });
+    var adultBTs = herd.filter(function (x) { return !x.young && x.bt > 0; }).map(function (x) { return x.bt; });
+    var med = median(adultBTs);
+    var sortedBTs = adultBTs.slice().sort(function (a, b) { return a - b; });
+    var lowCut = sortedBTs.length >= 4 ? sortedBTs[Math.floor(sortedBTs.length / 4)] : 0;
+
+    var ideas = [], forSale = [], held = [];
+    herd.forEach(function (x) {
+      var price = priceIdea(state, x.life, form.pace, comps);
+      if (x.forSale) { forSale.push(Object.assign({ price: price }, x)); return; }
+      var kind = x.young ? (x.sex === 'stallion' ? 'Colt' : 'Filly') : (x.sex === 'stallion' ? 'Stallion' : 'Mare');
+      if ((x.young && !form.young) || (!x.young && x.sex === 'mare' && !form.mares) || (!x.young && x.sex === 'stallion' && !form.stallions)) return;
+      var reasons = [], score = 0;
+      var misses = goalsOn ? goalMisses(state, x.life) : [];
+      var met = goalsOn && goalCheck(state, x.life).met;
+      if (met) return;
+      if (misses.length) { score += misses.length * 3; reasons.push('Misses your goal' + (misses.length === 1 ? '' : 's') + ': ' + misses.join(', ')); }
+      if (!x.young && x.bt > 0 && med > 0 && x.bt < med * 0.92) { score += 2; reasons.push('Breed Total ' + (Math.round(x.bt * 10) / 10) + ' is below your herd median of ' + (Math.round(med * 10) / 10)); }
+      if (!x.young && x.bt > 0 && lowCut && x.bt <= lowCut) { score += 1; reasons.push('In the bottom quarter of your herd by Breed Total'); }
+      if (x.sex === 'mare') {
+        var rows = 0;
+        Object.keys(state.breedings || {}).forEach(function (sid) {
+          (state.breedings[sid] || []).forEach(function (b) { if (String(b.mareLifeNumber) === String(x.life)) rows++; });
+        });
+        if (!x.young && !rows) { score += 1; reasons.push('Never bred'); }
+        var st = mareBreedStatus(state, x.life);
+        if (st.status) { held.push({ life: x.life, name: x.name, why: st.status === 'pregnant' ? 'in foal' : 'just covered' }); return; }
+      } else if (!x.young) {
+        var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(x.life); });
+        var recs = rec ? (state.breedings[rec.id] || []) : [];
+        var done = recs.filter(function (b) { return b.status === 'Succeeded' || b.status === 'Failed' || b.status === 'Foal Born'; });
+        var failed = done.filter(function (b) { return b.status === 'Failed'; }).length;
+        if (done.length >= 5 && failed / done.length >= 0.4) { score += 2; reasons.push('Fails ' + Math.round(failed / done.length * 100) + '% of his resolved breedings'); }
+        if (!recs.length) { score += 1; reasons.push('No breedings recorded'); }
+      }
+      var qualifies = (form.mode === 'misses' && goalsOn) ? misses.length > 0 : (score >= 2 || (!x.young && lowCut && x.bt > 0 && x.bt <= lowCut));
+      if (!qualifies) return;
+      if (!reasons.length) return;
+      ideas.push(Object.assign({ kind: kind, score: score, reasons: reasons, price: price, misses: misses }, x));
+    });
+    ideas.sort(function (a, b) { return b.score - a.score || a.bt - b.bt; });
+    return { form: form, goalsOn: goalsOn, ideas: ideas, forSale: forSale, held: held, medianBT: med, comps: comps.length };
+  }
+
   // ---------- analytics: numbers and suggestions drawn from what is already saved ----------
   // Nothing here makes a network request. A breeding that worked is stored as a
   // "Succeeded" row and later also as a "Foal Born" row, so a success is counted
@@ -1433,6 +1548,8 @@
 
   global.HRLib = {
     purchaseOf: purchaseOf,
+    sellIdeas: sellIdeas,
+    sellFormOf: sellFormOf,
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
     applyStudFee: applyStudFee,

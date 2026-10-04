@@ -1285,6 +1285,8 @@
     }
     html += '</div>';
 
+    html += sellIdeasHtml();
+
     // horses you have sold
     var ss = a.soldSummary;
     html += '<div class="an-card" style="margin-top:18px;"><h3>Sold horses</h3>';
@@ -1303,6 +1305,54 @@
       html += '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Paid = price plus shipping when you bought the horse (blank if you bred it). Profit is shown only when the sale and purchase used the same currency.</p>';
     }
     html += '</div>';
+    return html;
+  }
+
+  // ---------- sell ideas: the suggestion form, horses to sell and what to ask ----------
+  function sellIdeasHtml() {
+    var r = L.sellIdeas(state), f = r.form;
+    function chk(key, label) {
+      return '<label style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;"><input type="checkbox" data-action="update-sell" data-field="' + key + '"' + (f[key] ? ' checked' : '') + '> ' + label + '</label>';
+    }
+    function sel(key, options) {
+      return '<select data-action="update-sell" data-field="' + key + '">' + options.map(function (o) { return '<option value="' + o[0] + '"' + (f[key] === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+    }
+    function money(n) { return L.esc(L.fmtMoney(n)) + ' HRC'; }
+    function priceCell(p) {
+      if (p.suggested == null) return '<span class="sub">No sales or purchase price to go on yet</span>';
+      return '<strong class="mono">' + money(p.suggested) + '</strong><div class="sub" style="font-size:12px;">range ' + L.esc(L.fmtMoney(p.low)) + '\u2013' + L.esc(L.fmtMoney(p.high)) + ' \u00b7 ' + L.esc(p.basis) +
+        (p.belowCost ? ' \u00b7 raised to what you paid' : '') + '</div>';
+    }
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Sell ideas</h3>' +
+      '<p class="notes-line" style="margin:0 0 10px;">Horses worth selling, and what to ask. It never lists a horse that meets all your goals, a Companion, or a mare that is covered or in foal.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:12px;">' +
+        '<span><strong>Look at:</strong> ' + chk('mares', 'Mares') + chk('stallions', 'Stallions') + chk('young', 'Colts &amp; Fillies') + '</span>' +
+        '<span><strong>Pick by:</strong> ' + sel('mode', [['misses', 'Missing my goals'], ['weakest', 'Weakest in the herd']]) + '</span>' +
+        '<span><strong>Price:</strong> ' + sel('pace', [['quick', 'Quick sale (15% under)'], ['fair', 'Fair'], ['high', 'Top dollar (15% over)']]) + '</span>' +
+      '</div>';
+    if (!r.goalsOn && f.mode === 'misses') html += '<div class="an-tip info">You have no highlight goals set, so horses are picked from the weaker end of your herd. Set goals under <em>Highlight goals</em> for sharper picks.</div>';
+    if (!r.comps) html += '<div class="an-tip info">No past sales with a known Breed Total yet, so prices start from what you paid for a horse. They get better as sales are recorded from your bank page.</div>';
+    if (!r.ideas.length) {
+      html += '<p class="notes-line" style="margin:8px 0 0;">Nothing to suggest with these settings. Every horse you look at either meets your goals or is worth keeping.</p>';
+    } else {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Horse</th><th>Why sell</th><th class="num">BT</th><th>Suggested price</th></tr></thead><tbody>';
+      r.ideas.slice(0, 15).forEach(function (x) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button><div class="sub">' + x.kind + '</div></td>' +
+          '<td>' + x.reasons.map(function (t) { return '<div>' + L.esc(t) + '</div>'; }).join('') + '</td>' +
+          '<td class="num mono">' + (x.bt ? Math.round(x.bt * 10) / 10 : '\u2014') + '</td><td>' + priceCell(x.price) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      if (r.ideas.length > 15) html += '<p class="notes-line" style="margin:6px 0 0;">Showing the 15 strongest of ' + r.ideas.length + '.</p>';
+    }
+    if (r.held.length) html += '<p class="notes-line" style="margin:8px 0 0;">Held back until their foal is born: ' + r.held.map(function (x) { return L.esc(x.name) + ' (' + x.why + ')'; }).join(', ') + '.</p>';
+    if (r.forSale.length) {
+      html += '<h4 style="margin:16px 0 6px;">Already for sale: price check</h4><div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Horse</th><th class="num">BT</th><th>Price to ask</th></tr></thead><tbody>';
+      r.forSale.forEach(function (x) {
+        html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button></td><td class="num mono">' + (x.bt ? Math.round(x.bt * 10) / 10 : '\u2014') + '</td><td>' + priceCell(x.price) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '<p class="notes-line" style="margin:10px 0 0;">Prices are estimates, not what the market will pay: they come from the price per Breed Total point of your most similar past sales, never below what you paid. Check the market before listing.</p></div>';
     return html;
   }
 
@@ -2501,6 +2551,13 @@
         goals[t.getAttribute('data-field')] = t.value.trim();
         state.settings.goals = goals;
         goalsOpen = true;
+        persist();
+      }
+      else if (action === 'update-sell') {
+        var sf = Object.assign({}, state.settings.sellForm);
+        var fld = t.getAttribute('data-field');
+        sf[fld] = t.type === 'checkbox' ? t.checked : t.value;
+        state.settings.sellForm = sf;
         persist();
       }
       else if (action === 'update-username') {

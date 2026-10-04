@@ -177,6 +177,10 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 
 Click any column heading in the stallion, mare or Colts & Fillies tables to sort by it; click it again to reverse the order (a small arrow shows the direction). Empty values always sort to the bottom. Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
 
+## Sell ideas
+
+The **Sell ideas** card on the Analytics tab suggests which of your horses to sell and what to ask. Use its form to choose what to look at (mares, stallions, colts and fillies), how to pick (horses missing your highlight goals, or the weakest in your herd) and how to price (quick sale 15% under, fair, or top dollar 15% over). Each suggestion lists the reasons (missed goals, Breed Total below your herd median, never bred, a stallion that fails a lot) and a suggested price with a range. It never suggests a horse that meets all your goals, a Companion, or a mare that is covered or in foal. Prices come from the price per Breed Total point of your most similar past sales, and never go below what you paid; with no sales yet it starts from what you paid. Horses already marked For Sale get a price check too. These are estimates, so check the market before listing.
+
 ## Breeding suggestions
 
 Open a mare's page (My Mares, or any mare's profile) and click **Breeding suggestions →** to see the 10 best stallions for her, each with the reasons: the foal's estimated Breed Total (from both parents' genetic potential and top conformation), inbreeding, conformation traits where he covers her weak ones (or where you are both weak), his fertility, what he costs (stud fee, transport and semen vial when known), and whether they have been bred together before.

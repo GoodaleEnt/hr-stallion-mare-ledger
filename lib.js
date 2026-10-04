@@ -611,7 +611,7 @@
     return n;
   }
   // ---------- goals: horses worth a closer look ----------
-  // state.settings.goals = { minConf, minBT, maxVG, maxGP, maxG, maxA, maxBA }. A blank goal
+  // state.settings.goals = { minConf, minBT, maxGP, maxG, maxA, maxBA }. A blank goal
   // is ignored. Each horse gets three sections - top conformation, Breed Total
   // and conformation traits - each 'ok' (meets the goal), 'bad' (doesn't) or
   // 'na' (no goal set, or no data yet). A horse is highlighted overall when it
@@ -619,7 +619,7 @@
   function goalsOf(state) {
     var g = (state && state.settings && state.settings.goals) || {};
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
-    return { minConf: num(g.minConf), minBT: num(g.minBT), maxVG: num(g.maxVG), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
+    return { minConf: num(g.minConf), minBT: num(g.minBT), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
@@ -650,7 +650,7 @@
     }
     var counts = traitCounts(info);
     var traits = { label: 'Conformation traits', state: 'na', text: 'no goal' };
-    var limits = [['VG', 'VG', g.maxVG], ['GP', 'G+', g.maxGP], ['G', 'G', g.maxG], ['A', 'A', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
+    var limits = [['GP', 'G+', g.maxGP], ['G', 'G', g.maxG], ['A', 'A', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
     if (limits.length) {
       if (!counts) {
         traits.text = 'no data yet';

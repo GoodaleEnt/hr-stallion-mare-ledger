@@ -130,7 +130,7 @@ Each horse's card and page shows its **top conformation score** and its **Breed 
 
 ### Highlight goals
 
-Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and a maximum number of conformation traits at each rating: **VG** (Very good), **G+** (Good+), **G** (Good), **A** (Average) and **BA** (Below average). Leave a box empty to ignore it.
+Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and a maximum number of conformation traits at each of these ratings: **G+** (Good+), **G** (Good), **A** (Average) and **BA** (Below average). There's no limit for Very good (VG), since you always want as many of those as possible. Leave a box empty to ignore it.
 
 Every horse card, herd row and horse page then shows three labelled boxes above its picture: **Conformation**, **Breed Total** and **Conformation traits**. A box is green if the horse meets that goal, red if it doesn't, and grey if there's no goal set or no data yet. A horse that meets every goal you set is outlined. Trait limits are "at or under": a maximum of 2 BA traits accepts horses with 0, 1 or 2.
 

@@ -715,6 +715,42 @@
       sections: s
     };
   }
+  // ---------- where a mare stands: covered, or in foal ----------
+  // 'pregnant' = her page says she is pregnant, or a breeding of hers succeeded and no foal has been
+  // recorded for it yet. 'covered' = a covering within the last 7 days that has no result yet (Horse
+  // Reality settles a covering within about 6 days). Otherwise ''.
+  function mareBreedStatus(state, life) {
+    life = String(life || '');
+    var out = { status: '', date: '', due: '', stallion: '' };
+    if (!life) return out;
+    var info = state.horseInfo && state.horseInfo[life];
+    var preg = !!(info && info.pregnancy && String(info.pregnancy.status || '').indexOf('Pregnant') === 0);
+    var succeeded = false, covered = null;
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      var list = state.breedings[sid] || [];
+      var hasFoal = list.some(function (b) { return String(b.mareLifeNumber) === life && b.status === 'Foal Born'; });
+      list.forEach(function (b) {
+        if (String(b.mareLifeNumber) !== life) return;
+        var days = b.date ? daysSince(b.date) : 0;
+        if (b.status === 'Succeeded' && !hasFoal && (days == null || days <= 400)) { succeeded = true; out.stallion = out.stallion || sid; }
+        if (b.status === 'Pending' && (days == null || days <= 7)) {
+          if (!covered || String(b.date || '') > String(covered.date || '')) covered = { date: b.date || '', sid: sid };
+        }
+      });
+    });
+    var nameOf = function (sid) { var s = (state.stallions || []).find(function (x) { return x.id === sid; }); return s ? s.name : ''; };
+    if (preg || succeeded) {
+      out.status = 'pregnant';
+      out.due = preg && info.pregnancy.dueText ? info.pregnancy.dueText : '';
+      out.stallion = nameOf(out.stallion) || (preg && info.pregnancy.sireName) || '';
+    } else if (covered) {
+      out.status = 'covered';
+      out.date = covered.date;
+      out.stallion = nameOf(covered.sid);
+    }
+    return out;
+  }
+
   // ---------- stud fees you paid to breed to someone else's stallion ----------
   // Bank row: "You paid 35 000 HRC + 1 000 HRC for transport to <owner> to breed <mare> with the stud <stallion>."
   // sf = { fee, currency, transport, studOwner, mareName, mareLife, stallionName, stallionLife, date }
@@ -1113,6 +1149,7 @@
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
     applyStudFee: applyStudFee,
+    mareBreedStatus: mareBreedStatus,
     recordFoalsFromList: recordFoalsFromList,
     recordFoalFromHorse: recordFoalFromHorse,
     foalLifeOf: foalLifeOf,

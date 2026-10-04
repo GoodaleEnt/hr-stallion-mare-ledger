@@ -193,6 +193,10 @@ Below the inbreeding check, the calculator shows the odds for the foal's **coat 
 
 A mare's foals are picked up three ways: from the **Offspring** tab of one of your stallions, from the mare's own **Foals** tab on Horse Reality (open it once and every foal listed there, with its sire, is added to her breeding history), and from a foal's own page when its dam is one of your mares. A foal is recorded once, under its sire; a sire you don't own is kept as an *outside stud* (it appears in the mare's history but not on your Stallions tab), and foal scores are read from the list. The same goes for breedings you do to a stallion that isn't yours: clicking **Breed** records the covering against that outside stud with today's date, and the next time you open your bank page the **stud fee you paid** (plus any transport) is read from the "You paid … to breed … with the stud …" row and added to that covering. It shows in the mare's breeding history under Price, with "+ transport" and who you paid beneath it.
 
+## Covered and in-foal mares
+
+A mare's card on **My Mares** shows where she stands: an amber outline and a **✔ Covered** ribbon (with the date) while a covering has been recorded in the last 7 days and has no result yet, and a pink outline with a **♥ In foal** ribbon (with her due date when known) once she is pregnant. The same labels appear as a tag on her own page and in the Status column on Analytics. On Horse Reality's **Breed** page, the mare dropdown also marks them: *♥ IN FOAL (due …)* and *✔ COVERED by …* next to the mare's name, so you can see at a glance who is already bred. Mares with no label are free to breed.
+
 ## Breeding dates
 
 When you click **Breed** on Horse Reality's Breed page, the ledger records the covering with today's date (shown as **Date bred**) and the status *Pending*, unless the site shows an error. The foal's **Date born** is filled in from the foal's passport once it's born.

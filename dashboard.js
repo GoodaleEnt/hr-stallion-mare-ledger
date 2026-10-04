@@ -725,6 +725,14 @@
     '</div>';
   }
 
+  // corner ribbon and note on a mare's card: covered (waiting for the result) or in foal
+  function mareBreedBadgeHtml(st) {
+    if (!st || !st.status) return '';
+    if (st.status === 'pregnant') {
+      return '<span class="pill corner-badge mare-ribbon pregnant" title="' + L.esc('In foal' + (st.stallion ? ' to ' + st.stallion : '') + (st.due ? ' \u2014 ' + st.due : '')) + '">\u2665 In foal' + (st.due ? ' \u00b7 ' + L.esc(st.due.replace(/^Due /, 'due ')) : '') + '</span>';
+    }
+    return '<span class="pill corner-badge mare-ribbon covered" title="' + L.esc('Covered' + (st.stallion ? ' by ' + st.stallion : '') + (st.date ? ' on ' + L.fmtDate(st.date) : '') + ' \u2014 waiting for the result') + '">\u2714 Covered' + (st.date ? ' \u00b7 ' + L.esc(L.fmtDate(st.date)) : '') + '</span>';
+  }
   function renderMaresList() {
     var html = topHeaderHtml();
     var myName = (state.settings.myUsername || '').trim();
@@ -753,7 +761,9 @@
       html += '<div class="stallion-grid">';
       maresIndex.forEach(function (m) {
         var mareInfo = (state.horseInfo && m.mareLifeNumber) ? state.horseInfo[m.mareLifeNumber] : null;
-        html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+        var breedSt = L.mareBreedStatus(state, m.mareLifeNumber);
+        html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
+          mareBreedBadgeHtml(breedSt) +
           goalStripHtml(m.mareLifeNumber) +
           (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
@@ -1123,9 +1133,9 @@
       html += '<p class="notes-line" style="margin:0;">No adult mares (3+) of yours cached yet.</p>';
     } else {
       html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr>' + sortHead('mares', 'name', 'Mare') + sortHead('mares', 'breedings', 'Breedings', 'num') + sortHead('mares', 'foals', 'Foals', 'num') + sortHead('mares', 'last', 'Last bred') + sortHead('mares', 'status', 'Status') + '</tr></thead><tbody>';
-      sortList('mares', adultMares, { name: function (m) { return String(m.name || ''); }, breedings: function (m) { return m.breedings; }, foals: function (m) { return m.foals; }, last: function (m) { return m.last || null; }, status: function (m) { return m.pregnant ? 'In foal' : 'Open'; } }).forEach(function (m) {
+      sortList('mares', adultMares, { name: function (m) { return String(m.name || ''); }, breedings: function (m) { return m.breedings; }, foals: function (m) { return m.foals; }, last: function (m) { return m.last || null; }, status: function (m) { var b = L.mareBreedStatus(state, m.life).status; return b === 'pregnant' || m.pregnant ? 'In foal' : b === 'covered' ? 'Covered' : 'Open'; } }).forEach(function (m) {
         html += '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(m.life) + '">' + L.esc(m.name) + '</button></td>' +
-          '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (m.pregnant ? 'In foal' : 'Open') + '</td></tr>';
+          '<td class="num mono">' + m.breedings + '</td><td class="num mono">' + m.foals + '</td><td>' + (m.last ? L.fmtDate(m.last) : '\u2014') + '</td><td>' + (function () { var b = L.mareBreedStatus(state, m.life).status; return b === 'pregnant' || m.pregnant ? 'In foal' : b === 'covered' ? 'Covered' : 'Open'; })() + '</td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -1907,6 +1917,9 @@
     var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
     if (paidTags) tags.push(paidTags);
     if (info.lifeNumber && lifeStatus(info.lifeNumber) === 'For Sale') tags.push('<span class="tag" style="background:#f1e6c9;border-color:#a9822f;color:#6b4f00;font-weight:600;">$ For sale</span>');
+    var breedNow = info.lifeNumber ? L.mareBreedStatus(state, info.lifeNumber) : { status: '' };
+    if (breedNow.status === 'pregnant') tags.push('<span class="tag" style="background:#f6dbe9;border-color:#b0407a;color:#8a2a5c;font-weight:600;">\u2665 In foal' + (breedNow.due ? ' \u00b7 ' + L.esc(breedNow.due.replace(/^Due /, 'due ')) : '') + '</span>');
+    else if (breedNow.status === 'covered') tags.push('<span class="tag" style="background:#f1e6c9;border-color:#a9822f;color:#6b4f00;font-weight:600;">\u2714 Covered' + (breedNow.date ? ' \u00b7 ' + L.esc(L.fmtDate(breedNow.date)) : '') + '</span>');
     var saleTags = info.lifeNumber ? saleTagsHtml(info.lifeNumber) : '';
     if (saleTags) tags.push(saleTags);
     var scoreTags = info.lifeNumber ? highScoreTagsHtml(info.lifeNumber) : '';

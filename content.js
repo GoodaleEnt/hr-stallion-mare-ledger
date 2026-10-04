@@ -1201,6 +1201,28 @@
     var o = {}; o[PENDING_KEY] = list;
     chrome.storage.local.set(o, cb || function () {});
   }
+  // The Breed page's mare dropdown: mares you have covered, or that are in foal, say so in the list.
+  // The option's own text is kept in data-hr-name; the page only reads the option's value.
+  function annotateBreedDropdown() {
+    var select = document.getElementById('secondhorse');
+    if (!select) return;
+    HRStorage.getState(function (state) {
+      for (var i = 0; i < select.options.length; i++) {
+        var opt = select.options[i];
+        if (!opt.value) continue;
+        if (!opt.hasAttribute('data-hr-name')) opt.setAttribute('data-hr-name', (opt.textContent || '').trim());
+        var base = opt.getAttribute('data-hr-name');
+        var st = HRLib.mareBreedStatus(state, opt.value);
+        var label = st.status === 'pregnant' ? '  \u2014  \u2665 IN FOAL' + (st.due ? ' (' + st.due.replace(/^Due /, 'due ') + ')' : '')
+          : st.status === 'covered' ? '  \u2014  \u2714 COVERED' + (st.stallion ? ' by ' + st.stallion : '') : '';
+        var text = base + label;
+        if (opt.textContent !== text) opt.textContent = text;
+        opt.style.fontWeight = label ? '700' : '';
+        opt.style.color = st.status === 'pregnant' ? '#b0407a' : st.status === 'covered' ? '#a06a00' : '';
+      }
+    });
+  }
+
   function setupBreedCapture() {
     document.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button.breedmare') : null;
@@ -1215,7 +1237,7 @@
       var stallionTop = document.querySelector('#first_horseinfo .top');
       var covering = {
         mareLife: mareLife,
-        mareName: parseHorseNameHeader(opt ? opt.textContent : ''),
+        mareName: parseHorseNameHeader(opt ? (opt.getAttribute('data-hr-name') || opt.textContent) : ''),
         stallionLife: stallionLife,
         stallionName: parseHorseNameHeader(stallionTop ? stallionTop.textContent : ''),
         at: Date.now()
@@ -1513,6 +1535,7 @@
   setInterval(function () {
     injectLedgerButton(); // put it back if the site's own scripts removed it
     scrapeFoalsTab();
+    annotateBreedDropdown();
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

@@ -1271,26 +1271,23 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
-  // An "Open in Ledger" button on every horse page. It sits directly under the
-  // page's own Cover / Breed button when there is one (mares); otherwise it floats
-  // at the bottom-left of the screen. On desktop it asks the extension to open (or
-  // focus) the dashboard on this horse's profile; on mobile it opens the overlay.
+  // An "Open in Ledger" tab on every horse page. Where the page has Horse Reality's own
+  // side tabs (<hr-tab-container sideways="true"> with <hr-tab> items like Dam / Foal) it is
+  // added to them as one more tab; on every other horse page it is drawn as a vertical tab
+  // on the right edge of the screen. On desktop it asks the extension to open (or focus)
+  // the dashboard on this horse's profile; on mobile it opens the on-page overlay.
   var LEDGER_BTN_ID = 'hr-ledger-open-btn';
-  var LEDGER_WRAP_ID = 'hr-ledger-open-wrap';
-  // Looks through the page, including open shadow roots, for the site's own
-  // Cover / Breed button (a short button or link whose label starts with that word).
-  function findCoverButton(root) {
-    var els = root.querySelectorAll('button, a, input[type=button], input[type=submit]');
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      if (el.id === LEDGER_BTN_ID || (el.closest && el.closest('nav, header, footer, .leftnav, .sidemenu, #bbmenu'))) continue;
-      var text = ((el.textContent || el.value || '') + '').replace(/\s+/g, ' ').trim();
-      if (text.length > 0 && text.length <= 24 && /^(cover|breed)\b/i.test(text)) return el;
+  var LEDGER_TAB_ID = 'hr-ledger-open-tab';
+  var tabHiddenTicks = 0, tabModeFailed = false;
+  function findSideTabs(root) {
+    var list = root.querySelectorAll('hr-tab-container');
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].getAttribute('sideways')) === 'true') return list[i];
     }
     var all = root.querySelectorAll('*');
     for (var j = 0; j < all.length; j++) {
       if (all[j].shadowRoot) {
-        var found = findCoverButton(all[j].shadowRoot);
+        var found = findSideTabs(all[j].shadowRoot);
         if (found) return found;
       }
     }
@@ -1304,60 +1301,71 @@
     }
     chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
   }
+  function removeLedgerTab() {
+    document.querySelectorAll('#' + LEDGER_TAB_ID).forEach(function (el) { el.remove(); });
+  }
   function removeLedgerButton() {
-    var w = document.getElementById(LEDGER_WRAP_ID);
-    if (w) w.remove();
+    removeLedgerTab();
     document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
   }
   function injectLedgerButton() {
     var life = parseHorseIdFromUrl();
     if (!life) { removeLedgerButton(); return; }
-    var anchor = findCoverButton(document);
-    var wrap = null;
-    var floating = document.getElementById(LEDGER_BTN_ID);
-    if (anchor) {
-      // already directly under the Cover button (this may be inside a shadow root)? nothing to do
-      var next = anchor.nextElementSibling;
-      if (next && next.id === LEDGER_WRAP_ID && next.firstChild && next.firstChild.getAttribute('data-life') === life) return;
-      removeLedgerButton();
-      var rootNode = anchor.getRootNode();
-      if (rootNode && rootNode.getElementById) {
-        var stale = rootNode.getElementById(LEDGER_WRAP_ID);
-        if (stale) stale.remove();
+
+    // 1) one more tab among the site's own side tabs
+    var tabs = tabModeFailed ? null : findSideTabs(document);
+    if (tabs) {
+      var mine = tabs.querySelector('#' + LEDGER_TAB_ID);
+      if (mine && mine.getAttribute('data-life') === life) {
+        // if the site never draws a tab we add, give up on this placement and use the edge tab
+        var box = mine.getBoundingClientRect();
+        if (box.width === 0 && box.height === 0) {
+          if (++tabHiddenTicks >= 3) { tabModeFailed = true; mine.remove(); }
+        } else {
+          tabHiddenTicks = 0;
+        }
+        if (!tabModeFailed) return;
+      } else if (!tabModeFailed) {
+        removeLedgerButton();
+        var tab = document.createElement('hr-tab');
+        tab.id = LEDGER_TAB_ID;
+        tab.setAttribute('text', 'Ledger');
+        tab.setAttribute('title', 'Open this horse in HR Stallion & Mare Ledger');
+        tab.setAttribute('data-life', life);
+        // handled here so the site's tab logic never sees the click
+        tab.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          openInLedger(tab.getAttribute('data-life'));
+        }, true);
+        tabHiddenTicks = 0;
+        tabs.appendChild(tab);
+        return;
       }
-      wrap = document.createElement('div');
-      wrap.id = LEDGER_WRAP_ID;
-      wrap.style.cssText = 'display:block;width:100%;flex:1 1 100%;margin:8px 0 0;';
-      var inline = document.createElement('button');
-      inline.type = 'button';
-      inline.id = LEDGER_BTN_ID;
-      inline.textContent = 'Open in Ledger';
-      inline.title = 'Open this horse in HR Stallion & Mare Ledger';
-      inline.setAttribute('data-life', life);
-      inline.style.cssText = 'cursor:pointer;background:#46592C;color:#fff;border:none;border-radius:6px;padding:8px 14px;font:600 14px system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.25);';
-      inline.addEventListener('click', function () { openInLedger(inline.getAttribute('data-life')); });
-      wrap.appendChild(inline);
-      anchor.insertAdjacentElement('afterend', wrap);
-      return;
+    } else {
+      removeLedgerTab();
     }
-    // no Cover button on this page: floating button, bottom-left
-    if (document.getElementById(LEDGER_WRAP_ID)) { removeLedgerButton(); floating = null; }
-    if (floating) { floating.setAttribute('data-life', life); return; }
+
+    // 2) our own vertical tab on the right edge of the screen
+    var edge = document.getElementById(LEDGER_BTN_ID);
+    if (edge) { edge.setAttribute('data-life', life); return; }
     var host = document.body || document.documentElement;
     if (!host) return;
-    var btn = document.createElement('button');
-    btn.id = LEDGER_BTN_ID;
-    btn.type = 'button';
-    btn.textContent = 'Open in Ledger';
-    btn.title = 'Open this horse in HR Stallion & Mare Ledger';
-    btn.setAttribute('data-life', life);
-    btn.style.cssText = [
-      'position:fixed', 'left:16px', 'bottom:16px', 'z-index:2147483000', 'cursor:pointer',
-      'background:#46592C', 'color:#fff', 'border:none', 'border-radius:999px', 'padding:10px 18px',
-      'font:600 15px system-ui,sans-serif', 'box-shadow:0 4px 14px rgba(0,0,0,.3)'
+    edge = document.createElement('button');
+    edge.id = LEDGER_BTN_ID;
+    edge.type = 'button';
+    edge.textContent = 'Open in Ledger';
+    edge.title = 'Open this horse in HR Stallion & Mare Ledger';
+    edge.setAttribute('data-life', life);
+    edge.style.cssText = [
+      'position:fixed', 'right:0', 'top:38%', 'z-index:2147483000', 'cursor:pointer',
+      'background:#46592C', 'color:#fff', 'border:none', 'border-radius:10px 0 0 10px',
+      'padding:16px 9px', 'writing-mode:vertical-rl', 'text-orientation:mixed',
+      'font:600 14px system-ui,sans-serif', 'letter-spacing:.03em',
+      'box-shadow:-2px 2px 10px rgba(0,0,0,.3)'
     ].join(';');
-    btn.addEventListener('click', function () { openInLedger(btn.getAttribute('data-life')); });
-    host.appendChild(btn);
+    edge.addEventListener('click', function () { openInLedger(edge.getAttribute('data-life')); });
+    host.appendChild(edge);
   }
 
   function onPageReady() {

@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.19.3 | 2026-10-03 | Open in Ledger is a side tab on every horse page (joins the site's own side tabs where they exist) | Draft |
 | 1.19.2 | 2026-10-03 | Open in Ledger button sits under the Cover button on mares | Draft |
 | 1.19.1 | 2026-10-03 | Open in Ledger button re-appears if the site removes it | Draft |
 | 1.19.0 | 2026-10-03 | "Open in Ledger" button on Horse Reality horse pages opens that horse's profile in the dashboard | Draft |

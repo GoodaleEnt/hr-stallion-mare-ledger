@@ -515,6 +515,29 @@
     '</div>';
   }
 
+  // How a group of horses stands against your highlight goals: meets all, misses exactly one box, misses more.
+  // A horse with no data yet for a box is not counted as a miss (same rule as the goal boxes on its card).
+  function goalTally(lives) {
+    var t = { total: lives.length, meet: 0, one: 0, more: 0, goals: false };
+    lives.forEach(function (life) {
+      if (!life) return;
+      var c = L.goalCheck(state, life);
+      if (!c.active) return;
+      t.goals = true;
+      if (c.met) { t.meet++; return; }
+      var n = L.goalMisses(state, life).length;
+      if (n === 1) t.one++; else if (n > 1) t.more++;
+    });
+    return t;
+  }
+  function goalTallyHtml(t) {
+    if (!t.goals) return '<div class="tally sub" style="font-size:12px;color:var(--text-muted);margin-top:6px;">Set highlight goals to see how many fit</div>';
+    return '<div class="tally" style="font-size:12px;margin-top:6px;line-height:1.5;">' +
+      '<div><span style="color:var(--success);font-weight:600;">' + t.meet + '</span> fit your goals</div>' +
+      '<div><span style="color:var(--warn);font-weight:600;">' + t.one + '</span> off by one</div>' +
+      '<div><span style="color:var(--danger);font-weight:600;">' + t.more + '</span> off by more</div></div>';
+  }
+
   function renderStallionsList() {
     var ownedStallions = getOwnedStallions();
     var totalBreedings = 0, totalsAll = {};
@@ -524,13 +547,18 @@
       L.CURRENCIES.forEach(function (c) { if (a.totals && a.totals[c]) totalsAll[c] = (totalsAll[c] || 0) + a.totals[c]; });
     });
     var totalEarnedLine = L.moneyLine(totalsAll);
+    var activeStallions = ownedStallions.filter(function (s) { return !movedOut(s.lifeNumber); });
+    var activeMares = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber); });
+    var stallionTally = goalTally(activeStallions.map(function (s) { return s.lifeNumber; }));
+    var mareTally = goalTally(activeMares.map(function (m) { return m.mareLifeNumber; }));
 
     var html = topHeaderHtml();
     html += renderDebugPanel();
 
     html += '<div class="stats-bar">' +
-      '<div class="stat-tile"><div class="num mono">' + ownedStallions.length + '</div><div class="label">Stallions</div></div>' +
-      '<div class="stat-tile"><div class="num mono">' + uniqueMareCount + '</div><div class="label">Mares (all)</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + activeStallions.length + '</div><div class="label">Active stallions</div>' + goalTallyHtml(stallionTally) + '</div>' +
+      '<div class="stat-tile"><div class="num mono">' + activeMares.length + '</div><div class="label">Active mares</div>' + goalTallyHtml(mareTally) + '</div>' +
+      '<div class="stat-tile"><div class="num mono">' + uniqueMareCount + '</div><div class="label">Mares bred (all)</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + totalBreedings + '</div><div class="label">Breedings logged</div></div>' +
       '<div class="stat-tile"><div class="' + (totalEarnedLine.indexOf('·') > -1 ? 'num mono multi' : 'num mono') + '">' + totalEarnedLine + '</div><div class="label">Total earned</div></div>' +
       '</div>';
@@ -763,11 +791,12 @@
       return html;
     }
 
+    var activeMaresTab = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber); });
     var totalRecords = 0, foalsBorn = 0;
     maresIndex.forEach(function (m) { totalRecords += m.records.length; foalsBorn += (m.counts['Foal Born'] || 0); });
 
     html += '<div class="stats-bar">' +
-      '<div class="stat-tile"><div class="num mono">' + maresIndex.length + '</div><div class="label">Your Mares</div></div>' +
+      '<div class="stat-tile"><div class="num mono">' + activeMaresTab.length + '</div><div class="label">Active mares</div>' + goalTallyHtml(goalTally(activeMaresTab.map(function (m) { return m.mareLifeNumber; }))) + '</div>' +
       '<div class="stat-tile"><div class="num mono">' + totalRecords + '</div><div class="label">Breedings logged</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + foalsBorn + '</div><div class="label">Foals born</div></div>' +
       '</div>';

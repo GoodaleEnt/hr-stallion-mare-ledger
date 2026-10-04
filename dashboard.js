@@ -627,6 +627,14 @@
   // Only bank rows carry a covering date; offspring, in-foal and failed rows
   // often have none. Fall back to another record for the same mare that does
   // (shown in italics) so a foal's row still says when she was bred.
+  // Older saves kept Horse Reality's icon markers ("!27923531|") or just the
+  // life number as the name; tidy that and prefer the name from her passport.
+  function displayMareName(b) {
+    var name = String(b.mareName || '').replace(/ↆ/g, '').split('|')[0].replace(/^!/, '').replace(/\s+/g, ' ').trim();
+    var info = b.mareLifeNumber && state.horseInfo ? state.horseInfo[b.mareLifeNumber] : null;
+    if ((!name || /^\d+$/.test(name)) && info && info.name) name = String(info.name).replace(/ↆ/g, '').split('|')[0].replace(/^!/, '').trim();
+    return name || b.mareName || '';
+  }
   var rowSiblings = [];
   function bredDate(b) {
     if (b.date) return { date: b.date, inferred: false, approx: !!b.dateApprox };
@@ -659,6 +667,7 @@
 
   function renderBreedingRow(b, i, viewMode) {
     var curStatus = b.status || 'Pending';
+    b = Object.assign({}, b, { mareName: displayMareName(b) });
     var sidForRow = b.stallionId || selectedId || '';
     var statusSelect = '<select class="pill-select ' + L.statusPillClass(curStatus) + '" data-action="update-breeding-status" data-id="' + b.id + '" data-sid="' + sidForRow + '">' +
       L.STATUS_OPTIONS.map(function (opt) {

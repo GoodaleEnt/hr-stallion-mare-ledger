@@ -53,7 +53,7 @@
     if (!a) return '';
     var text = a.textContent || '';
     text = text.replace(/ↆ/g, '');
-    text = text.split('|')[0];
+    text = text.split('|')[0].replace(/^!/, '');
     return text.replace(/\s+/g, ' ').trim();
   }
   function parseScore(strongEl) {
@@ -96,7 +96,7 @@
       if (!damA) return;
 
       out.push({
-        mareName: cleanText(damA),
+        mareName: parseHorseLabel(damA),
         mareUrl: damA.href || '',
         mareLifeNumber: lifeNumberFromUrl(damA.href),
         breederName: cleanText(breederA),

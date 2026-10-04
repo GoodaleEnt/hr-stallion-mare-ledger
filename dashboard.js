@@ -26,18 +26,20 @@
   var calcStallion = '';
   var listFilterText = '';
   var compareA = '', compareB = '';
+  var calcBreed = '', compareBreed = '';
   function defaultCompareFilter() { return { adult: true, young: true, mine: true, other: true, mares: true, stallions: true, sugg: false }; }
   var compareFilter = { a: defaultCompareFilter(), b: defaultCompareFilter() };
   var UI_KEY = 'hrLedgerUi';
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
   function saveUi() {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter })); } catch (e) {}
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed })); } catch (e) {}
   }
   try {
     var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
     if (savedUi.calcMare) calcMare = String(savedUi.calcMare);
     if (savedUi.calcStallion) calcStallion = String(savedUi.calcStallion);
+    if (savedUi.calcBreed) calcBreed = String(savedUi.calcBreed);
     if (savedUi.calcFilter) ['mare', 'stallion'].forEach(function (k) { if (savedUi.calcFilter[k]) calcFilter[k] = Object.assign(defaultCalcFilter(), savedUi.calcFilter[k]); });
     if (savedUi.tab === 'calc') activeTab = 'calc';
   } catch (e) {}
@@ -1528,9 +1530,11 @@
     }
     function sel(id, action, cur, side) {
       var f = compareFilter[side], sugg = f.sugg ? suggestedFor(side === 'a' ? compareB : compareA) : null;
+      var cmpKey = breedInForce(compareBreed, side === 'a' ? compareB : compareA);
       var rows = lives.filter(function (l) {
         if (l === cur) return true;
         var info = state.horseInfo[l];
+        if (!breedAllowed(l, cmpKey)) return false;
         if (info.sex === 'mare' ? !f.mares : info.sex === 'stallion' ? !f.stallions : false) return false;
         if (L.isYoungInfo(info) ? !f.young : !f.adult) return false;
         if (mineSet[l] ? !f.mine : !f.other) return false;
@@ -1552,7 +1556,7 @@
         group('Your horses \u00b7 Under 3', function (l) { return mineSet[l] && young(l); }) +
         group('Other horses \u00b7 Under 3', function (l) { return !mineSet[l] && young(l); }) + '</select></div>';
     }
-    var html = '<div class="an-card" style="margin-top:18px;"><h3>Compare two horses</h3><div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:10px;">' + sel('compare-a', 'compare-a', compareA, 'a') + sel('compare-b', 'compare-b', compareB, 'b') + '</div>';
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Compare two horses</h3><div style="max-width:380px;margin-bottom:8px;"><label for="compare-breed" style="font-weight:600;">Breed</label>' + breedSelectHtml('compare-breed', 'compare-breed', compareBreed) + '</div>' + breedNoteHtml(breedInForce(compareBreed, compareA || compareB), compareBreed, compareA || compareB) + '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:10px;">' + sel('compare-a', 'compare-a', compareA, 'a') + sel('compare-b', 'compare-b', compareB, 'b') + '</div>';
     if (compareA && compareB && state.horseInfo[compareA] && state.horseInfo[compareB]) {
       html += statsCompareHtml(compareA, compareB).replace('Parent stats', 'Side by side') + traitsCompareHtml(compareA, compareB);
       var ga = savedGenesText(compareA), gb = savedGenesText(compareB);
@@ -1799,16 +1803,49 @@
     if (!h) return '<p class="notes-line" style="margin:0 0 14px;">Pick a mare or a stallion and the ledger suggests partners from the horses it has saved, split into yours and other players\'.</p>';
     return h;
   }
+  // Breed picker. There is no crossbreeding in Horse Reality, so once a breed is chosen (or one parent is picked)
+  // only horses of that breed are offered.
+  function breedSelectHtml(id, action, cur) {
+    var known = L.HR_BREEDS.slice();
+    var keys = {};
+    known.forEach(function (b) { keys[L.breedKeyOf(b)] = true; });
+    Object.keys(state.horseInfo || {}).forEach(function (l) {
+      var b = state.horseInfo[l].breed, k = L.breedKeyOf(b);
+      if (k && !keys[k]) { keys[k] = true; known.push(b); }
+    });
+    return '<select id="' + id + '" data-action="' + action + '" style="width:100%;"><option value="">All breeds</option>' + known.sort().map(function (b) {
+      return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === L.breedKeyOf(cur) ? ' selected' : '') + '>' + L.esc(b) + '</option>';
+    }).join('') + '</select>';
+  }
+  // The breed in force for a list: the chosen breed, else the breed of the horse already picked on the other side.
+  function breedInForce(chosen, otherLife) {
+    if (chosen) return L.breedKeyOf(chosen);
+    var oi = otherLife && state.horseInfo[otherLife];
+    return oi ? L.breedKey(oi) : '';
+  }
+  function breedAllowed(life, key) {
+    if (!key) return true;
+    var k = L.breedKey(state.horseInfo[life]);
+    return !k || k === key;
+  }
+  function breedNoteHtml(key, chosen, otherLife) {
+    if (!key) return '';
+    var oi = otherLife && state.horseInfo[otherLife];
+    var name = chosen || (oi && oi.breed) || key;
+    return '<p class="notes-line" style="margin:0 0 12px;">Showing only <strong>' + L.esc(name) + '</strong> horses. There is no crossbreeding in Horse Reality, so only the same breed can be paired.</p>';
+  }
   function calcOptionsHtml(sex, selected) {
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
     var f = calcFilter[sex], sugg = f.sugg ? calcSuggestedSet(sex) : null;
+    var calcBreedKey = breedInForce(calcBreed, sex === 'mare' ? calcStallion : calcMare);
     var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).filter(function (life) {
       if (life === selected) return true;
       var young = L.isYoungInfo(state.horseInfo[life]);
       if (young ? !f.young : !f.adult) return false;
       if (mine[life] ? !f.mine : !f.other) return false;
       if (sugg && !sugg[life]) return false;
+      if (!breedAllowed(life, calcBreedKey)) return false;
       return true;
     }).map(function (life) {
       return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' } };
@@ -2039,6 +2076,8 @@
   function renderCalculator() {
     var html = topHeaderHtml();
     html += '<div class="section-head"><h2>Foal Calculator</h2><button type="button" class="btn btn-sm" data-action="calc-refresh" title="Reload the saved horses and recalculate. Your mare and stallion stay selected.">Refresh</button></div>';
+    html += '<div class="card" style="padding:12px 16px;margin-bottom:12px;max-width:380px;"><label for="calc-breed" style="font-weight:600;">Breed</label>' + breedSelectHtml('calc-breed', 'calc-breed', calcBreed) + '</div>';
+    html += breedNoteHtml(breedInForce(calcBreed, calcMare || calcStallion), calcBreed, calcMare || calcStallion);
     html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">' +
       '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + '<select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
       '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + '<select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
@@ -3020,6 +3059,24 @@
         var cfs = t.getAttribute('data-side'), cfk = t.getAttribute('data-key');
         if (cfk === 'all') compareFilter[cfs] = Object.assign(defaultCompareFilter(), t.checked ? {} : { adult: false, young: false, mine: false, other: false, mares: false, stallions: false });
         else compareFilter[cfs][cfk] = t.checked;
+        render();
+      }
+      else if (action === 'calc-breed') {
+        calcBreed = t.value;
+        var bk = L.breedKeyOf(calcBreed);
+        if (bk) {
+          if (calcMare && state.horseInfo[calcMare] && !breedAllowed(calcMare, bk)) calcMare = '';
+          if (calcStallion && state.horseInfo[calcStallion] && !breedAllowed(calcStallion, bk)) calcStallion = '';
+        }
+        saveUi(); render();
+      }
+      else if (action === 'compare-breed') {
+        compareBreed = t.value;
+        var ck = L.breedKeyOf(compareBreed);
+        if (ck) {
+          if (compareA && state.horseInfo[compareA] && !breedAllowed(compareA, ck)) compareA = '';
+          if (compareB && state.horseInfo[compareB] && !breedAllowed(compareB, ck)) compareB = '';
+        }
         render();
       }
       else if (action === 'compare-a') { compareA = t.value; render(); }

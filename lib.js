@@ -927,6 +927,7 @@
     Object.keys(state.horseInfo || {}).forEach(function (life) {
       var sInfo = state.horseInfo[life];
       if (!sInfo || sInfo.sex !== 'stallion' || isYoungInfo(sInfo)) return;
+      if (!sameBreed(sInfo, mInfo)) return;
       var sMeta = (state.horseMeta && state.horseMeta[life]) || {};
       if (isSoldLife(state, life) || sMeta.status === 'Retired' || sMeta.status === 'Deceased') return;
       if (sInfo.geneticPotential == null || mInfo.geneticPotential == null) { out.noData++; return; }
@@ -1283,6 +1284,23 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- breeds ----------
+  // The breeds in Horse Reality (from the wiki's Horse Breeds page). There is no crossbreeding in the game, so
+  // two horses can only be paired when they are the same breed.
+  var HR_BREEDS = ['Akhal-Teke Horse', 'Appaloosa Horse', 'Arabian Horse', 'Brabant Horse', 'Brumby Horse', 'Camargue Horse', 'Cleveland Bay', 'Exmoor Pony',
+    'Finnhorse', 'Fjord Horse', 'Friesian Horse', 'Haflinger Horse', 'Icelandic Horse', 'Irish Cob Horse', 'Kathiawari Horse', 'Kladruber Horse', 'Knabstrupper',
+    'Lipizzaner Horse', 'Lusitano', 'Mongolian Horse', 'Mustang Horse', 'Namib Desert Horse', 'Noriker Horse', 'Norman Cob', 'Oldenburg Horse', 'Pantaneiro Horse',
+    'Pura Raza Espa\u00f1ola', 'Quarter Horse', 'Shetland Pony', 'Shire Horse', 'Suffolk Punch', 'Thoroughbred', 'Trakehner Horse', 'Welsh Pony'];
+  // A comparable form of a breed name ("Friesian" and "Friesian Horse" match). '' when the breed is not known.
+  function breedKeyOf(name) {
+    return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/ horse$/, '');
+  }
+  function breedKey(info) { return breedKeyOf(info && info.breed); }
+  function sameBreed(a, b) {
+    var x = breedKey(a), y = breedKey(b);
+    return !x || !y || x === y;
+  }
+
   // ---------- Foal Calculator: partners for the horse you picked ----------
   // For a mare: the stallions to use; for a stallion: the mares to use. Only horses saved in the ledger are
   // considered (3 and older, not sold/retired, genetic potential known). Mares that are covered or in foal are left
@@ -1311,6 +1329,7 @@
       if (isSoldLife(state, cl) || cm.status === 'Retired' || cm.status === 'Deceased') return;
       if (ci.geneticPotential == null || info.geneticPotential == null) return;
       if (!isMare && mareBreedStatus(state, cl).status) return;
+      if (!sameBreed(ci, info)) return;
       var maxFee = parseFloat(state.settings && state.settings.calcMaxFee);
       if (isMare && maxFee > 0 && !(!!myName && String(ci.ownerName || '').trim().toLowerCase() === myName)) {
         var tm = studTermsOf(state, cl);
@@ -1847,6 +1866,7 @@
       var mInfo = state.horseInfo[m.life], mConf = bestConformation((state.horseMeta && state.horseMeta[m.life]) || {}).best;
       studs.forEach(function (s) {
         var sInfo = state.horseInfo[s.lifeNumber], sConf = bestConformation((state.horseMeta && state.horseMeta[s.lifeNumber]) || {}).best;
+        if (!sameBreed(sInfo, mInfo)) return;
         var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
         var confs = [mConf, sConf].filter(function (x) { return x > 0; });
         var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
@@ -1921,6 +1941,10 @@
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
+    HR_BREEDS: HR_BREEDS,
+    breedKey: breedKey,
+    breedKeyOf: breedKeyOf,
+    sameBreed: sameBreed,
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
     goalAdvice: goalAdvice,

@@ -218,6 +218,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 ## Foal Calculator
 
+There is a **Breed** picker (all 34 breeds in Horse Reality, from the wiki) above the selectors. Horse Reality has no crossbreeding, so once you choose a breed, or pick one parent, the other list shows only horses of that breed; the Compare card on Analytics works the same way, and the suggested partners and breeding suggestions only offer the same breed. Horses with no breed saved are never hidden.
+
 Above each selector are check boxes (All, 3+, Under 3, My horses, Other horses, Suggestions) that narrow the horses it offers, one set for mares and one for stallions. **Suggestions** keeps only the horses suggested for the parent picked on the other side. Under the selectors the calculator suggests partners for the mare and/or stallion you picked, split into your horses and other players' horses, saying whether the foal might fit your minimum Breed Total and conformation goals. Click **Use** to pick one. Only horses saved in the ledger are considered.
 
 In the **Mare** list, a mare who is already covered or in foal says so next to her name (✔ COVERED by … / ♥ IN FOAL, in colour), and picking her shows a notice under the pickers saying who she is covered by or due to, and whether the stallion you are comparing is the pairing she already has.

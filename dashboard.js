@@ -1511,7 +1511,7 @@
       '<p class="notes-line" style="margin:10px 0 0;"><strong>Health</strong> (the five vet-check traits) \u2014 the worst rating you will accept, and how many may be at it. Plus a minimum fertility.</p>' +
       '<div class="goals-grid">' +
         selectField('Worst health rating accepted', 'healthWorst', [['', 'no limit'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']]) +
-        field('How many at that rating', 'healthWorstMax', '1') +
+        selectField('How many at that rating (of 5)', 'healthWorstMax', [['', 'none (0)'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']]) +
         selectField('Min fertility', 'minFert', [['', 'no limit'], ['poor', 'Poor'], ['fair', 'Fair'], ['average', 'Average'], ['good', 'Good'], ['excellent', 'Excellent']]) +
       '</div></details>';
   }

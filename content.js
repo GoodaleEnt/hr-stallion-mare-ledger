@@ -53,7 +53,7 @@
     if (!a) return '';
     var text = a.textContent || '';
     text = text.replace(/ↆ/g, '');
-    text = text.split('|')[0].replace(/^!/, '');
+    text = text.replace(/^\s*!/, '').replace(/\s*\|\s*$/, '');
     return text.replace(/\s+/g, ' ').trim();
   }
   function parseScore(strongEl) {
@@ -233,7 +233,7 @@
   function parseHorseNameHeader(text) {
     text = String(text || '').replace(/^!/, '');
     text = text.replace(/ↆ/g, '');
-    text = text.split('|')[0];
+    text = text.replace(/\s*\|\s*$/, '');
     return text.replace(/\s+/g, ' ').trim();
   }
   // Runs an optional-enrichment step in isolation: if the API response ever

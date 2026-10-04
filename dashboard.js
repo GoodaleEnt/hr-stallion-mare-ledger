@@ -647,9 +647,11 @@
   // Older saves kept Horse Reality's icon markers ("!27923531|") or just the
   // life number as the name; tidy that and prefer the name from her passport.
   function displayMareName(b) {
-    var name = String(b.mareName || '').replace(/ↆ/g, '').split('|')[0].replace(/^!/, '').replace(/\s+/g, ' ').trim();
+    var tidy = function (n) { return String(n || '').replace(/ↆ/g, '').replace(/^\s*!/, '').replace(/\s*\|\s*$/, '').replace(/\s+/g, ' ').trim(); };
+    var name = tidy(b.mareName);
     var info = b.mareLifeNumber && state.horseInfo ? state.horseInfo[b.mareLifeNumber] : null;
-    if ((!name || /^\d+$/.test(name)) && info && info.name) name = String(info.name).replace(/ↆ/g, '').split('|')[0].replace(/^!/, '').trim();
+    // a name that is only her life number (possibly followed by a code, "28040882|$") is replaced by her real name
+    if ((!name || /^\d+$/.test(name.split('|')[0].trim())) && info && info.name) name = tidy(info.name);
     return name || b.mareName || '';
   }
   var rowSiblings = [];

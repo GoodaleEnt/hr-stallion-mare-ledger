@@ -374,6 +374,7 @@
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
     html += healthPanelHtml(selectedPassportLife);
+    html += studProfilePanelHtml(selectedPassportLife);
     html += purchaseDetailsHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
@@ -844,6 +845,46 @@
     return html;
   }
 
+  // ---------- stud fees of any stallion in the ledger (other players' too) ----------
+  // Rows [label, text] from what was read on his page / Breed page, plus the last fee you paid him.
+  function studTermRows(life) {
+    var meta = life && state.horseMeta ? state.horseMeta[life] : null;
+    var t = meta && meta.studTerms;
+    var rec = life ? state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(life); }) : null;
+    var rows = [];
+    if (t) {
+      if (t.public && L.priceList(t.public)) rows.push(['Public stud', L.priceList(t.public)]);
+      if (t.private && L.priceList(t.private)) rows.push(['Private stud', L.priceList(t.private)]);
+      if (t.semen && L.priceList(t.semen)) rows.push(['Semen vial', L.priceList(t.semen)]);
+      if (t.cheapest && L.priceList(t.cheapest)) rows.push(['Cheapest on Breed page', L.priceList(t.cheapest)]);
+      if (t.transport) rows.push(['Transport', L.fmtMoney(t.transport) + ' ' + (t.transportCurrency || 'HRC')]);
+      if (t.owner) rows.push(['Offered by', t.owner]);
+    }
+    if (rec && rec.owned === false && rec.lastFee && rec.lastFee.fee > 0) {
+      rows.push(['Last fee you paid', L.fmtMoney(rec.lastFee.fee) + ' ' + (rec.lastFee.currency || 'HRC') + (rec.lastFee.transport ? ' + ' + L.fmtMoney(rec.lastFee.transport) + ' transport' : '') + (rec.lastFee.date ? ' \u00b7 ' + L.fmtDate(rec.lastFee.date) : '')]);
+    }
+    return { rows: rows, seenAt: t && t.seenAt ? t.seenAt : '' };
+  }
+  // compact lines for a card or list row
+  function studFeeCompactHtml(life) {
+    var r = studTermRows(life);
+    if (!r.rows.length) return '';
+    return '<div class="sub" style="margin-top:6px;line-height:1.5;">' + r.rows.map(function (x) { return '<div><span style="color:var(--text-muted);">' + L.esc(x[0]) + ':</span> <span class="mono">' + L.esc(x[1]) + '</span></div>'; }).join('') + '</div>';
+  }
+  // panel on a stallion's profile page
+  function studProfilePanelHtml(life) {
+    var info = life && state.horseInfo ? state.horseInfo[life] : null;
+    if (!info || info.sex !== 'stallion') return '';
+    var r = studTermRows(life);
+    if (!r.rows.length) {
+      return '<div class="card" style="padding:12px 16px;margin-bottom:16px;"><strong>Stud fees</strong> <span class="notes-line" style="margin:0;">\u2014 not recorded yet. Open his page (the Public / Private Stud Service boxes) or his Breed page on Horse Reality and they are saved.</span></div>';
+    }
+    return '<div class="card" style="padding:14px 16px;margin-bottom:16px;max-width:560px;"><strong>Stud fees</strong>' +
+      '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;">' +
+        r.rows.map(function (x) { return '<div class="row" style="gap:14px;flex-wrap:wrap;"><span>' + L.esc(x[0]) + '</span><span class="v fee mono">' + L.esc(x[1]) + '</span></div>'; }).join('') +
+      '</div>' + (r.seenAt ? '<p class="notes-line" style="margin:6px 0 0;">Read on ' + L.esc(L.fmtDate(r.seenAt)) + '; open his page again to refresh.</p>' : '') + '</div>';
+  }
+
   // ---------- a stallion's stud fees (from his page) ----------
   function studSemenRowHtml(life) {
     var t = life && state.horseMeta[life] && state.horseMeta[life].studTerms;
@@ -854,7 +895,7 @@
     var t = s.lifeNumber && state.horseMeta[s.lifeNumber] && state.horseMeta[s.lifeNumber].studTerms;
     var pub = L.feeObj(s, 'Public'), priv = L.feeObj(s, 'Private');
     var log = (s.lifeNumber && state.horseMeta[s.lifeNumber] && state.horseMeta[s.lifeNumber].studTermsLog) || [];
-    var row = function (label, text) { return '<div class="row"><span>' + label + '</span><span class="v fee mono">' + (text ? L.esc(text) : '\u2014') + '</span></div>'; };
+    var row = function (label, text) { return '<div class="row" style="gap:14px;flex-wrap:wrap;"><span>' + label + '</span><span class="v fee mono">' + (text ? L.esc(text) : '\u2014') + '</span></div>'; };
     var html = '<div class="card" style="padding:14px 16px;margin:0 0 16px;max-width:520px;"><strong>Stud fees</strong>' +
       '<div class="stallion-card" style="padding:6px 0 0;cursor:default;box-shadow:none;border:none;">' +
         row('Public fee', L.priceList(pub)) + row('Private fee', L.priceList(priv)) +
@@ -1331,7 +1372,7 @@
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
         goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
         '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span>' + (info.sold ? '<div class="name-tags"><span class="tag">Sold</span>' + saleTagsHtml(info.lifeNumber) + '</div>' : '') + '</div>' +
-        '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span></div>' +
+        '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span>' + (info.sex === 'stallion' ? studFeeCompactHtml(info.lifeNumber) : '') + '</div>' +
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
       '</div>';
     });

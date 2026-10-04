@@ -183,6 +183,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 **Your own stallions.** Your stallions' fees come from the **My Studs** page in the Horse Reality market office (v2.horsereality.com/market/office/my-studs). Open it and the ledger reads your **public** offers (every currency with a price); flip its **Private** switch on and it reads your **private** offers too. Each stallion listed there is yours, so he is added to your Stallions tab if he wasn't, and his **Public** and **Private** fee fields are filled in (when a stallion has several offers, the lowest price per currency is kept). His card always shows both fees (plus a semen vial price when there is one), and his page has a **Stud fees** panel with the date it was read and a **fee history** of every change. You can still edit the fees by hand; they are replaced the next time you open that page.
 
+**Other players' stallions.** A stallion you added to **Other Horses** shows what he costs right on his row (public and private stud, semen vial, the transport fee, who offers him, and the last fee you paid him), and his profile page has a **Stud fees** panel with the same details and the date they were read. They are saved whenever you open his page or his Breed page on Horse Reality.
+
 ## Foal Calculator
 
 In the **Mare** list, a mare who is already covered or in foal says so next to her name (✔ COVERED by … / ♥ IN FOAL, in colour), and picking her shows a notice under the pickers saying who she is covered by or due to, and whether the stallion you are comparing is the pairing she already has.

@@ -541,6 +541,11 @@
         if (matchId) {
           offspringStallionId = matchId;
           offspring.forEach(function (row) {
+            // a foal already recorded another way: line its address up so this row merges instead of doubling
+            var rowLife = lifeNumberFromUrl(row.foalUrl);
+            (state.breedings[matchId] || []).forEach(function (b) {
+              if (rowLife && b.foalUrl && b.foalUrl !== row.foalUrl && HRLib.foalLifeOf(b.foalUrl) === rowLife) b.foalUrl = row.foalUrl;
+            });
             var result = HRStorage.upsertBreeding(state, matchId, {
               mareName: row.mareName, mareLifeNumber: row.mareLifeNumber, mareUrl: row.mareUrl,
               breederName: row.breederName, breederUrl: row.breederUrl,
@@ -766,13 +771,18 @@
         }
       }
 
-      if (infoRefreshed || passportCached || newStud || pregnancyMarked) {
+      // This horse is a foal of one of your mares: make sure her breeding history lists it.
+      var foalRecorded = HRLib.recordFoalFromHorse(state, horseInfo);
+
+      if (infoRefreshed || passportCached || newStud || pregnancyMarked || foalRecorded) {
         HRStorage.setState(state, function () {
           if (newStud) {
             showToast('HR Ledger: added ' + horseInfo.name + ' as a new stud');
             // Offspring rows on this same page may have been scraped before
             // the stud existed to attach to — retry now that it does.
             mergeIntoLedger();
+          } else if (foalRecorded) {
+            showToast('HR Ledger: recorded ' + (horseInfo.name || 'foal') + ' as a foal of ' + ((horseInfo.dam && horseInfo.dam.name) || 'your mare'));
           } else if (pregnancyMarked) {
             showToast('HR Ledger: ' + horseInfo.name + ' marked in foal');
           } else if (passportCached && !existing) {
@@ -1271,6 +1281,74 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // The mare's "Foals" tab: a table with the columns Horse | Name | Sire | Owner | Breeder | Status,
+  // one row per foal. The Name cell holds the foal's link and its score line ("2G|7A|3BA|569|63|69.499",
+  // the last number is its score). Found by the header words rather than by class names, and the page
+  // is searched inside open shadow roots too.
+  function deepFindAllText(text, root, out) {
+    root = root || document;
+    out = out || [];
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.children.length === 0 && (el.textContent || '').trim() === text) out.push(el);
+      if (el.shadowRoot) deepFindAllText(text, el.shadowRoot, out);
+    }
+    return out;
+  }
+  function readFoalsTable() {
+    // the header cell "Sire" whose row also has "Name" and "Breeder" cells
+    var headRow = null, heads = null;
+    deepFindAllText('Sire').forEach(function (el) {
+      if (headRow || !el.parentElement) return;
+      var h = Array.prototype.slice.call(el.parentElement.children).map(function (c) { return (c.textContent || '').trim(); });
+      if (h.indexOf('Name') > -1 && h.indexOf('Breeder') > -1) { headRow = el.parentElement; heads = h; }
+    });
+    if (!headRow) return null;
+    var sireIdx = heads.indexOf('Sire'), nameIdx = heads.indexOf('Name');
+    var rowEls;
+    var section = headRow.parentElement;
+    if (section && section.tagName === 'THEAD') rowEls = Array.prototype.slice.call(section.parentElement.querySelectorAll('tbody tr'));
+    else rowEls = Array.prototype.slice.call(section ? section.children : []).filter(function (r) { return r !== headRow; });
+    var out = [];
+    rowEls.forEach(function (row) {
+      var cells = row.children;
+      if (cells.length <= Math.max(sireIdx, nameIdx)) return;
+      function horseLink(cell) {
+        var links = cell.querySelectorAll('a');
+        for (var i = 0; i < links.length; i++) if (lifeNumberFromUrl(links[i].href)) return links[i];
+        return null;
+      }
+      var foalA = horseLink(cells[nameIdx]);
+      if (!foalA) return;
+      var sireA = horseLink(cells[sireIdx]);
+      var tag = (cells[nameIdx].textContent || '').replace(/\s+/g, ' ').trim();
+      var m = /([0-9]+(?:\.[0-9]+)?)\s*$/.exec(tag);
+      out.push({
+        foalLife: lifeNumberFromUrl(foalA.href), foalName: parseHorseLabel(foalA),
+        sireLife: sireA ? lifeNumberFromUrl(sireA.href) : '', sireName: sireA ? parseHorseLabel(sireA) : (cells[sireIdx].textContent || '').trim(),
+        score: m ? parseFloat(m[1]) : 0
+      });
+    });
+    return out;
+  }
+  var lastFoalsSig = '', lastFoalsAt = 0;
+  function scrapeFoalsTab() {
+    var damLife = parseHorseIdFromUrl();
+    if (!damLife || Date.now() - lastFoalsAt < 2000) return;
+    lastFoalsAt = Date.now();
+    var rows = readFoalsTable();
+    if (!rows || !rows.length) return;
+    var sig = damLife + ':' + rows.map(function (r) { return r.foalLife + ':' + r.score; }).join(',');
+    if (sig === lastFoalsSig) return;
+    HRStorage.getState(function (state) {
+      var n = HRLib.recordFoalsFromList(state, damLife, rows);
+      if (n < 0) return; // not one of your mares (or not cached yet): try again later
+      lastFoalsSig = sig;
+      if (n > 0) HRStorage.setState(state, function () { showToast('HR Ledger: ' + n + ' foal' + (n === 1 ? '' : 's') + ' added to her history'); });
+    });
+  }
+
   // An "Open in Ledger" pill on every horse page, inside the horse's picture box in the top-left
   // corner, styled like the site's own status pills. It goes beside those pills ("Covered",
   // "Stud or semen", ...) when the page has them; when it doesn't, it is placed in the same
@@ -1406,6 +1484,7 @@
   var lastHref = location.href;
   setInterval(function () {
     injectLedgerButton(); // put it back if the site's own scripts removed it
+    scrapeFoalsTab();
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

@@ -715,6 +715,87 @@
       sections: s
     };
   }
+  // ---------- foals found on a mare's Foals tab, or from a foal's own page ----------
+  // A stallion's Offspring tab is the usual source of "Foal Born" rows, but it only helps for studs you
+  // open it on. A mare's own Foals tab lists every foal she has had (with its sire), and a foal's page
+  // names its dam and sire, so both can fill in her history. A foal is recorded once, under its sire
+  // (an external-stud stub is created if the sire is not yet known).
+  function foalLifeOf(url) {
+    var m = /\/horses\/([0-9]+)/.exec(String(url || ''));
+    return m ? m[1] : '';
+  }
+  function isMyMare(state, damLife) {
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    if (!me) return false;
+    var damInfo = state.horseInfo && state.horseInfo[damLife];
+    if (damInfo && String(damInfo.ownerName || '').trim().toLowerCase() === me) return true;
+    var mine = false;
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (String(b.mareLifeNumber) === String(damLife) && String(b.breederName || '').trim().toLowerCase() === me) mine = true;
+      });
+    });
+    return mine;
+  }
+  // f = { damLife, damName, damUrl, sireLife, sireName, foalLife, foalName, born (yyyy-mm-dd), score }
+  // returns 'added', 'updated' or ''
+  function addFoalRecord(state, f) {
+    var found = null;
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) { if (!found && foalLifeOf(b.foalUrl) === String(f.foalLife)) found = b; });
+    });
+    if (found) {
+      var changed = false;
+      if (f.score > 0 && f.score <= 100 && !found.foalScore) { found.foalScore = f.score; changed = true; }
+      if (f.born && !found.dateBorn) { found.dateBorn = f.born; changed = true; }
+      if (f.foalName && !found.foalName) { found.foalName = f.foalName; changed = true; }
+      return changed ? 'updated' : '';
+    }
+    if (!f.sireLife) return '';
+    var sid = findStallionMatch(state.stallions || [], { stallionLifeNumber: f.sireLife, stallionName: f.sireName });
+    if (!sid) {
+      sid = uid();
+      state.stallions.push({ id: sid, createdAt: Date.now(), status: 'Active', name: f.sireName || ('#' + f.sireLife), lifeNumber: String(f.sireLife), owned: false });
+      if (!state.breedings) state.breedings = {};
+      state.breedings[sid] = [];
+    }
+    if (!state.breedings[sid]) state.breedings[sid] = [];
+    var rec = {
+      id: uid(), createdAt: Date.now(),
+      mareName: f.damName || '', mareLifeNumber: String(f.damLife), mareUrl: f.damUrl || '',
+      breederName: (state.settings && state.settings.myUsername) || '', breederUrl: '', price: null, currency: 'HRC', feeType: 'Public',
+      date: '', status: 'Foal Born', foalName: f.foalName || '', foalUrl: 'https://www.horsereality.com/horses/' + f.foalLife + '/', dateBorn: f.born || ''
+    };
+    if (f.score > 0 && f.score <= 100) rec.foalScore = f.score;
+    state.breedings[sid].push(rec);
+    return 'added';
+  }
+  // rows from the Foals tab of mare damLife; -1 = not one of your mares (nothing recorded), else how many changed
+  function recordFoalsFromList(state, damLife, rows) {
+    if (!isMyMare(state, damLife)) return -1;
+    var info = state.horseInfo && state.horseInfo[damLife];
+    var n = 0;
+    (rows || []).forEach(function (r) {
+      if (addFoalRecord(state, {
+        damLife: damLife, damName: (info && info.name) || '', damUrl: 'https://www.horsereality.com/horses/' + damLife + '/',
+        sireLife: r.sireLife, sireName: r.sireName, foalLife: r.foalLife, foalName: r.foalName, born: r.born || '', score: r.score
+      })) n++;
+    });
+    return n;
+  }
+  function recordFoalFromHorse(state, info) {
+    if (!info || !info.lifeNumber || !info.sire || !info.dam || !info.sire.lifeNumber || !info.dam.lifeNumber) return false;
+    if (!isMyMare(state, String(info.dam.lifeNumber))) return false;
+    var born = '';
+    var d = new Date(info.dateOfBirth);
+    if (!isNaN(d.getTime())) born = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    var damInfo = state.horseInfo && state.horseInfo[String(info.dam.lifeNumber)];
+    return !!addFoalRecord(state, {
+      damLife: String(info.dam.lifeNumber), damName: info.dam.name || (damInfo && damInfo.name) || '', damUrl: info.dam.url || '',
+      sireLife: String(info.sire.lifeNumber), sireName: info.sire.name, foalLife: String(info.lifeNumber), foalName: info.name || '', born: born, score: 0
+    });
+  }
+
   // ---------- sales ----------
   // state.horseMeta[life].sale = { price, currency, date, buyer, recordedAt }. A horse
   // counts as sold when its herd status is Sold or, for a stallion, its record is.
@@ -986,6 +1067,9 @@
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
+    recordFoalsFromList: recordFoalsFromList,
+    recordFoalFromHorse: recordFoalFromHorse,
+    foalLifeOf: foalLifeOf,
     saleOf: saleOf,
     profitOf: profitOf,
     analytics: analytics,

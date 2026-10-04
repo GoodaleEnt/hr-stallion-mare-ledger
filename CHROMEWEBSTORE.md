@@ -14,13 +14,16 @@ Automatically tracks your Horse Reality stallion earnings, mare breeding history
 **Detailed Description**
 Keep a private ledger of your Horse Reality breeding business without typing anything in.
 
-As you browse horsereality.com, the ledger records your stud fees from the bank page, each covering and its result (pending, in foal, failed, foal born), and the foals your stallions produce. Open the dashboard from the toolbar icon to see it all.
+As you browse horsereality.com, the ledger records your stud fees from the bank page, each breeding and its result (pending, in foal, failed, foal born), the foals your stallions produce, and what you paid for horses you buy. Open the dashboard from the toolbar icon to see it all.
 
 Features:
 Stallions: earnings, breeding history and foal results for each of your studs.
-My Mares: every mare you have bred, with pregnancy status.
+My Mares: every mare you have bred, with pregnancy status, date bred and date born. Click Breed on Horse Reality and the breeding is saved with that day's date.
 Colts & Fillies: your young horses, with their real in-game age.
-My Herd: tag each horse with a status, role and project, record purchase prices, and track best conformation scores.
+My Herd: tag each horse with a status, role and project, and see what you paid, including transport. Purchases are picked up from your bank page.
+Top scores: each horse shows its best conformation score and its Breed Total, with when each was reached. Breed Total = ((Genetic Potential / 10) + top conformation) / 2.
+Highlight goals: set a minimum conformation score, a minimum Breed Total and a maximum number of Good+, Good, Average and Below-average traits. Every horse shows three labelled boxes, green when it meets a goal and red when it doesn't, and horses that meet all your goals are outlined.
+Retired and Sold: change a stallion's or mare's status and retired horses move to a Retired tab, sold horses move to Other Horses. Set them back to Active any time.
 Other Horses: when you view a horse that isn't yours, a box offers to add it to a separate list you can search.
 Foal Calculator: pick a mare and a stallion to see the average genetic potential, shared ancestors and coat colour odds.
 Review prompts: the toolbar icon shows a badge when coverings are old enough to check.

@@ -846,17 +846,45 @@
     });
     if (nearMiss.length) tips.push({ level: 'tip', text: nearMiss.length + ' horse' + (nearMiss.length === 1 ? ' misses' : 's miss') + ' your goals by only one box: ' + nearMiss.slice(0, 5).map(function (n) { return n.name + ' (' + n.why + ')'; }).join('; ') + '.' });
 
-    // pairing ideas: your adult mares x your active stallions, best average genetic potential with low inbreeding
+    // pairing ideas: your free adult mares x your active stallions. Ranked mostly by the
+    // foal's estimated Breed Total (from the parents' average genetic potential and
+    // average top conformation score), nudged up where one parent's strength covers the
+    // other's Below-average conformation trait, and down for shared weak traits and inbreeding.
+    var TRAIT_RANK = { 'below average': 0, 'average': 1, 'good': 2, 'good+': 3, 'good +': 3, 'very good': 4 };
+    function traitRank(v) { var r = TRAIT_RANK[String(v || '').toLowerCase().trim()]; return r == null ? null : r; }
     var pairs = [];
     var studs = stallions.filter(function (s) { return s.status === 'Active' && s.lifeNumber && state.horseInfo[s.lifeNumber] && state.horseInfo[s.lifeNumber].geneticPotential != null; });
     mares.filter(function (m) { return !m.young && !m.pregnant && state.horseInfo[m.life].geneticPotential != null; }).forEach(function (m) {
+      var mInfo = state.horseInfo[m.life], mConf = bestConformation((state.horseMeta && state.horseMeta[m.life]) || {}).best;
       studs.forEach(function (s) {
-        var gp = (Number(state.horseInfo[m.life].geneticPotential) + Number(state.horseInfo[s.lifeNumber].geneticPotential)) / 2;
+        var sInfo = state.horseInfo[s.lifeNumber], sConf = bestConformation((state.horseMeta && state.horseMeta[s.lifeNumber]) || {}).best;
+        var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
+        var confs = [mConf, sConf].filter(function (x) { return x > 0; });
+        var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+        var estBT = conf ? breedTotal(gp, conf) : null;
         var common = commonAncestors(ancestorMap(state, m.life, 3), ancestorMap(state, s.lifeNumber, 3));
-        pairs.push({ mare: m.name, stallion: s.name, gp: Math.round(gp * 10) / 10, coi: Math.round(estimateCoi(common) * 100) / 100 });
+        var coi = estimateCoi(common);
+        var shared = [], fixes = [];
+        if (mInfo.confTraits && sInfo.confTraits) {
+          Object.keys(mInfo.confTraits).forEach(function (t) {
+            var a = traitRank(mInfo.confTraits[t]), b = traitRank(sInfo.confTraits[t]);
+            if (a == null || b == null) return;
+            if (a === 0 && b === 0) shared.push(t);
+            else if (a === 0 && b >= 2) fixes.push({ trait: t, from: 'stallion' });
+            else if (b === 0 && a >= 2) fixes.push({ trait: t, from: 'mare' });
+          });
+        }
+        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi;
+        pairs.push({
+          mare: m.name, stallion: s.name, gp: Math.round(gp * 10) / 10,
+          conf: conf != null ? Math.round(conf * 10) / 10 : null,
+          estBT: estBT != null ? Math.round(estBT * 10) / 10 : null,
+          coi: Math.round(coi * 100) / 100, shared: shared, fixes: fixes,
+          noScore: !(mConf > 0 && sConf > 0), score: score
+        });
       });
     });
-    pairs = pairs.filter(function (p) { return p.coi < 6.25; }).sort(function (a, b) { return b.gp - a.gp || a.coi - b.coi; }).slice(0, 5);
+    pairs = pairs.filter(function (p) { return p.coi < 6.25; }).sort(function (a, b) { return b.score - a.score; }).slice(0, 5);
 
     // standouts
     var best = ownedHorses(state).map(function (h) {

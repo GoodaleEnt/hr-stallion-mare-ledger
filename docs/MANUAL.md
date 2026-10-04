@@ -153,7 +153,7 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 
 - **Overview:** breedings logged, success rate, foals born, pending coverings, stud fees earned and the average foal score.
 - **Suggestions:** coverings waiting for a result, stallions with a high failure rate (40% or more once at least 5 have resolved), stallions with no breedings in 45+ days, mares that are not in foal and haven't been bred in 30+ days, horses missing data, and horses that miss your goals by only one box.
-- **Pairing ideas:** your free mares crossed with your active stallions, ranked by average genetic potential, keeping only pairs with an estimated inbreeding under 6.25%.
+- **Pairing ideas:** your free mares crossed with your active stallions, keeping only pairs with an estimated inbreeding under 6.25%. They are ranked by the foal's estimated Breed Total (from both parents' average genetic potential and average top conformation score), nudged up when one parent is strong where the other is Below average ("Covers") and down when both are Below average in the same trait ("Watch") and for inbreeding. A pair where a parent has no show score yet uses the other parent's score only.
 - **Breedings per month:** the last 12 months as a bar chart.
 - **Top Breed Total, top conformation and goals:** your best horses and how many meet your highlight goals.
 - **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred.

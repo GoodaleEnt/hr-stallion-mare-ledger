@@ -1017,9 +1017,16 @@
     if (!a.tips.length) html += '<div class="an-tip info">Nothing needs attention right now.</div>';
     a.tips.forEach(function (t) { html += '<div class="an-tip ' + t.level + '">' + L.esc(t.text) + '</div>'; });
     if (a.pairs.length) {
-      html += '<div style="margin-top:10px;"><strong>Pairing ideas</strong> <span class="sub" style="color:var(--text-muted);font-size:12px;">your free mares \u00d7 your active stallions, best average genetic potential with an estimated inbreeding under 6.25%</span>';
+      html += '<div style="margin-top:10px;"><strong>Pairing ideas</strong> <span class="sub" style="color:var(--text-muted);font-size:12px;">your free mares \u00d7 your active stallions, ranked by the foal\u2019s estimated Breed Total from both parents\u2019 genetic potential and top conformation, then adjusted for conformation traits that cover each other, shared weak traits, and an estimated inbreeding under 6.25%</span>';
       a.pairs.forEach(function (p) {
-        html += '<div class="an-tip tip">' + L.esc(p.mare) + ' \u00d7 ' + L.esc(p.stallion) + ' \u2014 average GP <strong>' + p.gp + '</strong>, estimated inbreeding ' + p.coi + '%</div>';
+        var line = L.esc(p.mare) + ' \u00d7 ' + L.esc(p.stallion) + ' \u2014 ' +
+          (p.estBT != null ? 'estimated foal BT <strong>' + p.estBT + '</strong> (avg GP ' + p.gp + ', avg top conformation ' + p.conf + ')' : 'average GP <strong>' + p.gp + '</strong> (no show score yet)') +
+          ', inbreeding ' + p.coi + '%';
+        var notes = [];
+        if (p.fixes.length) notes.push('Covers: ' + p.fixes.map(function (f) { return L.esc(f.trait) + ' (' + f.from + ' is stronger)'; }).join(', '));
+        if (p.shared.length) notes.push('Watch: both Below average in ' + p.shared.map(L.esc).join(', '));
+        if (p.noScore && p.estBT != null) notes.push('One parent has no show score yet, so the conformation part uses the other parent only');
+        html += '<div class="an-tip tip">' + line + (notes.length ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + notes.join(' \u00b7 ') + '</div>' : '') + '</div>';
       });
       html += '</div>';
     }

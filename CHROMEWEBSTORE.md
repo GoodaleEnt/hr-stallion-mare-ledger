@@ -110,6 +110,7 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.17.4 | 2026-10-03 | Pairing ideas also weigh conformation scores and conformation traits | Draft |
 | 1.17.3 | 2026-10-03 | Analytics lists the horses that meet the goals and those that miss by one, with what is missing | Draft |
 | 1.17.2 | 2026-10-03 | Highlight goals menu is closed by default | Draft |
 | 1.17.1 | 2026-10-03 | Gold Health box (more than 3 Excellent) and gold Fertility box (Excellent) | Draft |

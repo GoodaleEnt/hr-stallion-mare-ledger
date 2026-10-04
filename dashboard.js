@@ -1492,28 +1492,27 @@
       return '<div class="field"><label for="goal-' + key + '">' + label + '</label>' +
         '<input id="goal-' + key + '" type="number" min="0" step="' + step + '" data-action="update-goal" data-field="' + key + '" value="' + (g[key] != null ? L.esc(g[key]) : '') + '" placeholder="no limit"></div>';
     }
+    function selectField(label, key, options) {
+      return '<div class="field"><label for="goal-' + key + '">' + label + '</label><select id="goal-' + key + '" data-action="update-goal" data-field="' + key + '" style="width:100%;">' +
+        options.map(function (o) { return '<option value="' + o[0] + '"' + (String(g[key] == null ? '' : g[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
+    }
     return '<details class="goals-panel"' + (goalsOpen || any ? ' open' : '') + '><summary>Highlight goals' +
-      (any ? ' — ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
-      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows five boxes above its picture (Conformation, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a box empty to ignore it. Trait limits count traits at or under the number you enter.</p>' +
+      (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + '</summary>' +
+      '<p class="notes-line" style="margin:6px 0 0;">Each horse shows five boxes above its picture (Conformation, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
       '<div class="goals-grid">' +
         field('Min top conformation', 'minConf', 'any') +
         field('Min Breed Total (BT)', 'minBT', 'any') +
       '</div>' +
+      '<p class="notes-line" style="margin:10px 0 0;"><strong>Conformation traits</strong> \u2014 the worst rating you will accept, and how many traits may be at that rating. Nothing may be rated worse.</p>' +
       '<div class="goals-grid">' +
-        field('Max G+ traits (Good+)', 'maxGP', '1') +
-        field('Max G traits (Good)', 'maxG', '1') +
-        field('Max A traits (Average)', 'maxA', '1') +
-        field('Max BA traits (Below average)', 'maxBA', '1') +
+        selectField('Worst trait rating accepted', 'traitWorst', [['', 'no limit'], ['GP', 'G+ (Good+)'], ['G', 'G (Good)'], ['A', 'A (Average)'], ['BA', 'BA (Below average)']]) +
+        field('How many at that rating', 'traitWorstMax', '1') +
       '</div>' +
-      '<p class="notes-line" style="margin:10px 0 0;"><strong>Health</strong> (the five vet-check traits) \u2014 most you will accept at each rating. Excellent has no limit.</p>' +
+      '<p class="notes-line" style="margin:10px 0 0;"><strong>Health</strong> (the five vet-check traits) \u2014 the worst rating you will accept, and how many may be at it. Plus a minimum fertility.</p>' +
       '<div class="goals-grid">' +
-        field('Max Poor health traits', 'maxHPoor', '1') +
-        field('Max Fair health traits', 'maxHFair', '1') +
-        field('Max Average health traits', 'maxHAvg', '1') +
-        field('Max Good health traits', 'maxHGood', '1') +
-        '<div class="field"><label for="goal-minFert">Min Fertility</label><select id="goal-minFert" data-action="update-goal" data-field="minFert" style="width:100%;">' +
-          ['', 'Poor', 'Fair', 'Average', 'Good', 'Excellent'].map(function (o) { return '<option value="' + o + '"' + ((g.minFert || '') === o.toLowerCase() ? ' selected' : '') + '>' + (o || 'no limit') + '</option>'; }).join('') +
-        '</select></div>' +
+        selectField('Worst health rating accepted', 'healthWorst', [['', 'no limit'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']]) +
+        field('How many at that rating', 'healthWorstMax', '1') +
+        selectField('Min fertility', 'minFert', [['', 'no limit'], ['poor', 'Poor'], ['fair', 'Fair'], ['average', 'Average'], ['good', 'Good'], ['excellent', 'Excellent']]) +
       '</div></details>';
   }
 

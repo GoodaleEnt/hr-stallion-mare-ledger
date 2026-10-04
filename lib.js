@@ -631,7 +631,14 @@
     var g = (state && state.settings && state.settings.goals) || {};
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
     var fert = String(g.minFert || '').toLowerCase();
-    return { minFert: FERT_RANK[fert] != null ? fert : null, maxHPoor: num(g.maxHPoor), maxHFair: num(g.maxHFair), maxHAvg: num(g.maxHAvg), maxHGood: num(g.maxHGood), minConf: num(g.minConf), minBT: num(g.minBT), maxGP: num(g.maxGP), maxG: num(g.maxG), maxA: num(g.maxA), maxBA: num(g.maxBA) };
+    var traitWorst = ['GP', 'G', 'A', 'BA'].indexOf(g.traitWorst) > -1 ? g.traitWorst : null;
+    var healthWorst = ['good', 'average', 'fair', 'poor'].indexOf(g.healthWorst) > -1 ? g.healthWorst : null;
+    return {
+      minFert: FERT_RANK[fert] != null ? fert : null,
+      minConf: num(g.minConf), minBT: num(g.minBT),
+      traitWorst: traitWorst, traitWorstMax: num(g.traitWorstMax),
+      healthWorst: healthWorst, healthWorstMax: num(g.healthWorstMax)
+    };
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
@@ -660,28 +667,26 @@
       if (!(have > 0)) return { label: label, state: 'na', text: 'no data yet' };
       return { label: label, state: have >= goal ? 'ok' : 'bad', text: r3(have) + ' (min ' + goal + ')' };
     }
-    var counts = traitCounts(info);
-    var traits = { label: 'Conformation traits', state: 'na', text: 'no goal' };
-    var limits = [['GP', 'G+', g.maxGP], ['G', 'G', g.maxG], ['A', 'A', g.maxA], ['BA', 'BA', g.maxBA]].filter(function (x) { return x[2] != null; });
-    if (limits.length) {
-      if (!counts) {
-        traits.text = 'no data yet';
-      } else {
-        traits.state = limits.every(function (x) { return counts[x[0]] <= x[2]; }) ? 'ok' : 'bad';
-        traits.text = limits.map(function (x) { return x[1] + ' ' + counts[x[0]] + ' (max ' + x[2] + ')'; }).join(', ');
-      }
+    // "Worst rating I'll accept, and how many at that rating": passes when
+    // nothing is rated worse than that rating and at most N sit exactly at it.
+    function worstSection(label, order, counts, worstKey, max) {
+      if (!worstKey) return { label: label, state: 'na', text: 'no goal' };
+      if (!counts) return { label: label, state: 'na', text: 'no data yet' };
+      var w = -1;
+      order.forEach(function (o, i) { if (o[0] === worstKey) w = i; });
+      var at = counts[worstKey] || 0, worse = 0;
+      order.slice(w + 1).forEach(function (o) { worse += counts[o[0]] || 0; });
+      var limit = max == null ? 0 : max;
+      return {
+        label: label,
+        state: at <= limit && worse === 0 ? 'ok' : 'bad',
+        text: order[w][1] + ' ' + at + ' (max ' + limit + ')' + (worse ? ', ' + worse + ' worse' : '')
+      };
     }
-    var hc = healthCounts(info);
-    var health = { label: 'Health', state: 'na', text: 'no goal' };
-    var hLimits = [['poor', 'Poor', g.maxHPoor], ['fair', 'Fair', g.maxHFair], ['average', 'Avg', g.maxHAvg], ['good', 'Good', g.maxHGood]].filter(function (x) { return x[2] != null; });
-    if (hLimits.length) {
-      if (!hc) {
-        health.text = 'no data yet';
-      } else {
-        health.state = hLimits.every(function (x) { return hc[x[0]] <= x[2]; }) ? 'ok' : 'bad';
-        health.text = hLimits.map(function (x) { return x[1] + ' ' + hc[x[0]] + ' (max ' + x[2] + ')'; }).join(', ');
-      }
-    }
+    var traits = worstSection('Conformation traits',
+      [['VG', 'VG'], ['GP', 'G+'], ['G', 'G'], ['A', 'A'], ['BA', 'BA']], traitCounts(info), g.traitWorst, g.traitWorstMax);
+    var health = worstSection('Health',
+      [['excellent', 'Excellent'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']], healthCounts(info), g.healthWorst, g.healthWorstMax);
     var fertility = { label: 'Fertility', state: 'na', text: 'no goal' };
     if (g.minFert) {
       var fv = String((info && info.fertility) || '').toLowerCase().trim();

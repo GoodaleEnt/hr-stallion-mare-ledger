@@ -1177,7 +1177,7 @@
 
   function healOwnedStubs() {
     HRStorage.getState(function (state) {
-      var btChanged = HRLib.refreshBreedTotals(state);
+      var btChanged = HRLib.refreshBreedTotals(state) + HRLib.dedupeFoals(state);
       var fixed = HRLib.adoptOwnedStallions(state);
       if (btChanged && !fixed) HRStorage.setState(state);
       if (fixed) {
@@ -1201,6 +1201,79 @@
     var o = {}; o[PENDING_KEY] = list;
     chrome.storage.local.set(o, cb || function () {});
   }
+  // The mare's Info tab, "Pregnancy" panel: "Covered 1 day ago" with "Sire: <stallion>". Read it for the
+  // covering's date and sire, and make sure the ledger has that covering.
+  function deepFindLeavesMatching(re, root, out) {
+    root = root || document;
+    out = out || [];
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.children.length === 0 && re.test((el.textContent || '').trim())) out.push(el);
+      if (el.shadowRoot) deepFindLeavesMatching(re, el.shadowRoot, out);
+    }
+    return out;
+  }
+  var lastCoveredSig = '', lastCoveredAt = 0;
+  function scrapeCoveredPanel() {
+    var life = parseHorseIdFromUrl();
+    if (!life || Date.now() - lastCoveredAt < 3000) return;
+    lastCoveredAt = Date.now();
+    var re = /^Covered (a|an|[0-9]+) (second|minute|hour|day)s? ago$/i;
+    var hit = deepFindLeavesMatching(re)[0];
+    if (!hit) return;
+    var m = re.exec((hit.textContent || '').trim());
+    var n = /^an?$/i.test(m[1]) ? 1 : parseInt(m[1], 10);
+    var d = new Date();
+    if (/day/i.test(m[2])) d.setDate(d.getDate() - n);
+    var date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    // the sire is named in the same panel
+    var box = hit, sireA = null;
+    for (var up = 0; up < 6 && box && !sireA; up++) {
+      box = box.parentElement || (box.getRootNode && box.getRootNode().host) || null;
+      if (box && /Sire/i.test(box.textContent || '')) {
+        var links = box.querySelectorAll('a');
+        for (var k = 0; k < links.length; k++) if (lifeNumberFromUrl(links[k].href) && lifeNumberFromUrl(links[k].href) !== life) { sireA = links[k]; break; }
+      }
+    }
+    var sireLife = sireA ? lifeNumberFromUrl(sireA.href) : '';
+    var sireName = sireA ? parseHorseNameHeader(sireA.textContent) : '';
+    var sig = [life, date, sireLife].join('|');
+    if (sig === lastCoveredSig) return;
+    HRStorage.getState(function (state) {
+      var info = state.horseInfo[life];
+      if (!info) return; // wait until the horse has been saved
+      info.coveredInfo = { date: date, sireName: sireName, sireLife: sireLife, seenAt: Date.now() };
+      var res = HRLib.recordCoveringFromPage(state, { mareLife: life, mareName: info.name || '', sireLife: sireLife, sireName: sireName, date: date });
+      lastCoveredSig = sig;
+      HRStorage.setState(state, function () {
+        if (res === 'added') showToast('HR Ledger: recorded ' + (info.name || 'her') + ' as covered' + (sireName ? ' by ' + sireName : ''));
+      });
+    });
+  }
+
+  // Horse Reality shows a horse's state as pills in its picture (<hr-status-pill status="covered">).
+  // They are saved on the horse (statusPills + when they were seen) so the ledger can show a mare as
+  // covered or in foal straight from the site, even when it never recorded the breeding itself.
+  var lastPillSig = '', lastPillAt = 0;
+  function scrapeStatusPills() {
+    var id = parseHorseIdFromUrl();
+    if (!id || Date.now() - lastPillAt < 3000) return;
+    lastPillAt = Date.now();
+    if (!deepQuery('#name')) return; // wait until the horse's header has drawn
+    var pills = deepQueryAll('hr-status-pill').map(function (el) { return String(el.getAttribute('status') || '').toLowerCase(); }).filter(Boolean).sort();
+    var sig = id + ':' + pills.join(',');
+    if (sig === lastPillSig) return;
+    HRStorage.getState(function (state) {
+      var info = state.horseInfo[id];
+      if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
+      info.statusPills = pills;
+      info.statusPillsAt = Date.now();
+      lastPillSig = sig;
+      HRStorage.setState(state);
+    });
+  }
+
   // The Breed page's mare dropdown: mares you have covered, or that are in foal, say so in the list.
   // The option's own text is kept in data-hr-name; the page only reads the option's value.
   function annotateBreedDropdown() {
@@ -1537,6 +1610,8 @@
   setInterval(function () {
     injectLedgerButton(); // put it back if the site's own scripts removed it
     scrapeFoalsTab();
+    scrapeStatusPills();
+    scrapeCoveredPanel();
     annotateBreedDropdown();
     if (location.href !== lastHref) {
       lastHref = location.href;

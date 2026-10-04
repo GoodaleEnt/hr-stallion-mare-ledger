@@ -2365,7 +2365,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    var scoresChanged = L.refreshBreedTotals(state);
+    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state);
     if (L.adoptOwnedStallions(state) || scoresChanged) { persist(openFromHash); return; }
     recompute();
     render();

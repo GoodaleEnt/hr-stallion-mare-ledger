@@ -746,8 +746,15 @@
         }
       });
     });
+    // the site's own pills (seen within the last 7 days) fill in what the ledger's records don't show
+    var pills = info && Array.isArray(info.statusPills) ? info.statusPills : [];
+    var fresh = !!(info && info.statusPillsAt && (Date.now() - info.statusPillsAt) < 7 * 86400000);
+    var pillPreg = fresh && pills.some(function (p) { return p.indexOf('pregnan') > -1 || p.indexOf('foal') > -1; });
+    var pillCovered = fresh && pills.some(function (p) { return p.indexOf('cover') > -1; });
+    var apiCovered = !!(info && info.pregnancy && /cover/i.test(String(info.pregnancy.status || '')) && info.capturedAt && (Date.now() - info.capturedAt) < 8 * 86400000);
+    var seenCover = info && info.coveredInfo && info.coveredInfo.seenAt && (Date.now() - info.coveredInfo.seenAt) < 8 * 86400000 ? info.coveredInfo : null;
     var nameOf = function (sid) { var s = (state.stallions || []).find(function (x) { return x.id === sid; }); return s ? s.name : ''; };
-    if (preg || succeeded) {
+    if (preg || succeeded || pillPreg) {
       out.status = 'pregnant';
       out.due = preg && info.pregnancy.dueText ? info.pregnancy.dueText : '';
       out.stallion = nameOf(out.stallion) || (preg && info.pregnancy.sireName) || '';
@@ -755,8 +762,48 @@
       out.status = 'covered';
       out.date = covered.date;
       out.stallion = nameOf(covered.sid);
+    } else if (pillCovered || apiCovered || seenCover) {
+      out.status = 'covered';
+      out.fromSite = true;
+      if (seenCover) { out.date = seenCover.date || ''; out.stallion = seenCover.sireName || ''; }
     }
     return out;
+  }
+
+  // The mare's Info tab says "Covered 1 day ago" and names the sire. If that covering isn't in the ledger,
+  // add it (under that stallion, an outside stud if needed); if it is but has no date, fill the date in.
+  // c = { mareLife, mareName, sireLife, sireName, date }. Returns 'added', 'updated' or ''.
+  function recordCoveringFromPage(state, c) {
+    if (!c || !c.mareLife || !c.date || !isMyMare(state, String(c.mareLife))) return '';
+    var life = String(c.mareLife);
+    var near = function (b) { var d1 = b.date ? daysSince(b.date) : null, d2 = daysSince(c.date); return !b.date || d1 == null || d2 == null || Math.abs(d1 - d2) <= 2; };
+    var existing = null;
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (!existing && String(b.mareLifeNumber) === life && (b.status === 'Pending' || b.status === 'Succeeded') && near(b)) existing = b;
+      });
+    });
+    if (existing) {
+      if (!existing.date) { existing.date = c.date; return 'updated'; }
+      return '';
+    }
+    var sid = findStallionMatch(state.stallions || [], { stallionLifeNumber: c.sireLife, stallionName: c.sireName });
+    if (!sid) {
+      if (!c.sireName && !c.sireLife) return '';
+      sid = uid();
+      state.stallions.push({ id: sid, createdAt: Date.now(), status: 'Active', name: c.sireName || ('#' + c.sireLife), lifeNumber: c.sireLife ? String(c.sireLife) : '', owned: false });
+      if (!state.breedings) state.breedings = {};
+      state.breedings[sid] = [];
+    }
+    if (!state.breedings[sid]) state.breedings[sid] = [];
+    var info = state.horseInfo && state.horseInfo[life];
+    state.breedings[sid].push({
+      id: uid(), createdAt: Date.now(),
+      mareName: c.mareName || (info && info.name) || '', mareLifeNumber: life, mareUrl: 'https://www.horsereality.com/horses/' + life + '/',
+      breederName: (state.settings && state.settings.myUsername) || '', breederUrl: '', price: null, currency: 'HRC', feeType: 'Public',
+      date: c.date, status: 'Pending'
+    });
+    return 'added';
   }
 
   // ---------- stud fees you paid to breed to someone else's stallion ----------
@@ -858,6 +905,35 @@
     if (f.score > 0 && f.score <= 100) rec.foalScore = f.score;
     state.breedings[sid].push(rec);
     return 'added';
+  }
+  // One "Foal Born" row per foal: when the same foal turns up more than once (under one or several
+  // stallions), keep the best copy (under a stallion you own, with a score and picture) and fold
+  // the missing details of the others into it. Returns how many copies were removed.
+  function dedupeFoals(state) {
+    var byLife = {};
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (b.status !== 'Foal Born') return;
+        var life = foalLifeOf(b.foalUrl);
+        if (life) (byLife[life] = byLife[life] || []).push({ sid: sid, rec: b });
+      });
+    });
+    var owned = {};
+    (state.stallions || []).forEach(function (s) { if (s.owned !== false) owned[s.id] = true; });
+    var weight = function (g) { return (owned[g.sid] ? 4 : 0) + (g.rec.foalScore ? 2 : 0) + (g.rec.foalImageUrl ? 1 : 0); };
+    var removed = 0;
+    Object.keys(byLife).forEach(function (life) {
+      var group = byLife[life];
+      if (group.length < 2) return;
+      group.sort(function (a, b) { return weight(b) - weight(a); });
+      var keep = group[0].rec;
+      group.slice(1).forEach(function (g) {
+        ['foalScore', 'foalImageUrl', 'dateBorn', 'foalName', 'mareUrl'].forEach(function (k) { if (!keep[k] && g.rec[k]) keep[k] = g.rec[k]; });
+        state.breedings[g.sid] = (state.breedings[g.sid] || []).filter(function (x) { return x !== g.rec; });
+        removed++;
+      });
+    });
+    return removed;
   }
   // rows from the Foals tab of mare damLife; -1 = not one of your mares (nothing recorded), else how many changed
   function recordFoalsFromList(state, damLife, rows) {
@@ -1157,6 +1233,8 @@
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
     applyStudFee: applyStudFee,
+    recordCoveringFromPage: recordCoveringFromPage,
+    dedupeFoals: dedupeFoals,
     mareBreedStatus: mareBreedStatus,
     goalMisses: goalMisses,
     recordFoalsFromList: recordFoalsFromList,

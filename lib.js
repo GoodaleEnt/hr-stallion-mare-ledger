@@ -715,6 +715,51 @@
       sections: s
     };
   }
+  // ---------- stud fees you paid to breed to someone else's stallion ----------
+  // Bank row: "You paid 35 000 HRC + 1 000 HRC for transport to <owner> to breed <mare> with the stud <stallion>."
+  // sf = { fee, currency, transport, studOwner, mareName, mareLife, stallionName, stallionLife, date }
+  // The Breed click may already have saved the covering (no price yet): the fee is added to that record.
+  // Returns 'added', 'updated' or ''.
+  function tidyName(n) { return String(n || '').replace(/^!/, '').replace(/[|]$/, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+  function applyStudFee(state, sf) {
+    if (!sf || !(sf.fee > 0)) return '';
+    var me = String((state.settings && state.settings.myUsername) || '').trim();
+    var mareLife = sf.mareLife || '';
+    if (!mareLife) {
+      Object.keys(state.horseInfo || {}).forEach(function (l) {
+        var i = state.horseInfo[l];
+        if (!mareLife && i && i.sex === 'mare' && tidyName(i.name) === tidyName(sf.mareName)) mareLife = l;
+      });
+    }
+    var sid = findStallionMatch(state.stallions || [], { stallionLifeNumber: sf.stallionLife, stallionName: sf.stallionName });
+    if (!sid) {
+      sid = uid();
+      state.stallions.push({ id: sid, createdAt: Date.now(), status: 'Active', name: sf.stallionName || ('#' + sf.stallionLife), lifeNumber: sf.stallionLife ? String(sf.stallionLife) : '', owned: false });
+      if (!state.breedings) state.breedings = {};
+      state.breedings[sid] = [];
+    }
+    var list = state.breedings[sid] || (state.breedings[sid] = []);
+    var sameMare = function (b) { return mareLife ? String(b.mareLifeNumber) === String(mareLife) : tidyName(b.mareName) === tidyName(sf.mareName); };
+    // already recorded with this fee on this date? nothing to do
+    if (list.some(function (b) { return sameMare(b) && b.price === sf.fee && (!b.date || !sf.date || b.date === sf.date); })) return '';
+    var pending = list.find(function (b) { return sameMare(b) && b.price == null && b.status === 'Pending' && (!b.date || !sf.date || b.date === sf.date); });
+    if (pending) {
+      pending.price = sf.fee;
+      pending.currency = sf.currency || 'HRC';
+      if (sf.transport) pending.transport = sf.transport;
+      if (!pending.date && sf.date) pending.date = sf.date;
+      if (!pending.studOwner && sf.studOwner) pending.studOwner = sf.studOwner;
+      return 'updated';
+    }
+    list.push({
+      id: uid(), createdAt: Date.now(),
+      mareName: sf.mareName || '', mareLifeNumber: mareLife ? String(mareLife) : '', mareUrl: mareLife ? 'https://www.horsereality.com/horses/' + mareLife + '/' : '',
+      breederName: me, breederUrl: '', price: sf.fee, currency: sf.currency || 'HRC', transport: sf.transport || 0, studOwner: sf.studOwner || '',
+      feeType: 'Public', date: sf.date || '', status: 'Pending'
+    });
+    return 'added';
+  }
+
   // ---------- foals found on a mare's Foals tab, or from a foal's own page ----------
   // A stallion's Offspring tab is the usual source of "Foal Born" rows, but it only helps for studs you
   // open it on. A mare's own Foals tab lists every foal she has had (with its sire), and a foal's page
@@ -1067,6 +1112,7 @@
     purchaseOf: purchaseOf,
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,
+    applyStudFee: applyStudFee,
     recordFoalsFromList: recordFoalsFromList,
     recordFoalFromHorse: recordFoalFromHorse,
     foalLifeOf: foalLifeOf,

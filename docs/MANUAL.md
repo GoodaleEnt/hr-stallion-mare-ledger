@@ -191,7 +191,7 @@ Below the inbreeding check, the calculator shows the odds for the foal's **coat 
 
 ## Foals
 
-A mare's foals are picked up three ways: from the **Offspring** tab of one of your stallions, from the mare's own **Foals** tab on Horse Reality (open it once and every foal listed there, with its sire, is added to her breeding history), and from a foal's own page when its dam is one of your mares. A foal is recorded once, under its sire; a sire you don't own is kept as an *outside stud* (it appears in the mare's history but not on your Stallions tab), and foal scores are read from the list. The same goes for breedings you do to a stallion that isn't yours: clicking **Breed** records the covering against that outside stud with today's date.
+A mare's foals are picked up three ways: from the **Offspring** tab of one of your stallions, from the mare's own **Foals** tab on Horse Reality (open it once and every foal listed there, with its sire, is added to her breeding history), and from a foal's own page when its dam is one of your mares. A foal is recorded once, under its sire; a sire you don't own is kept as an *outside stud* (it appears in the mare's history but not on your Stallions tab), and foal scores are read from the list. The same goes for breedings you do to a stallion that isn't yours: clicking **Breed** records the covering against that outside stud with today's date, and the next time you open your bank page the **stud fee you paid** (plus any transport) is read from the "You paid … to breed … with the stud …" row and added to that covering. It shows in the mare's breeding history under Price, with "+ transport" and who you paid beneath it.
 
 ## Breeding dates
 

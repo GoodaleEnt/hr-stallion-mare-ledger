@@ -139,7 +139,7 @@
         breederUrl: breederA.href,
         price: isNaN(price) ? null : price,
         currency: currencyFromCell(cells[1]),
-        date: parseBankDate(cleanText(cells[3]))
+        date: parseRowDate(cleanText(cells[3]))
       });
     });
     return out;
@@ -153,6 +153,29 @@
     var amount = parseInt(m[1].replace(/\D/g, ''), 10);
     var cur = (m[2] || '').toUpperCase();
     return { amount: isNaN(amount) ? 0 : amount, currency: (HRLib.CURRENCIES || []).indexOf(cur) > -1 ? cur : fallback };
+  }
+  // Breeding a mare to someone else's stallion shows as an OUTgoing bank row:
+  // "You paid 35 000 HRC + 1 000 HRC for transport to Ambre to breed !Its A Sign with the stud 73.4 | JS Antares."
+  function toInt(text) { var n = parseInt(String(text || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function scrapeStudFeesPaid() {
+    var out = [];
+    document.querySelectorAll('tr.bank-table').forEach(function (row) {
+      var cells = row.querySelectorAll('td');
+      if (cells.length < 4 || cleanText(cells[0]) !== 'OUT') return;
+      var text = cleanText(cells[2]);
+      var m = /You paid ([0-9\s\u00a0]+?)\s*([A-Z]{2,4})(?: \+ ([0-9\s\u00a0]+?)\s*[A-Z]{2,4} for transport)? to (.+?) to breed (.+?) with the stud (.+?)\.?$/.exec(text);
+      if (!m) return;
+      var horseLinks = [];
+      cells[2].querySelectorAll('a').forEach(function (a) { if (lifeNumberFromUrl(a.href || '')) horseLinks.push(a); });
+      var stallionA = horseLinks.length ? horseLinks[horseLinks.length - 1] : null;
+      var mareA = horseLinks.length > 1 ? horseLinks[0] : null;
+      out.push({
+        fee: toInt(m[1]), currency: (HRLib.CURRENCIES || []).indexOf(m[2]) > -1 ? m[2] : 'HRC', transport: m[3] ? toInt(m[3]) : 0,
+        studOwner: m[4].trim(), mareName: m[5].trim(), mareLife: mareA ? lifeNumberFromUrl(mareA.href) : '',
+        stallionName: m[6].trim(), stallionLife: stallionA ? lifeNumberFromUrl(stallionA.href) : '', date: parseRowDate(cleanText(cells[3]))
+      });
+    });
+    return out;
   }
   // Sales appear as INcoming bank rows naming one of your horses (not a stud fee).
   // The amount column is what you were paid. The wording isn't relied on beyond
@@ -505,10 +528,11 @@
     var failedCoverings = scrapeFailedCoverings();
     var purchases = scrapePurchases();
     var sales = scrapeSales();
-    if (!offspring.length && !bank.length && !failedCoverings.length && !purchases.length && !sales.length) return;
+    var studFees = scrapeStudFeesPaid();
+    if (!offspring.length && !bank.length && !failedCoverings.length && !purchases.length && !sales.length && !studFees.length) return;
 
     HRStorage.getState(function (state) {
-      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0, purchasesSaved = 0, salesSaved = 0;
+      var added = 0, updated = 0, newStuds = 0, failuresMarked = 0, purchasesSaved = 0, salesSaved = 0, feesPaid = 0;
       var offspringStallionId = null;
 
       // Bank transactions are the one page that PROVES the stud is yours
@@ -615,7 +639,10 @@
         salesSaved++;
       });
 
-      if (added || updated || newStuds || failuresMarked || purchasesSaved || salesSaved) {
+      // Stud fees you paid to breed to someone else's stallion (and the transport)
+      studFees.forEach(function (sf) { if (HRLib.applyStudFee(state, sf)) feesPaid++; });
+
+      if (added || updated || newStuds || failuresMarked || purchasesSaved || salesSaved || feesPaid) {
         HRStorage.setState(state, function () {
           var parts = [];
           if (added) parts.push(added + ' new');
@@ -624,6 +651,7 @@
           if (failuresMarked) parts.push(failuresMarked + ' marked failed');
           if (purchasesSaved) parts.push(purchasesSaved + ' purchase' + (purchasesSaved === 1 ? '' : 's') + ' recorded');
           if (salesSaved) parts.push(salesSaved + ' sale' + (salesSaved === 1 ? '' : 's') + ' recorded');
+          if (feesPaid) parts.push(feesPaid + ' stud fee' + (feesPaid === 1 ? '' : 's') + ' paid recorded');
           if (parts.length) showToast('HR Ledger: ' + parts.join(', '));
         });
       }

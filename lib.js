@@ -702,11 +702,13 @@
     }
     // Gold: fertility is Excellent.
     if (String((info && info.fertility) || '').toLowerCase().trim() === 'excellent') { fertility.gold = true; fertility.goldText = 'Excellent'; }
+    // Fertility can only be tested from age 3: for a younger horse it is not part of the goals
+    if (isYoungInfo(info)) fertility = { label: 'Fertility', state: 'na', text: 'tested from age 3', skip: true };
     return { conf: minSection('Conformation', g.minConf, conf), bt: minSection('Breed Total', g.minBT, bt), traits: traits, health: health, fertility: fertility };
   }
   function goalCheck(state, life) {
     var s = goalSections(state, life);
-    var list = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.text !== 'no goal'; });
+    var list = [s.conf, s.bt, s.traits, s.health, s.fertility].filter(function (x) { return x.text !== 'no goal' && !x.skip; });
     return {
       active: list.length > 0,
       met: list.length > 0 && list.every(function (x) { return x.state === 'ok'; }),

@@ -1187,13 +1187,13 @@
     if (!life) return;
     state.horseMeta[life] = Object.assign({}, state.horseMeta[life], { status: status });
     var s = state.stallions.find(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(life); });
-    if (s) s.status = (status === 'Sold' || status === 'Retired') ? status : 'Active';
+    if (s) s.status = (status === 'Sold' || status === 'Retired' || status === 'For Sale') ? status : 'Active';
     persist();
   }
   // Active / Sold / Retired menu (keeps any other herd status as its own option).
   function statusSelectHtml(life, id) {
     var cur = lifeStatus(life);
-    var opts = ['Active', 'Sold', 'Retired'];
+    var opts = ['Active', 'For Sale', 'Sold', 'Retired'];
     if (opts.indexOf(cur) === -1) opts.push(cur);
     return '<select' + (id ? ' id="' + id + '"' : '') + ' class="pill-select ' + L.herdStatusClass(cur) + '" data-action="herd-status" data-life="' + L.esc(life) + '" aria-label="Status">' +
       opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + L.esc(o) + '</option>'; }).join('') + '</select>';
@@ -1639,8 +1639,9 @@
 
   // ---------- goals: highlight horses that meet your minimums / maximums ----------
   var goalsOpen = false;
+  // classes for a horse's card or row: outlined if it meets your goals, and a big $ behind it if it is for sale
   function goalClass(life) {
-    return L.goalCheck(state, life).met ? ' goal-hit' : '';
+    return (L.goalCheck(state, life).met ? ' goal-hit' : '') + (lifeStatus(life) === 'For Sale' ? ' for-sale' : '');
   }
   // Three labelled boxes shown above a horse's picture: green = meets that
   // goal, red = doesn't, grey = no goal set or no data yet. Hidden entirely
@@ -1715,7 +1716,8 @@
       if (!h[k]) return;
       cells += '<div class="goal-sec ' + ratingClass(h[k]) + '"><span class="gl">' + L.esc(k) + '</span>' + L.esc(h[k]) + '</div>';
     });
-    cells += '<div class="goal-sec ' + ratingClass(info.fertility) + '"><span class="gl">Fertility</span>' + L.esc(info.fertility || 'not tested') + '</div>';
+    var youngHorse = L.isYoungInfo(info);
+    cells += '<div class="goal-sec ' + (youngHorse ? 'na' : ratingClass(info.fertility)) + '"><span class="gl">Fertility</span>' + L.esc(youngHorse ? 'tested from age 3' : (info.fertility || 'not tested')) + '</div>';
     return '<div class="card" style="padding:12px 16px;margin-bottom:16px;width:100%;flex:1 1 100%;box-sizing:border-box;"><strong>Health &amp; Fertility</strong>' +
       '<div class="goal-strip" style="margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">' + cells + '</div></div>';
   }
@@ -1904,6 +1906,7 @@
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');
     var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
     if (paidTags) tags.push(paidTags);
+    if (info.lifeNumber && lifeStatus(info.lifeNumber) === 'For Sale') tags.push('<span class="tag" style="background:#f1e6c9;border-color:#a9822f;color:#6b4f00;font-weight:600;">$ For sale</span>');
     var saleTags = info.lifeNumber ? saleTagsHtml(info.lifeNumber) : '';
     if (saleTags) tags.push(saleTags);
     var scoreTags = info.lifeNumber ? highScoreTagsHtml(info.lifeNumber) : '';
@@ -2009,7 +2012,7 @@
         '<div class="detail-actions">' +
           (s.owned === false ? '<button class="btn btn-sm btn-primary" data-action="mark-stallion-owned" data-id="' + s.id + '" title="He was only tracked because a mare\'s breeding record named him — mark him as your own stallion to list him on the Stallions tab.">Mark as My Stallion</button>' : '') +
           '<select class="pill-select ' + L.stallionStatusClass(s.status || 'Active') + '" data-action="update-stallion-status" data-id="' + s.id + '">' +
-            ['Active', 'Sold', 'Retired'].map(function (opt) { return '<option' + (opt === (s.status || 'Active') ? ' selected' : '') + '>' + opt + '</option>'; }).join('') +
+            ['Active', 'For Sale', 'Sold', 'Retired'].map(function (opt) { return '<option' + (opt === (s.status || 'Active') ? ' selected' : '') + '>' + opt + '</option>'; }).join('') +
           '</select>' +
           '<button class="btn btn-sm" data-action="edit-stallion">Edit</button>' +
           '<button class="btn btn-sm btn-danger" data-action="delete-stallion" data-id="' + s.id + '">Delete</button>' +
@@ -2282,7 +2285,7 @@
         var newStatus = t.value;
         var stRec = state.stallions.find(function (x) { return x.id === sid3; });
         if (stRec && stRec.lifeNumber) {
-          state.horseMeta[stRec.lifeNumber] = Object.assign({}, state.horseMeta[stRec.lifeNumber], { status: newStatus === 'Sold' || newStatus === 'Retired' ? newStatus : 'Active' });
+          state.horseMeta[stRec.lifeNumber] = Object.assign({}, state.horseMeta[stRec.lifeNumber], { status: newStatus === 'Sold' || newStatus === 'Retired' || newStatus === 'For Sale' ? newStatus : 'Active' });
         }
         updateStallionRec(sid3, { status: newStatus });
         if (newStatus === 'Retired' && state.settings.autoDeleteRetired) {

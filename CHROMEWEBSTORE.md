@@ -107,17 +107,17 @@ The dashboard page also loads fonts from Google Fonts (Google sees the user's IP
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 1.11.1 | 2026-10-03 | Breeding date survives the site reloading onto the stallion page after you click Breed | Draft |
-| 1.11.0 | 2026-10-03 | Breeding date recorded automatically when you breed a mare on the Breed page | Draft |
-| 1.10.1 | 2026-10-03 | Tidy mare names that showed icon markers or only a life number | Draft |
-| 1.10.0 | 2026-10-03 | Separate Date bred and Date born columns; dates filled from notifications, related records and foal passports; self-bred mares get an approximate date | Draft |
-| 1.9.0 | 2026-10-03 | Purchase price and transport fee are recorded automatically from the bank page | Draft |
-| 1.8.5 | 2026-10-03 | Fix: viewing another player's pregnant mare no longer lists her under My Mares | Draft |
-| 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Draft |
-| 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Draft |
-| 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Draft |
-| 1.8.1 | 2026-10-03 | Docs for Other Horses tab | Draft |
-| 1.8.0 | 2026-10-03 | Add-to-ledger prompt for other people's horses; Other Horses tab | Draft |
+| 1.11.1 | 2026-10-03 | Breeding date survives the site reloading onto the stallion page after you click Breed | Submitted |
+| 1.11.0 | 2026-10-03 | Breeding date recorded automatically when you breed a mare on the Breed page | Included in 1.11.1 |
+| 1.10.1 | 2026-10-03 | Tidy mare names that showed icon markers or only a life number | Included in 1.11.1 |
+| 1.10.0 | 2026-10-03 | Separate Date bred and Date born columns; dates filled from notifications, related records and foal passports; self-bred mares get an approximate date | Included in 1.11.1 |
+| 1.9.0 | 2026-10-03 | Purchase price and transport fee are recorded automatically from the bank page | Included in 1.11.1 |
+| 1.8.5 | 2026-10-03 | Fix: viewing another player's pregnant mare no longer lists her under My Mares | Included in 1.11.1 |
+| 1.8.4 | 2026-10-03 | Focus an open dashboard without the tabs permission | Included in 1.11.1 |
+| 1.8.3 | 2026-10-03 | Tidier Other Horses row layout | Included in 1.11.1 |
+| 1.8.2 | 2026-10-03 | Removed unneeded `tabs` permission; added packaging script and privacy policy | Included in 1.11.1 |
+| 1.8.1 | 2026-10-03 | Docs for Other Horses tab | Included in 1.11.1 |
+| 1.8.0 | 2026-10-03 | Add-to-ledger prompt for other people's horses; Other Horses tab | Included in 1.11.1 |
 
 ## Review Notes
 

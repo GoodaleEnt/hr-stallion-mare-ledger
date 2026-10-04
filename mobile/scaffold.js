@@ -16,6 +16,7 @@
   // --- chrome shim --------------------------------------------------------
   window.chrome = window.chrome || {};
   window.chrome.runtime = window.chrome.runtime || {};
+  window.chrome.runtime.id = window.chrome.runtime.id || 'hr-ledger-mobile'; // storage.js treats a missing id as a dead extension
   window.chrome.runtime.sendMessage = window.chrome.runtime.sendMessage || function (msg, cb) {
     if (typeof cb === 'function') cb({ dataUrl: '' });
   };

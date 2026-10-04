@@ -1204,13 +1204,17 @@
   // so the click is saved straight to extension storage (not the page) and
   // recorded a moment later, or on the next page load. If Horse Reality shows
   // an error pop-up instead, the covering is dropped.
+  // false once the extension has been reloaded under an already-open tab (the mobile build has no such check)
+  function storageAlive() { return typeof HRStorage.alive !== 'function' || HRStorage.alive(); }
   var PENDING_KEY = 'hrPendingCoverings';
   function readPendingCoverings(cb) {
-    chrome.storage.local.get(PENDING_KEY, function (res) { cb(Array.isArray(res[PENDING_KEY]) ? res[PENDING_KEY] : []); });
+    if (!storageAlive()) return;
+    try { chrome.storage.local.get(PENDING_KEY, function (res) { cb(Array.isArray(res[PENDING_KEY]) ? res[PENDING_KEY] : []); }); } catch (e) { /* extension was reloaded */ }
   }
   function writePendingCoverings(list, cb) {
+    if (!storageAlive()) return;
     var o = {}; o[PENDING_KEY] = list;
-    chrome.storage.local.set(o, cb || function () {});
+    try { chrome.storage.local.set(o, cb || function () {}); } catch (e) { /* extension was reloaded */ }
   }
   // The mare's Info tab, "Pregnancy" panel: "Covered 1 day ago" with "Sire: <stallion>". Read it for the
   // covering's date and sire, and make sure the ledger has that covering.
@@ -1789,7 +1793,9 @@
   onPageReady();
 
   var lastHref = location.href;
-  setInterval(function () {
+  var tickTimer = setInterval(function () {
+    // after the extension is reloaded or updated this old copy of the script is orphaned: stop quietly
+    if (!storageAlive()) { clearInterval(tickTimer); return; }
     injectLedgerButton(); // put it back if the site's own scripts removed it
     scrapeFoalsTab();
     scrapeStatusPills();

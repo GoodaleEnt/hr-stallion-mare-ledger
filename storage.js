@@ -18,6 +18,13 @@
   var CACHE_MS = 2000;
   var cache = null, cacheAt = 0, gate = Promise.resolve();
   function clone(o) { return typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)); }
+  // When the extension is reloaded or updated, a Horse Reality tab that was already open keeps running the OLD
+  // content script, whose connection to the extension is gone ("Extension context invalidated"). That is harmless
+  // (reload the tab to get the new script), so the old script just goes quiet instead of logging errors.
+  function alive() {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  }
+  function isGone(e) { return !alive() || /context invalidated/i.test(String((e && e.message) || e || '')); }
   function readFromStorage() {
     return new Promise(function (resolve) {
       chrome.storage.local.get({ hrLedger: defaultState() }, function (res) { resolve(normalize(res.hrLedger)); });
@@ -33,18 +40,21 @@
     return state;
   }
   function getState(cb) {
+    if (!alive()) return;
     gate = gate.then(function () {
+      if (!alive()) throw new Error('Extension context invalidated');
       if (cache && Date.now() - cacheAt < CACHE_MS) { cacheAt = Date.now(); return cache; }
       return readFromStorage().then(function (s) { cache = s; cacheAt = Date.now(); return s; });
     }).then(function (s) {
       try { cb(clone(s)); } catch (e) { console.error('HR Ledger:', e); }
-    }).catch(function (e) { console.error('HR Ledger storage error:', e); });
+    }).catch(function (e) { if (!isGone(e)) console.error('HR Ledger storage error:', e); });
   }
 
   function setState(state, cb) {
     cache = clone(state);
     cacheAt = Date.now();
-    chrome.storage.local.set({ hrLedger: state }, cb || function () {});
+    if (!alive()) return;
+    try { chrome.storage.local.set({ hrLedger: state }, cb || function () {}); } catch (e) { if (!isGone(e)) console.error('HR Ledger storage error:', e); }
   }
 
   function allBreedingsFlat(state) {
@@ -98,6 +108,7 @@
     defaultState: defaultState,
     getState: getState,
     setState: setState,
+    alive: alive,
     allBreedingsFlat: allBreedingsFlat,
     upsertStallionByMatch: upsertStallionByMatch,
     upsertBreeding: upsertBreeding,

@@ -184,6 +184,12 @@ The ledger follows the rules on the Horse Reality wiki:
 - **Label ranges:** hover a conformation or health label to see the hidden number range it stands for (for example Good conformation is 70 to 84).
 - **Clinical Approved:** a stallion's Health & Fertility panel says whether he can qualify for the predicate (all five health stats and fertility 75 or more, checked at 7).
 
+## Breed picker on every page and best disciplines
+
+If you breed more than one breed, the **Breed** picker under the tabs on every page limits the whole ledger to one breed: the lists, the Active stallions / mares / colts / fillies counts, Analytics, the calendar, sell ideas and goal suggestions, and the Foal Calculator and Compare lists. Choose **All breeds** to go back. Your choice is remembered.
+
+Every horse page also has **Best disciplines from conformation**, which scores the seven disciplines from the conformation traits each one uses (from the wiki). The game also counts genetic potential stats, training, fitness and tack, which the ledger cannot see, so it is a guide only.
+
 ## Removing a horse
 
 Every horse page (stallion, mare, or any other horse) has a **Remove from ledger** button. After you confirm, it deletes everything saved about that horse: its page data and tags, its stallion record with the breedings under him, the breedings where she is the mare, and any foal row for it. The ledger then stops saving that horse when you visit its page. To undo it, open **Other Horses → Removed horses** and click **Allow again**; the horse is saved again the next time you open its page. Export a backup first if you are unsure, because a removal cannot be undone.

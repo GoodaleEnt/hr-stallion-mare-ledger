@@ -1323,6 +1323,41 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- disciplines (wiki: Competitions) ----------
+  // The conformation traits that count in each discipline. Genetic-potential stats also count in the game, but the
+  // ledger only saves the total genetic potential, so this fit is from conformation alone.
+  var DISCIPLINES = [
+    { name: 'Dressage', traits: ['Walk', 'Trot', 'Canter', 'Posture'] },
+    { name: 'Driving', traits: ['Trot', 'Back', 'Shoulders', 'Hindquarters'] },
+    { name: 'Endurance', traits: ['Walk', 'Trot', 'Canter', 'Head', 'Neck', 'Back'] },
+    { name: 'Eventing', traits: ['Walk', 'Trot', 'Canter', 'Posture', 'Head', 'Neck'] },
+    { name: 'Flat Racing', traits: ['Gallop', 'Posture', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters'] },
+    { name: 'Show Jumping', traits: ['Canter', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters'] },
+    { name: 'Western Reining', traits: ['Head', 'Neck', 'Shoulders', 'Frontlegs', 'Hindquarters'] }
+  ];
+  // The middle of each label's hidden number range (poor 0-39, below average 40-59, average 60-69, good 70-84, very good 85-100).
+  function traitMidpoint(label) {
+    var t = String(label || '').toLowerCase().trim();
+    if (/^very good|^vg/.test(t)) return 92;
+    if (/^good|^g\b/.test(t)) return 77;
+    if (/^average|^a\b/.test(t)) return 65;
+    if (/^below|^ba\b/.test(t)) return 50;
+    if (/^poor/.test(t)) return 20;
+    return null;
+  }
+  function disciplineFit(info) {
+    var traits = info && info.confTraits;
+    if (!traits) return null;
+    var byKey = {};
+    Object.keys(traits).forEach(function (k) { byKey[k.toLowerCase().replace(/\s+/g, '')] = traits[k]; });
+    var out = DISCIPLINES.map(function (d) {
+      var vals = d.traits.map(function (t) { return traitMidpoint(byKey[t.toLowerCase()]); }).filter(function (v) { return v != null; });
+      var fit = vals.length ? Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length * 10) / 10 : null;
+      return { name: d.name, fit: fit, known: vals.length, total: d.traits.length, traits: d.traits };
+    }).filter(function (x) { return x.fit != null; });
+    return out.length ? out.sort(function (a, b) { return b.fit - a.fit; }) : null;
+  }
+
   // ---------- breeds ----------
   // The breeds in Horse Reality (from the wiki's Horse Breeds page). There is no crossbreeding in the game, so
   // two horses can only be paired when they are the same breed.
@@ -2051,6 +2086,8 @@
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
     HR_BREEDS: HR_BREEDS,
+    DISCIPLINES: DISCIPLINES,
+    disciplineFit: disciplineFit,
     breedKey: breedKey,
     breedKeyOf: breedKeyOf,
     sameBreed: sameBreed,

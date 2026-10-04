@@ -27,19 +27,38 @@
   var listFilterText = '';
   var compareA = '', compareB = '';
   var calcBreed = '', compareBreed = '';
+  var activeBreed = ''; // the breed picked at the top of every page ('' = all breeds)
+  function breedOk(breed) { return !activeBreed || L.breedKeyOf(breed) === L.breedKeyOf(activeBreed); }
+  function lifeBreedOk(life) {
+    if (!activeBreed) return true;
+    var info = state.horseInfo && state.horseInfo[life];
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    return breedOk((info && info.breed) || (rec && rec.breed) || '');
+  }
+  // The ledger as seen through the chosen breed (for the numbers on Analytics, the calendar and so on).
+  function viewState() {
+    if (!activeBreed) return state;
+    var key = L.breedKeyOf(activeBreed), info = {};
+    Object.keys(state.horseInfo || {}).forEach(function (l) { if (L.breedKey(state.horseInfo[l]) === key) info[l] = state.horseInfo[l]; });
+    return Object.assign({}, state, {
+      horseInfo: info,
+      stallions: (state.stallions || []).filter(function (s) { var i = state.horseInfo[s.lifeNumber]; return L.breedKeyOf((i && i.breed) || s.breed) === key; })
+    });
+  }
   function defaultCompareFilter() { return { adult: true, young: true, mine: true, other: true, mares: true, stallions: true, sugg: false }; }
   var compareFilter = { a: defaultCompareFilter(), b: defaultCompareFilter() };
   var UI_KEY = 'hrLedgerUi';
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
   function saveUi() {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed })); } catch (e) {}
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed, activeBreed: activeBreed })); } catch (e) {}
   }
   try {
     var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
     if (savedUi.calcMare) calcMare = String(savedUi.calcMare);
     if (savedUi.calcStallion) calcStallion = String(savedUi.calcStallion);
     if (savedUi.calcBreed) calcBreed = String(savedUi.calcBreed);
+    if (savedUi.activeBreed) { activeBreed = String(savedUi.activeBreed); }
     if (savedUi.calcFilter) ['mare', 'stallion'].forEach(function (k) { if (savedUi.calcFilter[k]) calcFilter[k] = Object.assign(defaultCalcFilter(), savedUi.calcFilter[k]); });
     if (savedUi.tab === 'calc') activeTab = 'calc';
   } catch (e) {}
@@ -373,8 +392,21 @@
         '<button class="tab-btn' + (activeTab === 'analytics' ? ' active' : '') + '" data-action="show-tab" data-tab="analytics">Analytics</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
       '</div>';
-    if (['stallions', 'mares', 'young', 'herd', 'retired', 'others'].indexOf(activeTab) > -1) {
-      html += '<div style="margin:-6px 0 16px;"><input id="list-filter" type="search" data-action="list-filter" placeholder="Filter this list by name, breed or status\u2026" value="' + L.esc(listFilterText) + '" style="width:100%;max-width:380px;"></div>';
+    var breedsHere = {}, breedNames = [];
+    Object.keys(state.horseInfo || {}).forEach(function (l) {
+      var b = state.horseInfo[l].breed, k = L.breedKeyOf(b);
+      if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(b); }
+    });
+    (state.stallions || []).forEach(function (s) { var k = L.breedKeyOf(s.breed); if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(s.breed); } });
+    var isListTab = ['stallions', 'mares', 'young', 'herd', 'retired', 'others'].indexOf(activeTab) > -1;
+    if (breedNames.length > 1 || activeBreed || isListTab) {
+      html += '<div style="margin:-6px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">';
+      if (breedNames.length > 1 || activeBreed) {
+        html += '<label for="global-breed" style="font-weight:600;font-size:13px;">Breed</label><select id="global-breed" data-action="global-breed"><option value="">All breeds</option>' +
+          breedNames.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === L.breedKeyOf(activeBreed) ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>';
+      }
+      if (isListTab) html += '<input id="list-filter" type="search" data-action="list-filter" placeholder="Filter this list by name, breed or status\u2026" value="' + L.esc(listFilterText) + '" style="flex:1 1 240px;max-width:380px;">';
+      html += '</div>';
     }
     return html;
   }
@@ -399,9 +431,12 @@
     if (!app) return;
     app.querySelectorAll('.stallion-card[data-action], .herd-row').forEach(function (el) {
       var life = el.getAttribute('data-life') || (el.querySelector('[data-life]') && el.querySelector('[data-life]').getAttribute('data-life')) || '';
+      if (!life && el.getAttribute('data-key')) { var mrec = maresIndex.find(function (x) { return x.key === el.getAttribute('data-key'); }); life = mrec && mrec.mareLifeNumber || ''; }
       if (!life && el.getAttribute('data-id')) { var srec = state.stallions.find(function (x) { return x.id === el.getAttribute('data-id'); }); life = srec && srec.lifeNumber || ''; }
       var note = life && state.horseMeta[life] && state.horseMeta[life].notes || '';
-      el.style.display = !q || ((el.textContent || '') + ' ' + note).toLowerCase().indexOf(q) > -1 ? '' : 'none';
+      var textOk = !q || ((el.textContent || '') + ' ' + note).toLowerCase().indexOf(q) > -1;
+      var breedShown = !life || lifeBreedOk(life);
+      el.style.display = textOk && breedShown ? '' : 'none';
     });
   }
 
@@ -429,7 +464,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += healthPanelHtml(selectedPassportLife);
+    html += healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -477,7 +512,7 @@
     return months >= 36;
   }
   function getOwnedStallions() {
-    return state.stallions.filter(function (s) { return s.owned !== false && isAdultHorse(s.lifeNumber); });
+    return state.stallions.filter(function (s) { return s.owned !== false && isAdultHorse(s.lifeNumber) && lifeBreedOk(s.lifeNumber); });
   }
 
   // Cached passports (state.horseInfo) belonging to you, under 3 years old —
@@ -493,6 +528,7 @@
       .filter(function (h) {
         if (h.sex !== 'stallion' && h.sex !== 'mare') return false;
         if ((h.ownerName || '').trim().toLowerCase() !== myName) return false;
+        if (!breedOk(h.breed)) return false;
         if (movedOut(h.lifeNumber)) return false;
         return L.isYoungInfo(h);
       })
@@ -594,7 +630,7 @@
     });
     var totalEarnedLine = L.moneyLine(totalsAll);
     var activeStallions = ownedStallions.filter(function (s) { return !movedOut(s.lifeNumber); });
-    var activeMares = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber); });
+    var activeMares = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber) && lifeBreedOk(m.mareLifeNumber); });
     var stallionTally = goalTally(activeStallions.map(function (s) { return s.lifeNumber; }));
     var mareTally = goalTally(activeMares.map(function (m) { return m.mareLifeNumber; }));
     var youngNow = getYoungHorses();
@@ -844,9 +880,9 @@
       return html;
     }
 
-    var activeMaresTab = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber); });
+    var activeMaresTab = maresIndex.filter(function (m) { return !movedOut(m.mareLifeNumber) && lifeBreedOk(m.mareLifeNumber); });
     var totalRecords = 0, foalsBorn = 0;
-    maresIndex.forEach(function (m) { totalRecords += m.records.length; foalsBorn += (m.counts['Foal Born'] || 0); });
+    maresIndex.filter(function (m) { return lifeBreedOk(m.mareLifeNumber); }).forEach(function (m) { totalRecords += m.records.length; foalsBorn += (m.counts['Foal Born'] || 0); });
 
     html += '<div class="stats-bar">' +
       '<div class="stat-tile"><div class="num mono">' + activeMaresTab.length + '</div><div class="label">Active mares</div>' + goalTallyHtml(goalTally(activeMaresTab.map(function (m) { return m.mareLifeNumber; }))) + '</div>' +
@@ -1101,7 +1137,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += healthPanelHtml(m.mareLifeNumber);
+    html += healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -1194,7 +1230,7 @@
       return html;
     }
 
-    var horses = L.ownedHorses(state).filter(function (h) { return !movedOut(h.lifeNumber); });
+    var horses = L.ownedHorses(state).filter(function (h) { return !movedOut(h.lifeNumber) && lifeBreedOk(h.lifeNumber); });
     if (!horses.length) {
       html += '<div class="empty"><h3>No horses of yours cached yet</h3>' +
         '<p>Open your own horses\' pages on Horse Reality — each one you visit is added here automatically once the page shows "' + L.esc(myName) + '" as its owner.</p></div>';
@@ -1262,7 +1298,7 @@
   function totalEarned(e) { return Object.keys(e || {}).reduce(function (n, c) { return n + e[c]; }, 0); }
   function renderAnalytics() {
     var html = topHeaderHtml();
-    var a = L.analytics(state);
+    var a = L.analytics(viewState());
     var o = a.overall;
     if (!a.stallions.length && !a.mares.length) {
       return html + '<div class="empty"><h3>Nothing to analyse yet</h3><p>Analytics appear once the ledger has your stallions, mares and breedings. Browse your bank page and horses on Horse Reality and they fill in automatically.</p></div>';
@@ -1392,7 +1428,7 @@
 
     html += sellIdeasHtml();
     html += feeWatchHtml() + moneyCardHtml() + compareCardHtml();
-    var fa = L.foalAccuracy(state);
+    var fa = L.foalAccuracy(viewState());
     html += '<div class="an-card" style="margin-top:18px;"><h3>Foal results vs. the parents</h3>';
     if (!fa.count) {
       html += '<p class="notes-line" style="margin:0;">Needs foals with a score whose two parents both have a saved show score. The foal\'s score is compared with its parents\' average top conformation.</p>';
@@ -1466,7 +1502,7 @@
 
   // ---------- breeding calendar (My Mares tab): foals due and mares ready ----------
   function breedingCalendarHtml() {
-    var due = L.foalsDue(state), ready = L.readyMares(state);
+    var due = L.foalsDue(viewState()), ready = L.readyMares(viewState());
     if (!due.length && !ready.length) return '';
     var html = '<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:18px;">';
     html += '<div class="an-card"><h3>Foals due</h3>' + (due.length ? due.map(function (f) {
@@ -1583,7 +1619,7 @@
 
   // ---------- sell ideas: the suggestion form, horses to sell and what to ask ----------
   function sellIdeasHtml() {
-    var r = L.sellIdeas(state), f = r.form;
+    var r = L.sellIdeas(viewState()), f = r.form;
     function chk(key, label) {
       return '<label style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;"><input type="checkbox" data-action="update-sell" data-field="' + key + '"' + (f[key] ? ' checked' : '') + '> ' + label + '</label>';
     }
@@ -1821,6 +1857,7 @@
   // The breed in force for a list: the chosen breed, else the breed of the horse already picked on the other side.
   function breedInForce(chosen, otherLife) {
     if (chosen) return L.breedKeyOf(chosen);
+    if (activeBreed) return L.breedKeyOf(activeBreed);
     var oi = otherLife && state.horseInfo[otherLife];
     return oi ? L.breedKey(oi) : '';
   }
@@ -2281,7 +2318,7 @@
   }
   // Suggestions on when to raise the goals and to what, from the herd and recent foals.
   function goalAdviceHtml() {
-    var a = L.goalAdvice(state);
+    var a = L.goalAdvice(viewState());
     if (!a.tips.length && !a.review.length) return '';
     var kinds = { start: 'Set', raise: 'Raise', lower: 'Lower' };
     return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Goal suggestions</strong>' +
@@ -2309,7 +2346,7 @@
       return '<div class="field"><label for="goal-' + key + '">' + label + '</label><select id="goal-' + key + '" data-action="update-goal" data-field="' + key + '" style="width:100%;">' +
         options.map(function (o) { return '<option value="' + o[0] + '"' + (String(g[key] == null ? '' : g[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
     }
-    var adv = L.goalAdvice(state), goalTipCount = adv.tips.length + adv.review.length;
+    var adv = L.goalAdvice(viewState()), goalTipCount = adv.tips.length + adv.review.length;
     return '<details class="goals-panel"' + (goalsOpen ? ' open' : '') + '><summary>Highlight goals' +
       (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + (goalTipCount ? ' \u00b7 ' + goalTipCount + ' suggestion' + (goalTipCount === 1 ? '' : 's') : '') + '</summary>' +
       '<p class="notes-line" style="margin:6px 0 0;">Each horse shows six boxes above its picture (Conformation, Genetic Potential, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
@@ -2332,6 +2369,18 @@
   }
 
   // ---------- health & fertility (read from the horse's Health box) ----------
+  // Which disciplines the horse's conformation suits (wiki: Competitions lists the traits each discipline uses).
+  function disciplinePanelHtml(life) {
+    var info = state.horseInfo[life];
+    var fit = L.disciplineFit(info);
+    if (!fit) return '';
+    var young = L.isYoungInfo(info);
+    return '<details class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;font-weight:600;">Best disciplines from conformation \u2014 ' + L.esc(fit[0].name) + (fit[1] ? ', ' + L.esc(fit[1].name) : '') + '</summary>' +
+      '<div style="margin-top:8px;">' + fit.map(function (d) {
+        return '<div style="display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;padding:3px 0;font-size:13.5px;" title="Traits used: ' + L.esc(d.traits.join(', ')) + (d.known < d.total ? ' (' + d.known + ' of ' + d.total + ' known)' : '') + '"><span>' + L.esc(d.name) + '</span>' +
+          '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.max(4, Math.min(100, d.fit)) + '%;background:var(--accent);"></span></span><span class="mono">' + d.fit + '</span></div>';
+      }).join('') + '</div><p class="notes-line" style="margin:8px 0 0;">Each score is the average of the middle of the hidden number range behind the horse\'s ratings for the traits that discipline uses. The game also counts genetic potential stats, training, fitness, grooming and tack, which the ledger can\'t see, so treat this as a guide to conformation only.' + (young ? ' Horses can enter competitions from age 3.' : '') + '</p></details>';
+  }
   function healthPanelHtml(life) {
     var info = (state.horseInfo && state.horseInfo[life]) || {};
     if (!info.health && !info.fertility) {
@@ -2681,7 +2730,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += healthPanelHtml(s.lifeNumber);
+    html += healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
@@ -3080,6 +3129,19 @@
         if (cfk === 'all') compareFilter[cfs] = Object.assign(defaultCompareFilter(), t.checked ? {} : { adult: false, young: false, mine: false, other: false, mares: false, stallions: false });
         else compareFilter[cfs][cfk] = t.checked;
         render();
+      }
+      else if (action === 'global-breed') {
+        activeBreed = t.value;
+        calcBreed = activeBreed; compareBreed = activeBreed;
+        var gk = L.breedKeyOf(activeBreed);
+        if (gk) {
+          if (calcMare && state.horseInfo[calcMare] && !breedAllowed(calcMare, gk)) calcMare = '';
+          if (calcStallion && state.horseInfo[calcStallion] && !breedAllowed(calcStallion, gk)) calcStallion = '';
+          if (compareA && state.horseInfo[compareA] && !breedAllowed(compareA, gk)) compareA = '';
+          if (compareB && state.horseInfo[compareB] && !breedAllowed(compareB, gk)) compareB = '';
+        }
+        selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+        saveUi(); render();
       }
       else if (action === 'calc-breed') {
         calcBreed = t.value;

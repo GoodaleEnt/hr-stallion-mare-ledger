@@ -26,6 +26,7 @@
   var calcStallion = '';
   var listFilterText = '';
   var compareA = '', compareB = '';
+  var goalsEdit = 'mare'; // which goal set the Highlight goals panel is editing when mares and stallions have their own
   var calcBreed = '', compareBreed = '';
   var activeBreed = ''; // the breed picked at the top of every page ('' = all breeds)
   function breedOk(breed) { return !activeBreed || L.breedKeyOf(breed) === L.breedKeyOf(activeBreed); }
@@ -1356,8 +1357,7 @@
 
     // goals: who meets them, and who misses by exactly one box (and which box)
     html += '<div class="an-card" style="margin-bottom:18px;"><h3>Goals</h3>';
-    var goalSet = L.goalsOf(state);
-    var anyGoal = Object.keys(goalSet).some(function (k) { return goalSet[k] != null; });
+    var anyGoal = L.anyGoals(state);
     if (!anyGoal) {
       html += '<p class="notes-line" style="margin:0;">No goals set. Open <em>Highlight goals</em> at the top of the page to set some.</p>';
     } else {
@@ -2322,19 +2322,41 @@
   }
   // Suggestions on when to raise the goals and to what, from the herd and recent foals.
   function goalAdviceHtml() {
-    var a = L.goalAdvice(viewState());
+    var a = goalAdviceAll();
     if (!a.tips.length && !a.review.length) return '';
     var kinds = { start: 'Set', raise: 'Raise', lower: 'Lower' };
     return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Goal suggestions</strong>' +
       a.review.map(function (t) { return '<div class="an-tip info" style="margin-top:6px;">' + L.esc(t) + '</div>'; }).join('') +
       a.tips.map(function (t) {
-        return '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;"><strong>' + kinds[t.kind] + ' ' + L.esc(t.label) + (t.current != null ? ' from ' + L.esc(t.current) : '') + ' to ' + L.esc(t.suggested) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(t.why) + '</span></span>' +
-          '<button type="button" class="btn btn-sm" data-action="goal-apply" data-field="' + t.key + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
+        return '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;">' + (t.who ? '<span class="tag" style="margin-right:6px;">' + L.esc(t.who) + '</span>' : '') + '<strong>' + kinds[t.kind] + ' ' + L.esc(t.label) + (t.current != null ? ' from ' + L.esc(t.current) : '') + ' to ' + L.esc(t.suggested) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(t.why) + '</span></span>' +
+          '<button type="button" class="btn btn-sm" data-action="goal-apply" data-field="' + t.key + '" data-set="' + L.esc(t.set || 'goals') + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
       }).join('') + '</div>';
   }
+  // Advice for the goal set(s) in use: one list, or (with separate goals) the mare and stallion lists together.
+  function goalAdviceAll() {
+    var vs = viewState();
+    if (!state.settings.goalsSplit) return L.goalAdvice(vs);
+    var m = L.goalAdvice(vs, 'mare'), s = L.goalAdvice(vs, 'stallion');
+    m.tips.forEach(function (t) { t.who = 'Mares & fillies'; });
+    s.tips.forEach(function (t) { t.who = 'Stallions & colts'; });
+    return { tips: m.tips.concat(s.tips), review: m.review.length ? m.review : s.review, herdSize: m.herdSize + s.herdSize };
+  }
+  // The switch: one set of goals for everyone, or a set for mares & fillies and another for stallions & colts.
+  function goalsSwitchHtml() {
+    var split = !!state.settings.goalsSplit;
+    var html = '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;">' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="goals-split"' + (split ? ' checked' : '') + '> Separate goals for mares &amp; fillies and for stallions &amp; colts</label>';
+    if (split) {
+      html += '<span style="display:inline-flex;gap:4px;">' +
+        '<button type="button" class="btn btn-sm' + (goalsEdit === 'mare' ? ' btn-primary' : '') + '" data-action="goals-edit" data-sex="mare">Mares &amp; fillies</button>' +
+        '<button type="button" class="btn btn-sm' + (goalsEdit === 'stallion' ? ' btn-primary' : '') + '" data-action="goals-edit" data-sex="stallion">Stallions &amp; colts</button></span>';
+    }
+    return html + '</div>';
+  }
   function goalsPanelHtml() {
-    var g = L.goalsOf(state);
-    var any = Object.keys(g).some(function (k) { return g[k] != null; });
+    var splitOn = !!state.settings.goalsSplit;
+    var g = L.goalsOf(state, splitOn ? goalsEdit : undefined);
+    var any = L.anyGoals(state);
     var hits = 0;
     if (any) {
       var seen = {};
@@ -2350,9 +2372,10 @@
       return '<div class="field"><label for="goal-' + key + '">' + label + '</label><select id="goal-' + key + '" data-action="update-goal" data-field="' + key + '" style="width:100%;">' +
         options.map(function (o) { return '<option value="' + o[0] + '"' + (String(g[key] == null ? '' : g[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
     }
-    var adv = L.goalAdvice(viewState()), goalTipCount = adv.tips.length + adv.review.length;
+    var adv = goalAdviceAll(), goalTipCount = adv.tips.length + adv.review.length;
     return '<details class="goals-panel"' + (goalsOpen ? ' open' : '') + '><summary>Highlight goals' +
       (any ? ' \u2014 ' + hits + ' horse' + (hits === 1 ? '' : 's') + ' meet all of them' : '') + (goalTipCount ? ' \u00b7 ' + goalTipCount + ' suggestion' + (goalTipCount === 1 ? '' : 's') : '') + '</summary>' +
+      goalsSwitchHtml() + (splitOn ? '<p class="notes-line" style="margin:6px 0 0;"><strong>Editing the goals for ' + (goalsEdit === 'stallion' ? 'stallions &amp; colts' : 'mares &amp; fillies') + '.</strong></p>' : '') +
       '<p class="notes-line" style="margin:6px 0 0;">Each horse shows six boxes above its picture (Conformation, Genetic Potential, Breed Total, Conformation traits, Health, Fertility): green if it meets that goal, red if not, grey if there is no goal or no data yet. A horse that meets <strong>every</strong> goal you fill in is outlined. Leave a goal on \u201cno limit\u201d or empty to ignore it.</p>' +
       '<div class="goals-grid">' +
         field('Min top conformation', 'minConf', 'any') +
@@ -2802,13 +2825,15 @@
       }
       else if (action === 'csv-export') { csvDownload('hr-ledger-' + t.getAttribute('data-kind'), csvRows(t.getAttribute('data-kind'))); }
       else if (action === 'goal-apply') {
-        var ga = Object.assign({}, state.settings.goals);
+        var gaKey = t.getAttribute('data-set') || 'goals';
+        var ga = Object.assign({}, state.settings[gaKey] || state.settings.goals);
         ga[t.getAttribute('data-field')] = t.getAttribute('data-value');
-        state.settings.goals = ga;
+        state.settings[gaKey] = ga;
         state.settings.goalsUpdatedAt = Date.now();
         goalsOpen = true;
         persist();
       }
+      else if (action === 'goals-edit') { goalsEdit = t.getAttribute('data-sex') === 'stallion' ? 'stallion' : 'mare'; goalsOpen = true; render(); }
       else if (action === 'trash-restore') {
         if (L.restoreTrash(state, t.getAttribute('data-id'))) persist();
       }
@@ -2816,7 +2841,7 @@
         var gsn = (document.getElementById('goalset-name').value || '').trim();
         if (!gsn) { document.getElementById('goalset-name').focus(); return; }
         var gs = Object.assign({}, state.settings.goalSets);
-        gs[gsn] = Object.assign({}, state.settings.goals);
+        gs[gsn] = { __bundle: true, split: !!state.settings.goalsSplit, goals: Object.assign({}, state.settings.goals), goalsMare: Object.assign({}, state.settings.goalsMare), goalsStallion: Object.assign({}, state.settings.goalsStallion) };
         state.settings.goalSets = gs;
         goalsOpen = true;
         persist();
@@ -3134,6 +3159,17 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'goals-split') {
+        if (t.checked) {
+          // start both sets from the goals you already have
+          state.settings.goalsMare = state.settings.goalsMare || Object.assign({}, state.settings.goals);
+          state.settings.goalsStallion = state.settings.goalsStallion || Object.assign({}, state.settings.goals);
+        }
+        state.settings.goalsSplit = !!t.checked;
+        state.settings.goalsUpdatedAt = Date.now();
+        goalsOpen = true;
+        persist();
+      }
       else if (action === 'update-note') {
         var nl = t.getAttribute('data-life');
         state.horseMeta[nl] = Object.assign({}, state.horseMeta[nl], { notes: t.value.trim() });
@@ -3141,7 +3177,11 @@
       }
       else if (action === 'goalset-load') {
         var gl = (state.settings.goalSets || {})[t.value];
-        if (gl) { state.settings.goals = Object.assign({}, gl); state.settings.goalsUpdatedAt = Date.now(); goalsOpen = true; persist(); }
+        if (gl) {
+          if (gl.__bundle) { state.settings.goalsSplit = !!gl.split; state.settings.goals = Object.assign({}, gl.goals); state.settings.goalsMare = Object.assign({}, gl.goalsMare); state.settings.goalsStallion = Object.assign({}, gl.goalsStallion); }
+          else state.settings.goals = Object.assign({}, gl);
+          state.settings.goalsUpdatedAt = Date.now(); goalsOpen = true; persist();
+        }
       }
       else if (action === 'compare-filter') {
         var cfs = t.getAttribute('data-side'), cfk = t.getAttribute('data-key');
@@ -3214,9 +3254,10 @@
         persist();
       }
       else if (action === 'update-goal') {
-        var goals = Object.assign({}, state.settings.goals);
+        var gKey = L.goalsKeyFor(state, state.settings.goalsSplit ? goalsEdit : undefined);
+        var goals = Object.assign({}, state.settings[gKey] || state.settings.goals);
         goals[t.getAttribute('data-field')] = t.value.trim();
-        state.settings.goals = goals;
+        state.settings[gKey] = goals;
         state.settings.goalsUpdatedAt = Date.now();
         goalsOpen = true;
         persist();

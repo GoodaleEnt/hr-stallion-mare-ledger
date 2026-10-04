@@ -160,6 +160,10 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 - **Mark For Sale:** each Sell ideas row has a button that sets the horse's status to For Sale.
 - **Backup reminder:** if you haven't exported a backup for 30 days, a bar at the top offers to export one (or to remind you in a week).
 
+## Separate goals for mares and stallions
+
+In **Highlight goals**, tick **Separate goals for mares & fillies and for stallions & colts** if the two should have different goals. Two buttons then appear: **Mares & fillies** and **Stallions & colts**. Click one to edit that set; a line under them says which set you are editing. Each horse's goal boxes, the "fit your goals" counts, the outlines, Analytics and the goal suggestions then use the goals for its own sex. The foal partner suggestions count a foal as fitting if it would fit either set. Un-tick the box to go back to one set for everyone; your two sets are kept if you tick it again. Saved goal sets keep the whole arrangement.
+
 ## Goal suggestions
 
 Besides conformation and Breed Total, you can set a **minimum Genetic Potential**; it has its own box on every horse. Under the goal boxes, **Goal suggestions** looks at the horses you own (3 and older) and your recent foals and tells you when to change a goal and to what: it suggests a starting value if a goal isn't set, a higher one when 60% or more of your herd already meets it (the level the top third of your herd starts at), or a reachable one when nobody meets it. Click **Apply** to use a suggestion. It also reminds you to review your goals every three months or after three or more new foals.

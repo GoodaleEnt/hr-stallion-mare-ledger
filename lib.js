@@ -706,8 +706,17 @@
     });
     return c;
   }
-  function goalsOf(state) {
-    var g = (state && state.settings && state.settings.goals) || {};
+  // Goals can be one set for every horse, or (state.settings.goalsSplit) a separate set for mares and fillies
+  // (settings.goalsMare) and for stallions and colts (settings.goalsStallion). sex is a horse's sex.
+  function goalsKeyFor(state, sex) {
+    var split = !!(state && state.settings && state.settings.goalsSplit);
+    if (!split) return 'goals';
+    return sex === 'stallion' ? 'goalsStallion' : sex === 'mare' ? 'goalsMare' : 'goals';
+  }
+  function goalsOf(state, sex) {
+    var st = (state && state.settings) || {};
+    var raw = st[goalsKeyFor(state, sex)];
+    var g = raw || st.goals || {};
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
     var fert = String(g.minFert || '').toLowerCase();
     var traitWorst = ['GP', 'G', 'A', 'BA'].indexOf(g.traitWorst) > -1 ? g.traitWorst : null;
@@ -718,6 +727,12 @@
       traitWorst: traitWorst, traitWorstMax: num(g.traitWorstMax),
       healthWorst: healthWorst, healthWorstMax: num(g.healthWorstMax)
     };
+  }
+  function anyGoals(state) {
+    return ['mare', 'stallion'].some(function (sx) {
+      var g = goalsOf(state, sx);
+      return Object.keys(g).some(function (k) { return g[k] != null; });
+    }) || (function () { var g = goalsOf(state); return Object.keys(g).some(function (k) { return g[k] != null; }); })();
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
@@ -735,9 +750,9 @@
     return c;
   }
   function goalSections(state, life) {
-    var g = goalsOf(state);
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var info = (state.horseInfo && state.horseInfo[life]) || {};
+    var g = goalsOf(state, info.sex);
     var conf = bestConformation(meta).best;
     var bt = Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf));
     function r3(n) { return Math.round(n * 1000) / 1000; }
@@ -1401,8 +1416,9 @@
     if (isYoungInfo(info)) { out.error = 'young'; return out; }
     var isMare = info.sex === 'mare';
     out.kind = isMare ? 'stallions' : 'mares';
-    var goals = goalsOf(state);
-    out.hasGoal = goals.minBT != null || goals.minConf != null || goals.minGP != null;
+    var goalSets = [goalsOf(state, 'mare'), goalsOf(state, 'stallion')];
+    var goals = goalSets[0];
+    out.hasGoal = goalSets.some(function (g) { return g.minBT != null || g.minConf != null || g.minGP != null; });
     var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var myConf = bestConformation(meta).best;
@@ -1443,7 +1459,7 @@
       }
       var fert = String(sI.fertility || '').toLowerCase().trim();
       var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
-      var fits = coi < 6.25 && (goals.minBT == null || (estBT != null && estBT >= goals.minBT)) && (goals.minConf == null || (conf != null && conf >= goals.minConf)) && (goals.minGP == null || gp >= goals.minGP);
+      var fits = coi < 6.25 && goalSets.some(function (g) { return (g.minBT == null || (estBT != null && estBT >= g.minBT)) && (g.minConf == null || (conf != null && conf >= g.minConf)) && (g.minGP == null || gp >= g.minGP); });
       var otherMet = goalCheck(state, cl).met;
       var mine = !!myName && String(ci.ownerName || '').trim().toLowerCase() === myName;
       var reasons = [];
@@ -1468,10 +1484,10 @@
   // Genetic Potential, Breed Total) that most of the herd already meets is too easy, so it suggests the level the top
   // third of the herd starts at; one nobody meets suggests something within reach; one that is not set gets a starting
   // value. Nothing changes until you apply a suggestion.
-  function goalAdvice(state) {
-    var g = goalsOf(state);
+  function goalAdvice(state, sex) {
+    var g = goalsOf(state, sex);
     var herd = ownedHorses(state).filter(function (h) {
-      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isYoungInfo(h.info) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion';
+      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && (!sex || !(state.settings && state.settings.goalsSplit) || h.info.sex === sex) && !isYoungInfo(h.info) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion';
     });
     function valuesOf(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
     function pct(arr, p) { if (!arr.length) return 0; var i = Math.min(arr.length - 1, Math.max(0, Math.round((arr.length - 1) * p))); return arr[i]; }
@@ -1487,15 +1503,15 @@
       if (n < 4) return;
       var cur = g[m.key], target = round(pct(m.vals, 0.65), m.dec), median = round(pct(m.vals, 0.5), m.dec), best = m.vals[n - 1];
       if (cur == null) {
-        out.tips.push({ key: m.key, label: m.label, kind: 'start', current: null, suggested: target, why: 'No goal set. The top third of your ' + n + ' horses starts at ' + target + ' (median ' + median + ', best ' + round(best, m.dec) + ').' });
+        out.tips.push({ key: m.key, set: goalsKeyFor(state, sex), label: m.label, kind: 'start', current: null, suggested: target, why: 'No goal set. The top third of your ' + n + ' horses starts at ' + target + ' (median ' + median + ', best ' + round(best, m.dec) + ').' });
         return;
       }
       var meet = m.vals.filter(function (v) { return v >= cur; }).length;
       if (meet / n >= 0.6) {
         var next = Math.max(target, round(cur + (m.dec ? 0.5 : 5), m.dec));
-        out.tips.push({ key: m.key, label: m.label, kind: 'raise', current: cur, suggested: next, why: meet + ' of ' + n + ' horses (' + Math.round(meet / n * 100) + '%) already meet ' + cur + ', so the goal is not picking out your best. The top third of your herd starts at ' + target + '.' });
+        out.tips.push({ key: m.key, set: goalsKeyFor(state, sex), label: m.label, kind: 'raise', current: cur, suggested: next, why: meet + ' of ' + n + ' horses (' + Math.round(meet / n * 100) + '%) already meet ' + cur + ', so the goal is not picking out your best. The top third of your herd starts at ' + target + '.' });
       } else if (meet === 0 && n >= 5) {
-        out.tips.push({ key: m.key, label: m.label, kind: 'lower', current: cur, suggested: median, why: 'None of your ' + n + ' horses meet ' + cur + ' (best is ' + round(best, m.dec) + ', median ' + median + '). A goal within reach, like the median, keeps the highlights useful.' });
+        out.tips.push({ key: m.key, set: goalsKeyFor(state, sex), label: m.label, kind: 'lower', current: cur, suggested: median, why: 'None of your ' + n + ' horses meet ' + cur + ' (best is ' + round(best, m.dec) + ', median ' + median + '). A goal within reach, like the median, keeps the highlights useful.' });
       }
     });
     // foals: recent foal scores that beat the conformation goal
@@ -1509,7 +1525,7 @@
     if (scores.length >= 3 && g.minConf != null) {
       var avg = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
       if (avg >= g.minConf + 2 && !out.tips.some(function (t) { return t.key === 'minConf' && t.kind === 'raise'; })) {
-        out.tips.push({ key: 'minConf', label: 'Top conformation', kind: 'raise', current: g.minConf, suggested: round(avg - 1, 1), why: 'Your ' + scores.length + ' foals from the last 6 months average ' + round(avg, 1) + ', well above the goal of ' + g.minConf + '.' });
+        out.tips.push({ key: 'minConf', set: goalsKeyFor(state, sex), label: 'Top conformation', kind: 'raise', current: g.minConf, suggested: round(avg - 1, 1), why: 'Your ' + scores.length + ' foals from the last 6 months average ' + round(avg, 1) + ', well above the goal of ' + g.minConf + '.' });
       }
     }
     // when to look again
@@ -1793,8 +1809,7 @@
   }
   function sellIdeas(state) {
     var form = sellFormOf(state);
-    var goals = goalsOf(state);
-    var goalsOn = Object.keys(goals).some(function (k) { return goals[k] != null; });
+    var goalsOn = anyGoals(state);
     // past sales that give a price per Breed Total point
     var comps = [];
     Object.keys(state.horseMeta || {}).forEach(function (l) {
@@ -2146,6 +2161,8 @@
     profitOf: profitOf,
     analytics: analytics,
     goalsOf: goalsOf,
+    goalsKeyFor: goalsKeyFor,
+    anyGoals: anyGoals,
     healthCounts: healthCounts,
     goalSections: goalSections,
     goalCheck: goalCheck,

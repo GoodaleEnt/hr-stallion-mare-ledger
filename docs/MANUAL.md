@@ -195,6 +195,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 
 ## Foal Calculator
 
+Above each selector are check boxes (All, 3+, Under 3, My horses, Other horses, Suggestions) that narrow the horses it offers, one set for mares and one for stallions. **Suggestions** keeps only the horses suggested for the parent picked on the other side. Under the selectors the calculator suggests partners for the mare and/or stallion you picked, split into your horses and other players' horses, saying whether the foal might fit your minimum Breed Total and conformation goals. Click **Use** to pick one. Only horses saved in the ledger are considered.
+
 In the **Mare** list, a mare who is already covered or in foal says so next to her name (✔ COVERED by … / ♥ IN FOAL, in colour), and picking her shows a notice under the pickers saying who she is covered by or due to, and whether the stallion you are comparing is the pairing she already has.
 
 Pick a **mare** and a **stallion** from any horses whose pages you've visited (the lists are grouped into 3 and older, then under 3, with your own horses first in each group) and the **Foal Calculator** shows the average of their genetic potential and checks both pedigrees for shared ancestors up to three generations behind each parent. If any turn up, it lists them with how far back they sit on each side and gives an *estimated* inbreeding percentage (an estimate that ignores the ancestors' own inbreeding, so Horse Reality's figure can be higher).

@@ -25,13 +25,16 @@
   var calcMare = '';
   var calcStallion = '';
   var UI_KEY = 'hrLedgerUi';
+  function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
+  var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
   function saveUi() {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion })); } catch (e) {}
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter })); } catch (e) {}
   }
   try {
     var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
     if (savedUi.calcMare) calcMare = String(savedUi.calcMare);
     if (savedUi.calcStallion) calcStallion = String(savedUi.calcStallion);
+    if (savedUi.calcFilter) ['mare', 'stallion'].forEach(function (k) { if (savedUi.calcFilter[k]) calcFilter[k] = Object.assign(defaultCalcFilter(), savedUi.calcFilter[k]); });
     if (savedUi.tab === 'calc') activeTab = 'calc';
   } catch (e) {}
 
@@ -1502,10 +1505,64 @@
   function foalGensText(gens) {
     return gens.map(function (g) { return foalGenLabel(g + 1); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(' & ');
   }
+  // Lives suggested for the horse picked on the other side (used by the Suggestions filter box).
+  function calcSuggestedSet(sex) {
+    var other = sex === 'mare' ? calcStallion : calcMare;
+    if (!other || !state.horseInfo[other]) return null;
+    var r = L.pairIdeas(state, other, 10), set = {};
+    r.mine.concat(r.other).forEach(function (x) { set[x.life] = true; });
+    return set;
+  }
+  // Check boxes above a selector that narrow the horses it offers.
+  function calcFilterHtml(sex) {
+    var f = calcFilter[sex];
+    var all = f.adult && f.young && f.mine && f.other && !f.sugg;
+    function box(key, label, checked, title) {
+      return '<label title="' + L.esc(title || '') + '" style="display:inline-flex;align-items:center;gap:4px;margin:0 12px 4px 0;font-size:12.5px;font-weight:400;cursor:pointer;"><input type="checkbox" data-action="calc-filter" data-side="' + sex + '" data-key="' + key + '"' + (checked ? ' checked' : '') + '> ' + label + '</label>';
+    }
+    var other = sex === 'mare' ? calcStallion : calcMare;
+    return '<div style="margin:2px 0 6px;">' + box('all', 'All', all, 'Show every ' + sex) + box('adult', '3+', f.adult) + box('young', 'Under 3', f.young) +
+      box('mine', 'My horses', f.mine) + box('other', 'Other horses', f.other) +
+      box('sugg', 'Suggestions', f.sugg, other ? 'Only the ' + sex + 's suggested for the horse picked on the other side' : 'Pick a ' + (sex === 'mare' ? 'stallion' : 'mare') + ' first') + '</div>' +
+      (f.sugg && !calcSuggestedSet(sex) ? '<div class="notes-line" style="margin:0 0 6px;">Pick a ' + (sex === 'mare' ? 'stallion' : 'mare') + ' first and this shows the ' + sex + 's suggested for it.</div>' : '');
+  }
+  // Suggested partners for the mare and/or stallion that is picked.
+  function calcSuggestionsHtml() {
+    function panel(life) {
+      if (!life || !state.horseInfo[life]) return '';
+      var r = L.pairIdeas(state, life, 10);
+      var head = '<h3 style="margin:0 0 4px;font-size:16px;">Suggested ' + r.kind + ' for ' + L.esc(r.name) + '</h3>';
+      if (r.error) return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head + '<p class="notes-line" style="margin:0;">' + (r.error === 'young' ? 'Horses under 3 can\'t be bred yet.' : 'Pick a mare or a stallion.') + '</p></div>';
+      var pickAction = r.kind === 'stallions' ? 'calc-pick-stallion' : 'calc-pick-mare';
+      function col(title, list) {
+        var inner = list.length ? list.slice(0, 5).map(function (x) {
+          return '<div style="border-top:1px solid var(--border);padding:7px 0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
+            '<strong>' + L.esc(x.name) + '</strong><button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(x.life) + '">Use</button></div>' +
+            (r.hasGoal ? '<span class="tag" style="font-size:11px;color:var(--' + (x.fits ? 'success' : 'warn') + ');">' + (x.fits ? 'might fit goals' : 'may fall short') + '</span> ' : '') +
+            '<span class="sub" style="font-size:12px;">' + x.reasons.map(function (t) { return L.esc(t); }).join(' \u00b7 ') + '</span></div>';
+        }).join('') : '<p class="notes-line" style="margin:6px 0 0;">None found yet. Open more ' + r.kind + '\' pages on Horse Reality so the ledger knows them.</p>';
+        return '<div><div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">' + title + '</div>' + inner + '</div>';
+      }
+      return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head +
+        '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px;">' +
+        col('Your ' + r.kind, r.mine) + col('Other players\' ' + r.kind, r.other) + '</div></div>';
+    }
+    var h = panel(calcMare) + panel(calcStallion);
+    if (!h) return '<p class="notes-line" style="margin:0 0 14px;">Pick a mare or a stallion and the ledger suggests partners from the horses it has saved, split into yours and other players\'.</p>';
+    return h;
+  }
   function calcOptionsHtml(sex, selected) {
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
-    var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).map(function (life) {
+    var f = calcFilter[sex], sugg = f.sugg ? calcSuggestedSet(sex) : null;
+    var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).filter(function (life) {
+      if (life === selected) return true;
+      var young = L.isYoungInfo(state.horseInfo[life]);
+      if (young ? !f.young : !f.adult) return false;
+      if (mine[life] ? !f.mine : !f.other) return false;
+      if (sugg && !sugg[life]) return false;
+      return true;
+    }).map(function (life) {
       return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' } };
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });
     function group(label, list) {
@@ -1734,10 +1791,11 @@
   function renderCalculator() {
     var html = topHeaderHtml();
     html += '<div class="section-head"><h2>Foal Calculator</h2><button type="button" class="btn btn-sm" data-action="calc-refresh" title="Reload the saved horses and recalculate. Your mare and stallion stay selected.">Refresh</button></div>';
-    html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">' +
-      '<div class="field"><label for="calc-mare">Mare</label><select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
-      '<div class="field"><label for="calc-stallion">Stallion</label><select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
+    html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">' +
+      '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + '<select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
+      '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + '<select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
       '</div>';
+    html += calcSuggestionsHtml();
     html += calcMareNoticeHtml();
 
     if (!calcMare || !calcStallion || !state.horseInfo[calcMare] || !state.horseInfo[calcStallion]) {
@@ -2330,7 +2388,20 @@
       if (!t) return;
       var action = t.getAttribute('data-action');
 
-      if (action === 'show-tab') {
+      if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
+      else if (action === 'calc-pick-stallion') { calcStallion = t.getAttribute('data-life'); saveUi(); render(); }
+      else if (action === 'calc-refresh') {
+        HRStorage.getState(function (fresh) {
+          state = fresh;
+          if (!state.breedings) state.breedings = {};
+          if (!state.horseInfo) state.horseInfo = {};
+          if (!state.horseMeta) state.horseMeta = {};
+          if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+          recompute();
+          render();
+        });
+      }
+      else if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
         saveUi();
         selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
@@ -2584,16 +2655,12 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
-      else if (action === 'calc-refresh') {
-        HRStorage.getState(function (fresh) {
-          state = fresh;
-          if (!state.breedings) state.breedings = {};
-          if (!state.horseInfo) state.horseInfo = {};
-          if (!state.horseMeta) state.horseMeta = {};
-          if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
-          recompute();
-          render();
-        });
+      else if (action === 'calc-filter') {
+        var side = t.getAttribute('data-side'), key = t.getAttribute('data-key'), cf = calcFilter[side];
+        if (key === 'all') calcFilter[side] = Object.assign(defaultCalcFilter(), t.checked ? {} : { adult: false, young: false, mine: false, other: false });
+        else cf[key] = t.checked;
+        saveUi();
+        render();
       }
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }

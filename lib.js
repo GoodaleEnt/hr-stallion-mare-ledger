@@ -1213,6 +1213,74 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- Foal Calculator: partners for the horse you picked ----------
+  // For a mare: the stallions to use; for a stallion: the mares to use. Only horses saved in the ledger are
+  // considered (3 and older, not sold/retired, genetic potential known). Mares that are covered or in foal are left
+  // out. Each result says whether the foal might fit your minimum Breed Total / conformation goals, judged from the
+  // average of the two parents' genetic potential and top conformation. Split into your horses and other players'.
+  function pairIdeas(state, life, limit) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life];
+    var out = { life: life, name: (info && info.name) || ('#' + life), kind: '', mine: [], other: [], error: '', hasGoal: false };
+    if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) { out.error = 'unknown'; return out; }
+    if (isYoungInfo(info)) { out.error = 'young'; return out; }
+    var isMare = info.sex === 'mare';
+    out.kind = isMare ? 'stallions' : 'mares';
+    var goals = goalsOf(state);
+    out.hasGoal = goals.minBT != null || goals.minConf != null;
+    var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var myConf = bestConformation(meta).best;
+    var myAnc = ancestorMap(state, life, 3);
+    var myMet = goalCheck(state, life).met;
+    var list = [];
+    Object.keys(state.horseInfo || {}).forEach(function (cl) {
+      var ci = state.horseInfo[cl];
+      if (!ci || cl === life || ci.sex !== (isMare ? 'stallion' : 'mare') || isYoungInfo(ci)) return;
+      var cm = (state.horseMeta && state.horseMeta[cl]) || {};
+      if (isSoldLife(state, cl) || cm.status === 'Retired' || cm.status === 'Deceased') return;
+      if (ci.geneticPotential == null || info.geneticPotential == null) return;
+      if (!isMare && mareBreedStatus(state, cl).status) return;
+      var cConf = bestConformation(cm).best;
+      var gp = (Number(info.geneticPotential) + Number(ci.geneticPotential)) / 2;
+      var confs = [myConf, cConf].filter(function (x) { return x > 0; });
+      var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+      var estBT = conf ? breedTotal(gp, conf) : null;
+      var common = commonAncestors(myAnc, ancestorMap(state, cl, 3));
+      var coi = estimateCoi(common);
+      if (coi > 12.5) return;
+      var mI = isMare ? info : ci, sI = isMare ? ci : info;
+      var shared = [], fixes = [];
+      if (mI.confTraits && sI.confTraits) {
+        Object.keys(mI.confTraits).forEach(function (t) {
+          var a = traitRankOf(mI.confTraits[t]), b = traitRankOf(sI.confTraits[t]);
+          if (a == null || b == null) return;
+          if (a === 0 && b === 0) shared.push(t);
+          else if (a === 0 && b >= 2) fixes.push(t);
+        });
+      }
+      var fert = String(sI.fertility || '').toLowerCase().trim();
+      var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
+      var fits = coi < 6.25 && (goals.minBT == null || (estBT != null && estBT >= goals.minBT)) && (goals.minConf == null || (conf != null && conf >= goals.minConf));
+      var otherMet = goalCheck(state, cl).met;
+      var mine = !!myName && String(ci.ownerName || '').trim().toLowerCase() === myName;
+      var reasons = [];
+      reasons.push(estBT != null ? 'Estimated foal Breed Total ' + (Math.round(estBT * 10) / 10) : 'Average genetic potential ' + (Math.round(gp * 10) / 10) + ' (no show score yet, so no Breed Total)');
+      if (out.hasGoal && !fits && goals.minBT != null && estBT != null && estBT < goals.minBT) reasons.push('Your goal is Breed Total ' + goals.minBT);
+      reasons.push(common.length ? 'Estimated inbreeding ' + (Math.round(coi * 100) / 100) + '%' : 'No shared ancestors');
+      if (fixes.length) reasons.push('Covers ' + fixes.join(', '));
+      if (shared.length) reasons.push('Both weak in ' + shared.join(', '));
+      if (myMet && otherMet) reasons.push('Both parents meet your goals');
+      if (isMare && !mine) { var terms = studTermsOf(state, cl); if (terms) reasons.push('Cost: ' + terms.summary); }
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0);
+      list.push({ life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
+    });
+    list.sort(function (a, b) { return b.score - a.score; });
+    out.mine = list.filter(function (x) { return x.mine; }).slice(0, limit || 10);
+    out.other = list.filter(function (x) { return !x.mine; }).slice(0, limit || 10);
+    return out;
+  }
+
   // ---------- sell ideas: which horses to sell, and what to ask ----------
   // Nothing here contacts Horse Reality. Prices come from your own past sales (price per Breed Total point
   // of the most similar horses you sold, in HRC) and never go below what you paid for the horse.
@@ -1571,6 +1639,7 @@
   global.HRLib = {
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
+    pairIdeas: pairIdeas,
     sellFormOf: sellFormOf,
     breedTotal: breedTotal,
     isSoldLife: isSoldLife,

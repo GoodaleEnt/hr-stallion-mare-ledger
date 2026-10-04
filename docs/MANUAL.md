@@ -60,9 +60,9 @@ Studs that show up here only because they were needed to track one of *your mare
 
 **Export Backup / Restore Backup** (top of this tab) save or reload your *entire* ledger as a single JSON file — every stallion, mare, breeding record, and cached horse passport. Use it before doing anything risky (switching computers, clearing browser data), or just periodically for peace of mind. Restoring a backup replaces everything currently stored, so you'll be asked to confirm first.
 
-## The Open in Ledger tab
+## The Open in Ledger button
 
-On every horse's page on Horse Reality there is a green **Ledger** tab. Where the page has Horse Reality's own side tabs (such as Dam and Foal) it is added to them as one more tab; on a horse without them the same vertical tab strip is created in the same place, so the **Ledger** tab sits at the right edge of the horse's picture on every horse page. (If the site ever refuses to show it, a green **Open in Ledger** tab on the right edge of the screen is used instead.) Click it to jump straight to that horse in the ledger: your stallions open on their stallion page, any other horse on its profile (your mares open on their mare page). If the dashboard is already open it is brought to the front instead of opening a second copy. If the ledger hasn't saved that horse yet, the dashboard opens with its life number in the search box. On mobile, the button opens the Ledger overlay on the same horse.
+On every horse's page on Horse Reality there is a white **Open in Ledger** pill inside the horse's picture, in the top-left corner. When the horse has status pills such as *Covered* or *Stud or semen* it sits beside them; when it doesn't, it sits in the same corner on its own. Click it to jump straight to that horse in the ledger: your stallions open on their stallion page, any other horse on its profile (your mares open on their mare page). If the dashboard is already open it is brought to the front instead of opening a second copy. If the ledger hasn't saved that horse yet, the dashboard opens with its life number in the search box. On mobile, the button opens the Ledger overlay on the same horse.
 
 ## Looking up any horse
 

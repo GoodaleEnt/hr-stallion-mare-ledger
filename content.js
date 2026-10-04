@@ -1223,7 +1223,6 @@
     });
   }
   setupBreedCapture();
-  setupLedgerTabClicks();
   setTimeout(confirmPendingCoverings, 2500);
 
   // The horse page's "Health" box lists five health traits and, once tested,
@@ -1272,58 +1271,15 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
-  // An "Open in Ledger" tab on every horse page. Where the page has Horse Reality's own
-  // side tabs (<hr-tab-container sideways="true"> with <hr-tab> items like Dam / Foal) it is
-  // added to them as one more tab; on a horse without them the same tab strip is created in
-  // the same place. Only if the site never draws it is a plain vertical tab used instead,
-  // on the right edge of the screen. On desktop it asks the extension to open (or focus)
-  // the dashboard on this horse's profile; on mobile it opens the on-page overlay.
+  // An "Open in Ledger" pill on every horse page, inside the horse's picture box in the top-left
+  // corner, styled like the site's own status pills. It goes beside those pills ("Covered",
+  // "Stud or semen", ...) when the page has them; when it doesn't, it is placed in the same
+  // corner of the picture itself. Only if the picture box can't be found is a plain vertical
+  // tab drawn on the right edge of the screen. On desktop the click asks the extension to open (or focus) the dashboard
+  // on this horse's profile; on mobile it opens the on-page overlay.
   var LEDGER_BTN_ID = 'hr-ledger-open-btn';
-  var LEDGER_TAB_ID = 'hr-ledger-open-tab';
-  var LEDGER_HASH = '#hr-ledger-open';
-  var tabHiddenTicks = 0, tabModeFailed = false;
-  // A click anywhere inside a tab strip whose path contains our tab, or a visible tab labelled
-  // "Ledger" (the strip's own copy, which is drawn inside its shadow root), opens the ledger.
-  function setupLedgerTabClicks() {
-    document.addEventListener('click', function (e) {
-      var path = e.composedPath ? e.composedPath() : [];
-      var inStrip = false, hit = false;
-      path.forEach(function (n) {
-        if (!n || n.nodeType !== 1) return;
-        if (n.tagName === 'HR-TAB-CONTAINER') inStrip = true;
-        if (n.id === LEDGER_TAB_ID) hit = true;
-        else if (n.children && n.children.length === 0 && (n.textContent || '').trim() === 'Ledger') hit = true;
-      });
-      if (!inStrip || !hit) return;
-      var id = parseHorseIdFromUrl();
-      if (!id) return;
-      e.preventDefault();
-      e.stopPropagation();
-      openInLedger(id);
-    }, true);
-    window.addEventListener('hashchange', checkLedgerHash);
-    checkLedgerHash();
-  }
-  function checkLedgerHash() {
-    if (location.hash !== LEDGER_HASH) return;
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-    var id = parseHorseIdFromUrl();
-    if (id) openInLedger(id);
-  }
-  function findSideTabs(root) {
-    var list = root.querySelectorAll('hr-tab-container');
-    for (var i = 0; i < list.length; i++) {
-      if (String(list[i].getAttribute('sideways')) === 'true') return list[i];
-    }
-    var all = root.querySelectorAll('*');
-    for (var j = 0; j < all.length; j++) {
-      if (all[j].shadowRoot) {
-        var found = findSideTabs(all[j].shadowRoot);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
+  var LEDGER_PILL_ID = 'hr-ledger-open-pill';
+  var areaFailed = false, pillHiddenTicks = 0;
   function openInLedger(id) {
     if (window.HRMobileOverlay && window.HRLedgerOpenProfile) {
       window.HRMobileOverlay.show();
@@ -1332,79 +1288,58 @@
     }
     chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
   }
-  function removeLedgerTab() {
-    document.querySelectorAll('#' + LEDGER_TAB_ID).forEach(function (el) { el.remove(); });
-  }
-  // Horses with no Dam / Foal tabs: build the same vertical tab strip the site uses. It goes
-  // right after the horse's info block and takes that block's own Svelte class, so the
-  // site's stylesheet places it exactly where the Dam / Foal tabs normally appear.
-  var LEDGER_STRIP_ID = 'hr-ledger-tabs';
-  function createSideTabs() {
-    var info = document.querySelector('div.horse-info');
-    var parent = info && info.parentElement;
-    if (!parent) return null;
-    var svelte = (String(parent.className).match(/svelte-[a-z0-9]+/) || [''])[0];
-    var strip = document.createElement('hr-tab-container');
-    strip.id = LEDGER_STRIP_ID;
-    if (svelte) strip.className = svelte;
-    strip.setAttribute('size', 'small');
-    strip.setAttribute('sideways', 'true');
-    info.insertAdjacentElement('afterend', strip);
-    return strip;
-  }
-  function removeLedgerStrip() {
-    var own = document.getElementById(LEDGER_STRIP_ID);
-    if (own) own.remove();
-  }
   function removeLedgerButton() {
-    removeLedgerTab();
-    removeLedgerStrip();
-    document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
+    document.querySelectorAll('#' + LEDGER_PILL_ID + ', #' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
   }
   function injectLedgerButton() {
     var life = parseHorseIdFromUrl();
     if (!life) { removeLedgerButton(); return; }
 
-    // 1) one more tab among the site's own side tabs
-    var tabs = tabModeFailed ? null : (findSideTabs(document) || createSideTabs());
-    if (tabs) {
-      var mine = tabs.querySelector('#' + LEDGER_TAB_ID);
-      if (mine && mine.getAttribute('data-life') === life) {
-        // if the site never draws a tab we add, give up on this placement and use the edge tab
-        var box = mine.getBoundingClientRect();
-        if (box.width === 0 && box.height === 0) {
-          if (++tabHiddenTicks >= 3) { tabModeFailed = true; mine.remove(); removeLedgerStrip(); }
+    // 1) in the picture's status-pill area (top-left), or 2) in that corner of the picture itself
+    var area = areaFailed ? null : document.querySelector('div.horse-status');
+    var picture = document.getElementById('top');
+    var home = area || picture;
+    if (home) {
+      document.querySelectorAll('#' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
+      var pill = document.getElementById(LEDGER_PILL_ID);
+      if (pill && pill.parentNode === home) {
+        pill.setAttribute('data-life', life);
+        // the status area can exist but draw nothing; if our pill is invisible there, use the picture corner
+        if (area && pill.getBoundingClientRect().width === 0) {
+          if (++pillHiddenTicks >= 3) { areaFailed = true; pill.remove(); }
         } else {
-          tabHiddenTicks = 0;
+          pillHiddenTicks = 0;
         }
-        if (!tabModeFailed) return;
-      } else if (!tabModeFailed) {
-        removeLedgerTab();
-        var tab = document.createElement('hr-tab');
-        tab.id = LEDGER_TAB_ID;
-        tab.setAttribute('text', 'Ledger');
-        tab.setAttribute('title', 'Open this horse in HR Stallion & Mare Ledger');
-        tab.setAttribute('data-life', life);
-        // The site's tab strip draws its own visible tabs from these <hr-tab> items, so a click
-        // lands on the strip, not on this element. Two ways to catch it: the document-level click
-        // listener below (it recognises the Ledger tab in the click's path), and, if the site
-        // "navigates" instead, this marker URL on the same page (see checkLedgerHash).
-        tab.setAttribute('href', location.origin + location.pathname + location.search + LEDGER_HASH);
-        tab.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          openInLedger(tab.getAttribute('data-life'));
-        }, true);
-        tabHiddenTicks = 0;
-        tabs.appendChild(tab);
         return;
       }
-    } else {
-      removeLedgerTab();
-      removeLedgerStrip();
+      if (pill) pill.remove();
+      pill = document.createElement('button');
+      pill.id = LEDGER_PILL_ID;
+      pill.type = 'button';
+      pill.title = 'Open this horse in HR Stallion & Mare Ledger';
+      pill.setAttribute('data-life', life);
+      var dot = document.createElement('span');
+      dot.style.cssText = 'width:9px;height:9px;border-radius:50%;background:#46592C;display:inline-block;';
+      pill.appendChild(dot);
+      pill.appendChild(document.createTextNode('Open in Ledger'));
+      pill.style.cssText = [
+        'display:inline-flex', 'align-items:center', 'gap:7px', 'height:32px', 'padding:0 14px',
+        'border-radius:999px', 'border:1px solid rgba(255,255,255,.7)', 'background:rgba(255,255,255,.88)',
+        'color:#081b28', 'font:500 13px Roboto,system-ui,sans-serif', 'cursor:pointer',
+        'box-shadow:0 1px 4px rgba(0,0,0,.25)', 'white-space:nowrap'
+      ].concat(area ? ['margin:0 0 0 8px'] : ['position:absolute', 'left:16px', 'top:16px', 'z-index:5', 'margin:0']).join(';');
+      pill.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openInLedger(pill.getAttribute('data-life'));
+      });
+      if (!area && window.getComputedStyle(picture).position === 'static') picture.style.position = 'relative';
+      home.appendChild(pill);
+      return;
     }
+    document.querySelectorAll('#' + LEDGER_PILL_ID).forEach(function (el) { el.remove(); });
 
-    // 2) our own vertical tab on the right edge of the screen
+    // 3) no picture box found: a vertical tab on the right edge of the screen
     var edge = document.getElementById(LEDGER_BTN_ID);
     if (edge) { edge.setAttribute('data-life', life); return; }
     var host = document.body || document.documentElement;

@@ -1300,6 +1300,32 @@
     });
   }
 
+  // Links on the Breed page to each parent's own page: the chosen mare (follows the dropdown) and the stallion.
+  function addBreedParentLinks() {
+    var select = document.getElementById('secondhorse');
+    if (!select || !select.parentElement) return;
+    var box = document.getElementById('hr-parent-links');
+    if (!box) {
+      box = document.createElement('span');
+      box.id = 'hr-parent-links';
+      box.style.cssText = 'margin-left:12px;font-size:13px;';
+      var a = document.createElement('a');
+      a.id = 'hr-mare-link'; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open mare \u2197';
+      var b = document.createElement('a');
+      b.id = 'hr-stallion-link'; b.target = '_blank'; b.rel = 'noopener'; b.textContent = 'Open stallion \u2197'; b.style.marginLeft = '12px';
+      box.appendChild(a); box.appendChild(b);
+      select.parentElement.appendChild(box);
+    }
+    var mare = document.getElementById('hr-mare-link'), stal = document.getElementById('hr-stallion-link');
+    if (select.value) { mare.href = 'https://www.horsereality.com/horses/' + select.value + '/'; mare.style.display = ''; }
+    else { mare.removeAttribute('href'); mare.style.display = 'none'; }
+    var btn = document.querySelector('button.breedmare');
+    var parts = location.pathname.split('/').filter(Boolean);
+    var stallionLife = (btn && btn.getAttribute('lang')) || (parts[0] === 'breed' ? parts[1] : '');
+    if (stallionLife) { stal.href = 'https://www.horsereality.com/horses/' + stallionLife + '/'; stal.style.display = ''; }
+    else stal.style.display = 'none';
+  }
+
   // ---- stud terms: what it costs to breed to a stallion ----
   // 1) The stallion's own page has "Public Stud Service" / "Private Stud Service" (and any semen) boxes, each
   //    with a price row: HRC, Delta Points, Foundation and Wildlife tickets (a greyed price is not offered).
@@ -1762,6 +1788,7 @@
     scrapeStudTerms();
     scrapeMyStuds();
     annotateBreedDropdown();
+    addBreedParentLinks();
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

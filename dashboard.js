@@ -24,6 +24,16 @@
   var suggestLife = null;
   var calcMare = '';
   var calcStallion = '';
+  var UI_KEY = 'hrLedgerUi';
+  function saveUi() {
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion })); } catch (e) {}
+  }
+  try {
+    var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
+    if (savedUi.calcMare) calcMare = String(savedUi.calcMare);
+    if (savedUi.calcStallion) calcStallion = String(savedUi.calcStallion);
+    if (savedUi.tab === 'calc') activeTab = 'calc';
+  } catch (e) {}
 
   // ---------- derived data ----------
   function recompute() {
@@ -1632,38 +1642,44 @@
   // The foal's pedigree: sire on top, dam below, each side expanded as far
   // back as the cached pedigrees reach. Ancestors that appear on BOTH sides
   // (the inbreeding check's shared ancestors) are outlined in red.
-  function pedBoxHtml(n, shared) {
+  function pedBoxHtml(n, shared, col, row, span) {
     var isShared = shared[n.life];
+    var full = n.name ? n.name + ' #' + n.life : '#' + n.life;
     var label = n.name ? L.esc(n.name) : '<span style="color:var(--text-muted);">#' + L.esc(n.life) + '</span>';
-    return '<div style="border:1px solid ' + (isShared ? 'var(--danger)' : 'var(--border)') + ';background:' + (isShared ? 'var(--danger-bg)' : 'var(--surface)') +
-      ';border-radius:8px;padding:5px 8px;font-size:12.5px;line-height:1.25;width:150px;box-sizing:border-box;">' + label +
-      (n.name ? '<div class="mono" style="font-size:10.5px;color:var(--text-muted);">#' + L.esc(n.life) + (n.cached ? '' : ' · not cached') + '</div>' : '') + '</div>';
+    return '<div title="' + L.esc(full) + '" style="grid-column:' + col + ';grid-row:' + row + ' / span ' + span + ';align-self:center;height:46px;overflow:hidden;box-sizing:border-box;' +
+      'border:1px solid ' + (isShared ? 'var(--danger)' : 'var(--border)') + ';background:' + (isShared ? 'var(--danger-bg)' : 'var(--surface)') +
+      ';border-radius:8px;padding:4px 8px;font-size:12px;line-height:1.2;">' +
+      '<div style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + label + '</div>' +
+      (n.name ? '<div class="mono" style="font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">#' + L.esc(n.life) + (n.cached ? '' : ' \u00b7 not cached') + '</div>' : '') + '</div>';
   }
-  function pedNodeHtml(n, shared) {
-    var kids = [];
-    if (n.s) kids.push(pedNodeHtml(n.s, shared));
-    if (n.d) kids.push(pedNodeHtml(n.d, shared));
-    return '<div style="display:flex;align-items:stretch;">' +
-      '<div style="display:flex;align-items:center;padding:3px 10px 3px 0;">' + pedBoxHtml(n, shared) + '</div>' +
-      (kids.length ? '<div style="display:flex;flex-direction:column;justify-content:space-around;">' + kids.join('') + '</div>' : '') +
-    '</div>';
+  // Every generation is a column of equal boxes; a horse spans the rows of its own ancestors, so the
+  // sire and dam lines line up whether or not their pedigrees are cached.
+  function pedCellsHtml(n, shared, level, row, levels) {
+    var span = Math.pow(2, levels - level);
+    if (!n) {
+      return level === 1 ? '<div style="grid-column:' + (level + 1) + ';grid-row:' + row + ' / span ' + span + ';align-self:center;height:46px;box-sizing:border-box;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;">not cached</div>' : '';
+    }
+    var h = pedBoxHtml(n, shared, level + 1, row, span);
+    if (level < levels) h += pedCellsHtml(n.s, shared, level + 1, row, levels) + pedCellsHtml(n.d, shared, level + 1, row + span / 2, levels);
+    return h;
   }
   function foalPedigreeHtml(studLife, mareLife, common) {
     var shared = {};
     common.forEach(function (c) { shared[c.life] = true; });
-    var tree = {
-      life: 'foal', name: 'Foal', cached: true,
-      s: L.pedigreeTreeOf(state, studLife, CALC_GENERATIONS),
-      d: L.pedigreeTreeOf(state, mareLife, CALC_GENERATIONS)
-    };
-    var rootBox = '<div style="border:1px dashed var(--border-strong);background:var(--surface-2);border-radius:8px;padding:5px 8px;font-size:12.5px;width:110px;box-sizing:border-box;">' +
-      '<strong>Foal</strong><div style="font-size:10.5px;color:var(--text-muted);">' + L.esc(L.ancestorName(state, mareLife) || 'Mare') + ' × ' + L.esc(L.ancestorName(state, studLife) || 'Stallion') + '</div></div>';
-    var inner = '<div style="display:flex;flex-direction:column;justify-content:space-around;">' + pedNodeHtml(tree.s, shared) + pedNodeHtml(tree.d, shared) + '</div>';
+    var sire = L.pedigreeTreeOf(state, studLife, CALC_GENERATIONS), dam = L.pedigreeTreeOf(state, mareLife, CALC_GENERATIONS);
+    // only as many generations as have a known horse, so there are no empty columns
+    var depth = function (n) { return n ? 1 + Math.max(depth(n.s), depth(n.d)) : 0; };
+    var levels = Math.max(1, depth(sire), depth(dam)), rows = Math.pow(2, levels);
+    var names = ['Parents', 'Grandparents', 'Great-grandparents', '3x great-grandparents', '4x great-grandparents'];
+    var head = '';
+    for (var i = 0; i < levels; i++) head += '<div style="grid-column:' + (i + 2) + ';grid-row:1;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">' + (names[i] || ('Generation ' + (i + 1))) + '</div>';
+    var root = '<div style="grid-column:1;grid-row:2 / span ' + rows + ';align-self:center;box-sizing:border-box;border:1px dashed var(--border-strong);background:var(--surface-2);border-radius:8px;padding:8px;font-size:12.5px;">' +
+      '<strong>Foal</strong><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + L.esc(L.ancestorName(state, mareLife) || 'Mare') + ' \u00d7 ' + L.esc(L.ancestorName(state, studLife) || 'Stallion') + '</div></div>';
     return '<div class="section-head"><h2>Foal pedigree</h2></div>' +
-      '<div class="card" style="padding:14px;overflow-x:auto;margin-bottom:16px;"><div style="display:flex;align-items:stretch;min-width:max-content;">' +
-        '<div style="display:flex;align-items:center;padding-right:10px;">' + rootBox + '</div>' + inner +
+      '<div class="card" style="padding:14px;overflow-x:auto;margin-bottom:16px;"><div style="display:grid;min-width:max-content;column-gap:12px;grid-template-columns:130px repeat(' + levels + ', 170px);grid-template-rows:auto repeat(' + rows + ', 52px);">' +
+        head + root + pedCellsHtml(sire, shared, 1, 2, levels) + pedCellsHtml(dam, shared, 1, 2 + rows / 2, levels) +
       '</div></div>' +
-      '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet — visit their pages to fill them in.</p>';
+      '<p class="notes-line" style="margin-top:-8px;margin-bottom:16px;">Sire on top, dam below. Red outline = ancestor on both sides. Ancestors shown as a number only haven\'t been cached yet \u2014 visit their pages to fill them in. Hover a box for the full name.</p>';
   }
 
   // Under the pickers: is the chosen mare already covered, or in foal? And is that the pairing she's already got?
@@ -1686,7 +1702,7 @@
 
   function renderCalculator() {
     var html = topHeaderHtml();
-    html += '<div class="section-head"><h2>Foal Calculator</h2></div>';
+    html += '<div class="section-head"><h2>Foal Calculator</h2><button type="button" class="btn btn-sm" data-action="calc-refresh" title="Reload the saved horses and recalculate. Your mare and stallion stay selected.">Refresh</button></div>';
     html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">' +
       '<div class="field"><label for="calc-mare">Mare</label><select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
       '<div class="field"><label for="calc-stallion">Stallion</label><select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
@@ -2285,6 +2301,7 @@
 
       if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
+        saveUi();
         selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
         render();
       }
@@ -2534,8 +2551,19 @@
           if (selectedId === sid3) selectedId = null;
         }
       }
-      else if (action === 'calc-mare') { calcMare = t.value; render(); }
-      else if (action === 'calc-stallion') { calcStallion = t.value; render(); }
+      else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
+      else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'calc-refresh') {
+        HRStorage.getState(function (fresh) {
+          state = fresh;
+          if (!state.breedings) state.breedings = {};
+          if (!state.horseInfo) state.horseInfo = {};
+          if (!state.horseMeta) state.horseMeta = {};
+          if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+          recompute();
+          render();
+        });
+      }
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }

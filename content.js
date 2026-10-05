@@ -1518,6 +1518,18 @@
     var hv = benefit && benefit.verdict;
     if (hv && hv !== 'unknown') pill(hv === 'helps' ? 'Helps herd' : hv === 'maybe' ? 'May help herd' : 'No herd lift', hv === 'no' ? false : true);
     host.appendChild(box);
+    // the row has a fixed height that would hide the badges: let it and the boxes around the horse's details grow
+    var row = outer.querySelector('.market-office-table-row') || outer;
+    for (var el = box.parentElement; el; el = el.parentElement) {
+      el.style.overflow = 'visible';
+      if (el === outer.parentElement) break;
+      if (el === row || el.contains(host) || host.contains(el)) { el.style.height = 'auto'; el.style.maxHeight = 'none'; }
+    }
+    // if it is still cut off, make the row tall enough for what is inside it
+    setTimeout(function () {
+      var need = box.getBoundingClientRect().bottom - row.getBoundingClientRect().top + 8;
+      if (need > row.getBoundingClientRect().height) { row.style.minHeight = Math.ceil(need) + 'px'; outer.style.minHeight = Math.ceil(need) + 'px'; }
+    }, 50);
   }
   // the highest bid seen on a listing you bid on is kept with the bid, so a lost bid still tells what the horse went for
   function noteHighest(state, tradeId, outer) {

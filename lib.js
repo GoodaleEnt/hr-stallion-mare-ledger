@@ -1369,10 +1369,19 @@
   // suggested), the partner suggestions (a foal that is likely to carry it ranks higher) and the Foal Calculator.
   function interestingAllele(l) { return l.recessive ? l.alleles[1] : l.alleles[0]; }
   function preferLoci() { return ALL_LOCI.filter(function (l) { return l.id !== 'E' && l.id !== 'A'; }); }
-  function preferenceMap(state) {
-    var pg = (state && state.settings && state.settings.preferGenes) || {};
+  // Levels: 'prefer', 'keep' (never sold), 'avoid' (a gene you don't want). Set for all breeds
+  // (settings.preferGenes) and optionally per breed (settings.preferGenesByBreed[breed]); a breed's own choice for a
+  // gene wins ('none' there means no preference for that breed), otherwise the all-breeds choice applies.
+  var PREFER_LEVELS = ['prefer', 'keep', 'avoid'];
+  function preferenceMap(state, breed) {
+    var st = (state && state.settings) || {};
+    var general = st.preferGenes || {};
+    var own = (breed && st.preferGenesByBreed && st.preferGenesByBreed[breedKeyOf(breed)]) || {};
     var out = {};
-    preferLoci().forEach(function (l) { if (pg[l.id] === 'prefer' || pg[l.id] === 'keep') out[l.id] = pg[l.id]; });
+    preferLoci().forEach(function (l) {
+      var v = own[l.id] != null && own[l.id] !== '' ? own[l.id] : general[l.id];
+      if (PREFER_LEVELS.indexOf(v) > -1) out[l.id] = v;
+    });
     return out;
   }
   function horseGenotype(state, life) {
@@ -1383,7 +1392,7 @@
   }
   // The preferred genes this horse has: [{ id, name, level }]
   function preferredGenesOf(state, life) {
-    var pm = preferenceMap(state), g = horseGenotype(state, life), out = [];
+    var pm = preferenceMap(state, state.horseInfo && state.horseInfo[life] && state.horseInfo[life].breed), g = horseGenotype(state, life), out = [];
     preferLoci().forEach(function (l) {
       if (!pm[l.id] || !g[l.id]) return;
       if (g[l.id].indexOf(interestingAllele(l)) > -1) out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')), level: pm[l.id] });
@@ -1392,9 +1401,9 @@
   }
   // Chance that a foal of a x b has each preferred gene: [{ id, name, level, p }] (p 0 to 1)
   function foalPreferredChances(state, aLife, bLife) {
-    var pm = preferenceMap(state);
-    if (!Object.keys(pm).length) return [];
     var a = state.horseInfo[aLife] || {}, b = state.horseInfo[bLife] || {};
+    var pm = preferenceMap(state, a.breed || b.breed);
+    if (!Object.keys(pm).length) return [];
     var res = colourOutcomes(a.testedColours, b.testedColours, manualGenes(state, aLife), manualGenes(state, bLife));
     var out = [];
     preferLoci().forEach(function (l) {
@@ -1410,8 +1419,8 @@
   function preferredGeneBonus(state, aLife, bLife) {
     var chances = foalPreferredChances(state, aLife, bLife), bonus = 0, reasons = [];
     chances.forEach(function (c) {
-      bonus += (c.level === 'keep' ? 3 : 1.5) * c.p;
-      if (c.p >= 0.25) reasons.push('Foal has a ' + Math.round(c.p * 100) + '% chance of ' + c.name + ' (a gene you ' + (c.level === 'keep' ? 'want to keep' : 'prefer') + ')');
+      bonus += (c.level === 'avoid' ? -2.5 : c.level === 'keep' ? 3 : 1.5) * c.p;
+      if (c.p >= 0.25) reasons.push('Foal has a ' + Math.round(c.p * 100) + '% chance of ' + c.name + ' (a gene you ' + (c.level === 'avoid' ? "don't want" : c.level === 'keep' ? 'want to keep' : 'prefer') + ')');
     });
     return { bonus: Math.round(bonus * 100) / 100, reasons: reasons };
   }
@@ -2156,7 +2165,10 @@
         else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { score += 2; reasons.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', ' + Math.abs(sr.avgDelta) + ' below their dams'); }
       }
       // genes you want to keep
-      var keepGenes = preferredGenesOf(state, x.life);
+      var allGenes = preferredGenesOf(state, x.life);
+      var keepGenes = allGenes.filter(function (g) { return g.level !== 'avoid'; });
+      var avoidGenes = allGenes.filter(function (g) { return g.level === 'avoid'; });
+      if (avoidGenes.length) { score += 2; reasons.push('Carries ' + avoidGenes.map(function (g) { return g.name; }).join(', ') + ', a gene you don\'t want'); }
       var hardGene = keepGenes.filter(function (g) { return g.level === 'keep'; });
       if (!heldWhy && hardGene.length) heldWhy = 'carries ' + hardGene.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep';
       else if (!heldWhy && keepGenes.length) { score -= 2; reasons.push('Carries ' + keepGenes.map(function (g) { return g.name; }).join(', ') + ' (a gene you prefer), so less likely to sell'); }
@@ -2443,6 +2455,7 @@
     producerRecord: producerRecord,
     preferLoci: preferLoci,
     preferenceMap: preferenceMap,
+    horseGenotype: horseGenotype,
     preferredGenesOf: preferredGenesOf,
     foalPreferredChances: foalPreferredChances,
     sireRecord: sireRecord,
@@ -2513,6 +2526,7 @@
     colourOutcomes: colourOutcomes,
     EXTRA_LOCI: EXTRA_LOCI,
     MANUAL_LOCI: MANUAL_LOCI,
+    ALL_LOCI: ALL_LOCI,
     agoutiPlain: agoutiPlain,
     extraGenotypeOptions: extraGenotypeOptions,
     manualGenes: manualGenes,

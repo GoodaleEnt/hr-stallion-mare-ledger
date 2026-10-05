@@ -189,12 +189,15 @@ In **Highlight goals**, tick **Separate goals for mares & fillies and for stalli
 
 ## Preferred genetics
 
-To give more weight to keeping certain genes in your herd, open the **My notes** panel (under Highlight goals) and choose a level for each gene under **Preferred genetics**: **No preference**, **Prefer** or **Keep**. The genes offered are the colour genes the ledger knows (Cream, Dun, Grey, Leopard complex, PATN1, Splashed white, W20, Sooty, Flaxen, Silver, Champagne, Roan, Tobiano, Sabino); Extension and Agouti are base colours and are left out.
+To give more weight to keeping certain genes in your herd, and to mark genes you do not want, open the **My notes** panel (under Highlight goals) and choose a level for each gene under **Preferred genetics**: **No preference**, **Prefer**, **Keep** or **Avoid**. The genes offered are the colour genes the ledger knows (Cream, Dun, Grey, Leopard complex, PATN1, Splashed white, W20, Sooty, Flaxen, Silver, Champagne, Roan, Tobiano, Sabino); Extension and Agouti are base colours and are left out.
 
-- **A horse with the gene** (one copy is enough, from Horse Reality's test or from genes you entered under Extra genes) gets a **✦** tag with the gene's name on its card and page. Untested counts as not there.
-- **Sell ideas:** with **Prefer**, the horse is less likely to be suggested for sale (its score drops and the reason says it carries a gene you prefer). With **Keep**, it is never suggested for sale and is listed under "Kept off the list because of their record".
-- **Breeding suggestions, the Foal Calculator's suggested partners and the pairing ideas on Analytics:** a pairing that could give a foal the gene ranks higher, more so for **Keep** than **Prefer**, and the reason says the chance (for example "Foal has a 50% chance of Leopard complex").
-- **Foal Calculator:** a **Your preferred genes** card shows the chance, for the pair you picked, that the foal has each preferred gene.
+**Set by breed:** the **Set for** drop-down at the top of the section chooses which breed the choices apply to. **All breeds** applies everywhere; picking a breed shows that breed's own choices, where **Same as all breeds** uses your all-breeds choice for that gene and **No preference** switches it off for that breed. A horse is judged by the choices for its own breed.
+
+- **A horse with the gene** (one copy is enough, from Horse Reality's test or from genes you entered under Extra genes) is marked on its card and page: a green **✦** for Prefer or Keep, a red **✖** for Avoid. Untested counts as not there.
+- **Genetics panel:** every horse's page has a **Genetics** panel listing the genes the ledger knows for it as chips (for example "Leopard complex LP/lp"), with preferred genes in green and unwanted ones in red, and the panel's border and a line at the top say when the horse carries one.
+- **Sell ideas:** with **Prefer**, the horse is less likely to be suggested for sale. With **Keep**, it is never suggested for sale and is listed under "Kept off the list because of their record". With **Avoid**, it is more likely to be suggested, with the reason "Carries X, a gene you don't want".
+- **Breeding suggestions, the Foal Calculator's suggested partners and the pairing ideas on Analytics:** a pairing that could give a foal a preferred gene ranks higher (Keep more than Prefer), and one that could give an unwanted gene ranks lower. The reason says the chance (for example "Foal has a 50% chance of Leopard complex").
+- **Foal Calculator:** a **Your preferred and unwanted genes** card shows the chance, for the pair you picked, that the foal has each one.
 
 ## Notes the suggestions use
 

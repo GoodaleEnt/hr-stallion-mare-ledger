@@ -1254,6 +1254,66 @@
       });
     });
   }
+  // ---- retiring a horse from your barn ----
+  // The Retire button (on a horse's Edit tab in your barn, or anywhere on the site) is noticed when you press it. If a
+  // confirmation box opens, the ledger waits for you to confirm it; if the button just submits, it is taken as done. The
+  // horse is then marked Retired (replacing For Sale) and moves to the Retired tab. Which horse it was comes from the page
+  // address, a link to the horse on the page, or a life number written in its header.
+  var RETIRE_KEY = 'hrRetirePending';
+  function lifeFromContext(el) {
+    var life = parseHorseIdFromUrl();
+    if (life) return life;
+    var um = /\/horses?\/(\d{6,})/.exec(location.href);
+    if (um) return um[1];
+    var scope = (el && el.closest && (el.closest('form') || el.closest('.modal,[role=dialog],.component,.frame,main'))) || document;
+    var a = scope.querySelector('a[href*="/horses/"]') || document.querySelector('a[href*="/horses/"]');
+    var lm = a && /\/horses\/(\d{6,})/.exec(a.getAttribute('href') || '');
+    if (lm) return lm[1];
+    var nm = /(?:#|life number[:\s]*)(\d{8})/i.exec(String((document.body && document.body.innerText) || '').slice(0, 5000));
+    return nm ? nm[1] : '';
+  }
+  function commitRetire(life) {
+    try { sessionStorage.removeItem(RETIRE_KEY); } catch (e) { /* no storage */ }
+    if (!life) return;
+    HRStorage.getState(function (state) {
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      var info = state.horseInfo && state.horseInfo[life];
+      if (info && me && info.ownerName && String(info.ownerName).trim().toLowerCase() !== me) return;
+      if (HRLib.recordRetired(state, life)) {
+        HRStorage.setState(state, function () { showToast('HR Ledger: ' + ((info && info.name) || ('#' + life)) + ' marked Retired'); });
+      }
+    });
+  }
+  // a visible confirmation box (a hidden one does not count)
+  function dialogOpen() {
+    return [].slice.call(document.querySelectorAll('.modal.show, .modal.in, .modal[style*="display: block"], [role=dialog]:not([aria-hidden="true"])')).some(function (el) { return el.getClientRects().length > 0 && el.offsetWidth > 0; });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('button,a,input[type=submit],.btn,[role=button]') : null;
+    if (!b) return;
+    var label = String(b.textContent || b.value || '').replace(/\s+/g, ' ').trim();
+    if (!/\bretire\b/i.test(label) || label.length > 45 || /breeding|unretire|un-retire|retired horses|cancel/i.test(label)) {
+      // a confirmation button in an open box, after a Retire press
+      var p0 = null;
+      try { p0 = JSON.parse(sessionStorage.getItem(RETIRE_KEY) || 'null'); } catch (err) { /* ignore */ }
+      if (p0 && Date.now() - p0.at < 180000 && b.closest('.modal,[role=dialog]') && /^(yes|confirm|ok|continue|proceed|retire)\b/i.test(label) && !/cancel|no\b/i.test(label)) commitRetire(p0.life);
+      return;
+    }
+    var life = lifeFromContext(b);
+    if (!life) { showToast('HR Ledger: could not tell which horse you retired. Open its page to update it.'); return; }
+    var isSubmit = (b.type === 'submit') || (b.closest && b.closest('form') && !dialogOpen());
+    try { sessionStorage.setItem(RETIRE_KEY, JSON.stringify({ life: life, at: Date.now(), confirmed: !!isSubmit })); } catch (err) { /* no storage */ }
+    if (isSubmit) { commitRetire(life); return; }
+    // not a form button: if no confirmation box appears shortly, the press itself did it
+    setTimeout(function () { if (!dialogOpen()) commitRetire(life); }, 1500);
+  }, true);
+  function checkPendingRetire() {
+    var p = null;
+    try { p = JSON.parse(sessionStorage.getItem(RETIRE_KEY) || 'null'); } catch (e) { /* ignore */ }
+    if (p && p.confirmed && Date.now() - p.at < 180000) commitRetire(p.life);
+    else if (p && Date.now() - p.at >= 180000) { try { sessionStorage.removeItem(RETIRE_KEY); } catch (e) { /* ignore */ } }
+  }
+
   // ---- your sales: asking prices of horses you list ----
   // On your My Sales page (rows like the Explore rows) each listing's buyout price is saved with the horse, the horse is
   // marked For Sale, and a price change adds a line to its asking-price history. On the New sale form, pressing the
@@ -1395,7 +1455,7 @@
   }
   // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
   // save. The rows are refreshed on load and when the tab is shown again.)
-  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus, scrapeMySales: scrapeMySales };
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus, scrapeMySales: scrapeMySales, checkPendingRetire: checkPendingRetire };
 
   // ---- fit summary on a horse's page ----
   // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why
@@ -2193,6 +2253,7 @@
     scheduleMarket();
     scheduleBidScan();
     scheduleSales();
+    checkPendingRetire();
     scrapeTradePage();
     var refTrade = parseHorseIdFromUrl() && /\/market\/trade\/(\d+)/.exec(document.referrer || '');
     if (refTrade) rememberTrade(refTrade[1], parseHorseIdFromUrl());

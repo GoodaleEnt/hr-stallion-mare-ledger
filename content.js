@@ -1203,10 +1203,11 @@
         row.style.background = '';
         row.style.boxShadow = '';
         row.removeAttribute('data-hr-fit');
-        if (off) return;
         var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
         if (!link) return;
         var tm = /\/market\/trade\/(\d+)/.exec(link.getAttribute('href') || '');
+        bidMark(outer, tm && state.marketBids && state.marketBids[tm[1]]);
+        if (off) return;
         var name = (link.textContent || '').replace(/\s+/g, ' ').trim();
         var life = (tm && trades[tm[1]]) || '';
         if (!life) { var nm = /(?:^|\D)(\d{8})(?:\D|$)/.exec(name); if (nm && state.horseInfo && state.horseInfo[nm[1]]) life = nm[1]; }
@@ -1251,13 +1252,79 @@
       });
     });
   }
+  // ---- your offers: a $ on listings you bid on, an X when you have been outbid ----
+  // The ledger notes an offer when you press a Bid / Offer button on a listing page (with the amount in the box), and
+  // reads the listing page's own wording ("outbid", "you are the highest bidder"). On the Explore pages a listing you
+  // bid on shows a green $ while your offer is the highest and a red X once someone's highest bid is above yours.
+  function tradeIdFromPath() {
+    if (typeof window !== 'undefined' && window.__HR_TEST__ && window.__HR_TEST_TRADE__) return window.__HR_TEST_TRADE__;
+    var m = /\/market\/trade\/(\d+)/.exec(location.pathname);
+    return m ? m[1] : '';
+  }
+  function saveBid(tradeId, patch) {
+    if (!tradeId) return;
+    HRStorage.getState(function (state) {
+      var mb = Object.assign({}, state.marketBids);
+      mb[tradeId] = Object.assign({}, mb[tradeId], patch, { seenAt: Date.now() });
+      var keys = Object.keys(mb);
+      if (keys.length > 300) keys.sort(function (a, b) { return (mb[a].seenAt || 0) - (mb[b].seenAt || 0); }).slice(0, keys.length - 300).forEach(function (k) { delete mb[k]; });
+      state.marketBids = mb;
+      HRStorage.setState(state);
+    });
+  }
+  function scanTradeStatus() {
+    var id = tradeIdFromPath();
+    if (!id) return;
+    var low = String((document.body && document.body.innerText) || '').slice(0, 30000).toLowerCase();
+    var status = '';
+    if (/\boutbid\b|no longer the highest|someone (else )?(has )?(placed )?a higher/.test(low)) status = 'outbid';
+    else if (/(you are|you're|you have) the highest (bid|offer|bidder)|your (bid|offer) is the highest|highest (bid|offer) is yours/.test(low)) status = 'leading';
+    if (status) saveBid(id, { status: status });
+  }
+  document.addEventListener('click', function (e) {
+    var id = tradeIdFromPath();
+    if (!id) return;
+    var b = e.target && e.target.closest ? e.target.closest('button,input[type=submit],a.button,.btn') : null;
+    if (!b) return;
+    var label = String(b.textContent || b.value || '').toLowerCase();
+    if (!/\b(bid|offer)\b/.test(label) || /buyout|buy out|autobuy|buy now|cancel/.test(label)) return;
+    var scope = b.closest('form') || document, amt = 0;
+    scope.querySelectorAll('input').forEach(function (i) {
+      if (i.type === 'hidden' || i.type === 'submit' || i.type === 'checkbox' || i.type === 'radio') return;
+      var v = parseInt(String(i.value || '').replace(/[^0-9]/g, ''), 10);
+      if (v > amt) amt = v;
+    });
+    saveBid(id, { amount: amt || null, status: 'placed', placedAt: Date.now() });
+  }, true);
+  var bidTimers = [];
+  function scheduleBidScan() {
+    bidTimers.forEach(clearTimeout);
+    bidTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(scanTradeStatus, ms); });
+  }
+  function bidMark(outer, bid) {
+    var host = outer.querySelector('.market-office-table-row-horse-info') || outer;
+    host.querySelectorAll('[data-hr-bid]').forEach(function (e) { e.remove(); });
+    if (!bid) return;
+    var hb = outer.querySelector('.market-office-table-row-highestbid');
+    var highest = 0;
+    if (hb && !/n\/a/i.test(hb.textContent || '')) highest = parseInt(String(hb.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+    var mine = Number(bid.amount) || 0;
+    var out = bid.status === 'outbid' || (mine > 0 && highest > mine && bid.status !== 'leading');
+    var tag = document.createElement('span');
+    tag.setAttribute('data-hr-bid', out ? 'outbid' : 'mine');
+    tag.textContent = out ? 'X' : '$';
+    tag.title = out ? 'HR Ledger: you have been outbid' + (mine ? ' (your offer ' + mine.toLocaleString('en-US') + (highest ? ', highest bid ' + highest.toLocaleString('en-US') : '') + ')' : '') : 'HR Ledger: you made an offer' + (mine ? ' of ' + mine.toLocaleString('en-US') : '') + ' and it is the highest so far';
+    tag.style.cssText = 'display:inline-block;margin-left:6px;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;font:700 14px system-ui,sans-serif;color:#fff;vertical-align:middle;background:' + (out ? '#C0281E' : '#1E8449') + ';box-shadow:0 0 0 2px #fff;';
+    var link = host.querySelector('a');
+    if (link && link.parentNode) link.parentNode.insertBefore(tag, link.nextSibling); else host.appendChild(tag);
+  }
   function scheduleMarket() {
     marketTimers.forEach(clearTimeout);
     marketTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(highlightMarket, ms); });
   }
   // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
   // save. The rows are refreshed on load and when the tab is shown again.)
-  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket };
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus };
 
   // ---- fit summary on a horse's page ----
   // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why
@@ -2050,6 +2117,7 @@
   function onPageReady() {
     scheduleFit();
     scheduleMarket();
+    scheduleBidScan();
     scrapeTradePage();
     var refTrade = parseHorseIdFromUrl() && /\/market\/trade\/(\d+)/.exec(document.referrer || '');
     if (refTrade) rememberTrade(refTrade[1], parseHorseIdFromUrl());

@@ -1359,6 +1359,143 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- mares that out-produce themselves ----------
+  // Compares a mare's foals with the mare herself: each foal's score against her own top conformation score, and
+  // (where the foal's page is saved) genetic potential and conformation traits. A mare is an "improver" when at least
+  // two of her foals have scores, they average higher than she scored, and at least half of them beat her. With
+  // opts.full it also works out what to look for in a stallion and which ledger stallions fit.
+  function producerRecord(state, mareLife, opts) {
+    mareLife = String(mareLife || '');
+    var info = state.horseInfo && state.horseInfo[mareLife];
+    var meta = (state.horseMeta && state.horseMeta[mareLife]) || {};
+    var out = { life: mareLife, mareScore: bestConformation(meta).best || 0, scored: 0, total: 0, avgFoal: null, avgDelta: null, better: 0,
+      improver: false, foals: [], bySire: [], needTraits: [], improvedTraits: [], heldBackTraits: [], gp: null, failed: 0, advice: [], candidates: [] };
+    var bySire = {};
+    var traitFoals = {};
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      var st = (state.stallions || []).find(function (s) { return s.id === sid; });
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (String(b.mareLifeNumber) !== mareLife) return;
+        if (b.status === 'Failed') { out.failed++; return; }
+        if (b.status !== 'Foal Born') return;
+        out.total++;
+        var fl = foalLifeOf(b.foalUrl);
+        var fInfo = fl && state.horseInfo && state.horseInfo[fl];
+        var fMeta = fl && state.horseMeta && state.horseMeta[fl];
+        var score = b.foalScore > 0 && b.foalScore <= 100 ? b.foalScore : (fMeta && Number(fMeta.confBest) > 0 ? Number(fMeta.confBest) : 0);
+        if (fInfo && fInfo.confTraits) Object.keys(fInfo.confTraits).forEach(function (t) { var r = traitRankOf(fInfo.confTraits[t]); if (r != null) (traitFoals[t] = traitFoals[t] || []).push(r); });
+        if (!(score > 0)) return;
+        out.scored++;
+        var delta = out.mareScore ? Math.round((score - out.mareScore) * 10) / 10 : null;
+        out.foals.push({ name: b.foalName || 'Foal', life: fl, score: score, delta: delta, sire: st ? st.name : '', sireLife: st ? st.lifeNumber : '', gp: fInfo && fInfo.geneticPotential != null ? Number(fInfo.geneticPotential) : null });
+        var key = st ? st.name : '?';
+        (bySire[key] = bySire[key] || { sire: key, sireLife: st ? st.lifeNumber : '', scores: [] }).scores.push(score);
+      });
+    });
+    if (out.scored) {
+      var total = out.foals.reduce(function (t, f) { return t + f.score; }, 0);
+      out.avgFoal = Math.round(total / out.scored * 10) / 10;
+      if (out.mareScore) {
+        out.avgDelta = Math.round((out.avgFoal - out.mareScore) * 10) / 10;
+        out.better = out.foals.filter(function (f) { return f.score > out.mareScore; }).length;
+        out.improver = out.scored >= 2 && out.avgDelta > 0 && out.better / out.scored >= 0.5;
+      }
+    }
+    out.bySire = Object.keys(bySire).map(function (k) {
+      var g = bySire[k], avg = g.scores.reduce(function (a, b) { return a + b; }, 0) / g.scores.length;
+      return { sire: g.sire, sireLife: g.sireLife, n: g.scores.length, avg: Math.round(avg * 10) / 10, delta: out.mareScore ? Math.round((avg - out.mareScore) * 10) / 10 : null };
+    }).sort(function (a, b) { return b.avg - a.avg; });
+    // genetic potential of her foals against hers
+    var fgp = out.foals.filter(function (f) { return f.gp != null; });
+    if (info && info.geneticPotential != null && fgp.length) {
+      out.gp = { mare: Number(info.geneticPotential), foalAvg: Math.round(fgp.reduce(function (t, f) { return t + f.gp; }, 0) / fgp.length), n: fgp.length };
+    }
+    // traits: where she is weak, and where her foals come out better or worse than she is
+    var mareTraits = (info && info.confTraits) || {};
+    var need = {};
+    Object.keys(mareTraits).forEach(function (t) {
+      var mr = traitRankOf(mareTraits[t]);
+      if (mr == null) return;
+      if (mr <= 1) need[t] = true;
+      var fr = traitFoals[t];
+      if (fr && fr.length) {
+        var avg = fr.reduce(function (a, b) { return a + b; }, 0) / fr.length;
+        if (avg >= mr + 0.5) out.improvedTraits.push(t);
+        else if (avg <= mr - 0.5) { out.heldBackTraits.push(t); need[t] = true; }
+      }
+    });
+    out.needTraits = Object.keys(need);
+    if (!(opts && opts.full)) return out;
+
+    // ---- advice (only with the full record)
+    var name = (info && info.name) || ('#' + mareLife);
+    if (!out.scored) {
+      out.advice.push('No foal scores saved for ' + name + ' yet, so there is nothing to compare. Open her Foals tab and each foal\'s page on Horse Reality to save them.');
+    } else {
+      out.advice.push('Her ' + out.scored + ' scored foal' + (out.scored === 1 ? '' : 's') + ' average ' + out.avgFoal + (out.mareScore ? (out.avgDelta >= 0 ? ', ' + out.avgDelta + ' above' : ', ' + Math.abs(out.avgDelta) + ' below') + ' her own ' + out.mareScore + ' (' + out.better + ' of ' + out.scored + ' beat her)' : '') + '.');
+    }
+    if (out.bySire.length) {
+      var top = out.bySire[0];
+      out.advice.push('Best result so far: ' + top.sire + ' (' + top.n + ' foal' + (top.n === 1 ? '' : 's') + ', average ' + top.avg + '). Repeating a cross that worked is the safest start.');
+      var weak = out.bySire.filter(function (x) { return x.delta != null && x.delta < -2; });
+      if (weak.length) out.advice.push('Foals by ' + weak.map(function (x) { return x.sire; }).join(', ') + ' scored below her, so look elsewhere.');
+    }
+    if (out.needTraits.length) out.advice.push('Look for a stallion rated Good or better in: ' + out.needTraits.join(', ') + (out.heldBackTraits.length ? ' (her foals came out weaker than she is in ' + out.heldBackTraits.join(', ') + ')' : '') + '.');
+    if (out.improvedTraits.length) out.advice.push('Her foals tend to improve on her in ' + out.improvedTraits.join(', ') + ', so those matter less.');
+    if (out.gp) out.advice.push('Genetic potential: hers is ' + out.gp.mare + ' and her foals average ' + out.gp.foalAvg + '. ' + (out.gp.foalAvg >= out.gp.mare ? 'Keep to stallions at or above ' + out.gp.mare + ' to keep that going.' : 'Choose a stallion above ' + out.gp.mare + ' to lift it.'));
+    if (out.failed >= 2 && out.failed / Math.max(1, out.failed + out.total) >= 0.3) out.advice.push('She has had ' + out.failed + ' failed coverings: prefer a stallion with Good or Excellent fertility.');
+    // ledger stallions that fit
+    var sug = breedingSuggestions(state, mareLife, 40);
+    if (!sug.error) {
+      var scored = sug.suggestions.map(function (s) {
+        var si = state.horseInfo[s.life] || {};
+        var covers = out.needTraits.filter(function (t) { var r = si.confTraits ? traitRankOf(si.confTraits[t]) : null; return r != null && r >= 2; });
+        return { life: s.life, name: s.name, covers: covers, estBT: s.estBT, yours: s.yours };
+      });
+      scored.sort(function (a, b) { return b.covers.length - a.covers.length; });
+      out.candidates = scored.slice(0, 3);
+    }
+    return out;
+  }
+  // The same idea for a stallion: his scored foals against the top scores of the mares they were out of.
+  function sireRecord(state, stallionLife) {
+    var out = { scored: 0, avgFoal: null, avgDelta: null, better: 0, improver: false };
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(stallionLife); });
+    if (!rec) return out;
+    var deltas = [], foals = [];
+    (state.breedings[rec.id] || []).forEach(function (b) {
+      if (b.status !== 'Foal Born' || !(b.foalScore > 0 && b.foalScore <= 100)) return;
+      var dam = bestConformation((state.horseMeta && state.horseMeta[b.mareLifeNumber]) || {}).best;
+      if (!(dam > 0)) return;
+      deltas.push(b.foalScore - dam); foals.push(b.foalScore);
+    });
+    out.scored = deltas.length;
+    if (!out.scored) return out;
+    out.avgFoal = Math.round(foals.reduce(function (a, b) { return a + b; }, 0) / out.scored * 10) / 10;
+    out.avgDelta = Math.round(deltas.reduce(function (a, b) { return a + b; }, 0) / out.scored * 10) / 10;
+    out.better = deltas.filter(function (d) { return d > 0; }).length;
+    out.improver = out.scored >= 3 && out.avgDelta > 0 && out.better / out.scored >= 0.5;
+    return out;
+  }
+  // Does this horse's dam out-produce herself? (her life number is saved with the horse's page)
+  function damImprover(state, life) {
+    var info = state.horseInfo && state.horseInfo[life];
+    var dl = info && info.dam && info.dam.lifeNumber;
+    if (!dl) return null;
+    var r = producerRecord(state, String(dl));
+    return r.improver ? { life: String(dl), name: r.mareScore ? ((state.horseInfo[dl] && state.horseInfo[dl].name) || (info.dam && info.dam.name) || 'her dam') : '' } : null;
+  }
+  // mares with a clear record of out-producing themselves, best first
+  function improverMares(state) {
+    var out = [];
+    ownedHorses(state).forEach(function (h) {
+      if (h.info.sex !== 'mare' || isSoldLife(state, h.lifeNumber)) return;
+      var r = producerRecord(state, h.lifeNumber);
+      if (r.improver) out.push(Object.assign({ name: h.info.name || ('#' + h.lifeNumber) }, r));
+    });
+    return out.sort(function (a, b) { return b.avgDelta - a.avgDelta; });
+  }
+
   // ---------- notes the suggestions can use ----------
   // The ledger has no AI: it looks for plain phrases in the notes you write and shows what it understood.
   // On a horse: "keep" / "don't sell" / "foundation" (never suggested for sale), "sell" (suggested for sale),
@@ -1883,12 +2020,19 @@
     var p = purchaseOf(state, life);
     var cost = p && (!p.price || p.currency === 'HRC') && (!p.shipping || p.shippingCurrency === 'HRC') ? p.price + p.shipping : 0;
     var mult = SELL_PACE[pace] || 1;
-    var out = { suggested: null, low: null, high: null, basis: '', comps: [], floor: cost || null, belowCost: false };
+    // A proven producer is worth more: +10% for a mare who out-produces herself or a stallion whose foals beat their
+    // dams, +5% for a daughter of such a mare.
+    var prem = 1, premWhy = '', pInfo = state.horseInfo && state.horseInfo[life];
+    if (pInfo && pInfo.sex === 'mare') {
+      if (producerRecord(state, life).improver) { prem = 1.1; premWhy = '+10% because she out-produces herself'; }
+      else if (damImprover(state, life)) { prem = 1.05; premWhy = '+5% because her dam out-produces herself'; }
+    } else if (pInfo && pInfo.sex === 'stallion' && sireRecord(state, life).improver) { prem = 1.1; premWhy = '+10% because his foals beat their dams'; }
+    var out = { suggested: null, low: null, high: null, basis: '', comps: [], floor: cost || null, belowCost: false, premium: premWhy };
     if (bt > 0 && soldComps.length) {
       var near = soldComps.filter(function (c) { return String(c.life) !== String(life); })
         .sort(function (a, b) { return Math.abs(a.bt - bt) - Math.abs(b.bt - bt); }).slice(0, 3);
       if (near.length) {
-        var est = median(near.map(function (c) { return c.price / c.bt; })) * bt * mult;
+        var est = median(near.map(function (c) { return c.price / c.bt; })) * bt * mult * prem;
         out.suggested = roundPrice(est); out.low = roundPrice(est * 0.85); out.high = roundPrice(est * 1.15);
         out.comps = near;
         out.basis = 'your ' + near.length + ' most similar past sale' + (near.length === 1 ? '' : 's') + ' (by Breed Total)';
@@ -1939,6 +2083,20 @@
       if (noteRules.keep || overallNoteRules(state).keepGroups[groupKey]) return; // your notes say to keep her / him
       var reasons = [], score = 0;
       if (noteRules.sell) { score += 3; reasons.push('Your note says to sell'); }
+      // What her foals (or his) have done: keep the proven producers and their daughters, flag the poor ones
+      var heldWhy = '';
+      if (x.sex === 'mare') {
+        var prod = producerRecord(state, x.life);
+        var dimp = damImprover(state, x.life);
+        if (prod.improver) heldWhy = 'she out-produces herself (foals average ' + prod.avgFoal + ' vs her ' + prod.mareScore + ')';
+        else if (dimp) heldWhy = 'her dam ' + dimp.name + ' out-produces herself';
+        else if (prod.scored >= 2 && prod.avgDelta != null && prod.avgDelta < -3 && prod.better === 0) { score += 2; reasons.push('Her ' + prod.scored + ' scored foals average ' + prod.avgFoal + ', below her own ' + prod.mareScore); }
+      } else {
+        var sr = sireRecord(state, x.life);
+        if (sr.improver) heldWhy = 'his foals beat their dams by ' + sr.avgDelta + ' on average';
+        else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { score += 2; reasons.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', ' + Math.abs(sr.avgDelta) + ' below their dams'); }
+      }
+      if (heldWhy && !noteRules.sell) { held.push({ life: x.life, name: x.name, why: heldWhy, kind: 'record' }); return; }
       var med = groupStats[x.sex].med, lowCut = groupStats[x.sex].lowCut, gname = GROUP_NAME[x.sex];
       var misses = goalsOn ? goalMisses(state, x.life) : [];
       var met = goalsOn && goalCheck(state, x.life).met;
@@ -1953,7 +2111,7 @@
         });
         if (!x.young && !rows) { score += 1; reasons.push('Never bred'); }
         var st = mareBreedStatus(state, x.life);
-        if (st.status) { held.push({ life: x.life, name: x.name, why: st.status === 'pregnant' ? 'in foal' : 'just covered' }); return; }
+        if (st.status) { held.push({ life: x.life, name: x.name, why: st.status === 'pregnant' ? 'in foal' : 'just covered', kind: 'foal' }); return; }
       } else if (!x.young) {
         var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(x.life); });
         var recs = rec ? (state.breedings[rec.id] || []) : [];
@@ -2218,6 +2376,10 @@
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
+    producerRecord: producerRecord,
+    sireRecord: sireRecord,
+    damImprover: damImprover,
+    improverMares: improverMares,
     parseNotes: parseNotes,
     overallNoteRules: overallNoteRules,
     horseNoteRules: horseNoteRules,

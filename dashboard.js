@@ -466,7 +466,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
+    html += producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -906,7 +906,7 @@
         var breedMisses = breedSt.status ? L.goalMisses(state, m.mareLifeNumber) : [];
         html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + (breedMisses.length ? ' mare-below' : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
           mareBreedBadgeHtml(breedSt, breedMisses) +
-          goalStripHtml(m.mareLifeNumber) +
+          goalStripHtml(m.mareLifeNumber) + improverTagHtml(m.mareLifeNumber) +
           (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
@@ -1142,7 +1142,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
+    html += producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -1431,7 +1431,7 @@
     html += '</div>';
 
     html += sellIdeasHtml();
-    html += feeWatchHtml() + moneyCardHtml() + compareCardHtml();
+    html += improversCardHtml() + feeWatchHtml() + moneyCardHtml() + compareCardHtml();
     var fa = L.foalAccuracy(viewState());
     html += '<div class="an-card" style="margin-top:18px;"><h3>Foal results vs. the parents</h3>';
     if (!fa.count) {
@@ -1541,6 +1541,14 @@
       '<p class="notes-line" style="margin:8px 0 0;">Last 12 months by the date of each breeding or sale. Horses bought are in the all-time total only, because the purchase date is not recorded. Other currencies are left out.</p></div>';
     return html;
   }
+  function improversCardHtml() {
+    var list = L.improverMares(viewState());
+    var html = '<div class="an-card" style="margin-top:18px;"><h3>Mares that out-produce themselves</h3>';
+    if (!list.length) return html + '<p class="notes-line" style="margin:0;">A mare shows here once at least two of her foals have scores, they average higher than her own top score, and half of them beat her. Open her Foals tab and her foals\' pages to save the scores.</p></div>';
+    return html + '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Mare</th><th class="num">Her score</th><th class="num">Foals average</th><th class="num">Difference</th><th>Foals that beat her</th></tr></thead><tbody>' + list.map(function (r) {
+      return '<tr><td><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(r.life) + '">' + L.esc(r.name) + '</button></td><td class="num mono">' + r.mareScore + '</td><td class="num mono">' + r.avgFoal + '</td><td class="num mono" style="color:var(--success);">+' + r.avgDelta + '</td><td>' + r.better + ' of ' + r.scored + '</td></tr>';
+    }).join('') + '</tbody></table></div><p class="notes-line" style="margin:8px 0 0;">Open a mare\'s page for what to look for in a stallion.</p></div>';
+  }
   function feeWatchHtml() {
     var ch = L.feeChanges(state, 14);
     if (!ch.length) return '';
@@ -1635,7 +1643,7 @@
     function priceCell(p) {
       if (p.suggested == null) return '<span class="sub">No sales or purchase price to go on yet</span>';
       return '<strong class="mono">' + money(p.suggested) + '</strong><div class="sub" style="font-size:12px;">range ' + L.esc(L.fmtMoney(p.low)) + '\u2013' + L.esc(L.fmtMoney(p.high)) + ' \u00b7 ' + L.esc(p.basis) +
-        (p.belowCost ? ' \u00b7 raised to what you paid' : '') + '</div>';
+        (p.premium ? ' \u00b7 ' + L.esc(p.premium) : '') + (p.belowCost ? ' \u00b7 raised to what you paid' : '') + '</div>';
     }
     var html = '<div class="an-card" style="margin-top:18px;"><h3>Sell ideas</h3>' +
       '<p class="notes-line" style="margin:0 0 10px;">Horses worth selling, and what to ask. It never lists a horse that meets all your goals, a Companion, or a mare that is covered or in foal.</p>' +
@@ -1658,7 +1666,9 @@
       html += '</tbody></table></div>';
       if (r.ideas.length > 15) html += '<p class="notes-line" style="margin:6px 0 0;">Showing the 15 strongest of ' + r.ideas.length + '.</p>';
     }
-    if (r.held.length) html += '<p class="notes-line" style="margin:8px 0 0;">Held back until their foal is born: ' + r.held.map(function (x) { return L.esc(x.name) + ' (' + x.why + ')'; }).join(', ') + '.</p>';
+    var heldFoal = r.held.filter(function (x) { return x.kind !== 'record'; }), heldRecord = r.held.filter(function (x) { return x.kind === 'record'; });
+    if (heldFoal.length) html += '<p class="notes-line" style="margin:8px 0 0;">Held back until their foal is born: ' + heldFoal.map(function (x) { return L.esc(x.name) + ' (' + x.why + ')'; }).join(', ') + '.</p>';
+    if (heldRecord.length) html += '<p class="notes-line" style="margin:8px 0 0;"><strong>Kept off the list because of their record:</strong> ' + heldRecord.map(function (x) { return '<button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(x.life) + '">' + L.esc(x.name) + '</button> (' + L.esc(x.why) + ')'; }).join('; ') + '.</p>';
     if (r.forSale.length) {
       html += '<h4 style="margin:16px 0 6px;">Already for sale: price check</h4><div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Horse</th><th class="num">BT</th><th>Price to ask</th></tr></thead><tbody>';
       r.forSale.forEach(function (x) {
@@ -2423,6 +2433,36 @@
   }
 
   // ---------- health & fertility (read from the horse's Health box) ----------
+  // A mare whose foals beat her own score: a star tag on cards and pages.
+  function improverTagHtml(life) {
+    var r = L.producerRecord(state, life);
+    if (!r.improver) return '';
+    return '<div style="margin:0 0 6px;"><span class="tag" style="color:var(--success);border-color:var(--success);" title="' + L.esc('Her ' + r.scored + ' scored foals average ' + r.avgFoal + ', ' + r.avgDelta + ' above her own ' + r.mareScore + '; ' + r.better + ' of ' + r.scored + ' beat her') + '">\u2605 Out-produces herself +' + r.avgDelta + '</span></div>';
+  }
+  // The mare's producer record and what to look for in a stallion.
+  function producerPanelHtml(life) {
+    var info = state.horseInfo[life];
+    if (!info || info.sex !== 'mare') return '';
+    var r = L.producerRecord(state, life, { full: true });
+    if (!r.total && !r.failed && !r.needTraits.length) return '';
+    var head = r.improver ? '\u2605 She out-produces herself' : (r.scored ? 'Her foals compared with her' : 'Producer record');
+    var html = '<details class="card profile-block" style="padding:12px 16px;margin-bottom:16px;' + (r.improver ? 'border-color:var(--success);' : '') + '"' + (r.improver ? ' open' : '') + '><summary style="cursor:pointer;font-weight:600;">' + head +
+      (r.scored && r.avgDelta != null ? ' \u2014 foals average ' + r.avgFoal + ' vs her ' + r.mareScore : '') + ' \u00b7 what to look for in a stallion</summary><div style="margin-top:8px;">';
+    if (r.foals.length) {
+      html += '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Foal</th><th>Sire</th><th class="num">Score</th><th class="num">vs her</th></tr></thead><tbody>' + r.foals.map(function (f) {
+        return '<tr><td>' + (f.life ? '<button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(f.life) + '">' + L.esc(f.name) + '</button>' : L.esc(f.name)) + '</td><td>' + L.esc(f.sire || '\u2014') + '</td><td class="num mono">' + f.score + '</td>' +
+          '<td class="num mono"' + (f.delta != null ? ' style="color:var(--' + (f.delta >= 0 ? 'success' : 'danger') + ');"' : '') + '>' + (f.delta != null ? (f.delta >= 0 ? '+' : '') + f.delta : '\u2014') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    }
+    html += '<div style="margin-top:10px;"><strong style="font-size:13px;">What to look for in a stallion</strong>' + r.advice.map(function (t) { return '<div class="an-tip tip" style="margin-top:4px;">' + L.esc(t) + '</div>'; }).join('') + '</div>';
+    if (r.candidates.length) {
+      html += '<div style="margin-top:10px;"><strong style="font-size:13px;">Stallions in the ledger that fit</strong>' + r.candidates.map(function (c) {
+        return '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding:5px 0;font-size:13.5px;"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(c.life) + '">' + L.esc(c.name) + '</button>' + (c.yours ? ' <span class="tag">yours</span>' : '') +
+          (c.covers.length ? ' <span class="sub">good in ' + L.esc(c.covers.join(', ')) + '</span>' : '') + '</span><button type="button" class="btn btn-sm" data-action="calc-open" data-mare="' + L.esc(life) + '" data-stallion="' + L.esc(c.life) + '">Foal Calculator</button></div>';
+      }).join('') + '</div>';
+    }
+    return html + '</div></details>';
+  }
   // Shows read from conformation-show results pages: the latest few, and progress to the Star predicate
   // (three 1st premiums, a score of 80 or more; wiki: Predicates).
   function showLogPanelHtml(life) {

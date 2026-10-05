@@ -38,6 +38,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 30. [Privacy](#privacy)
 31. [Troubleshooting](#troubleshooting)
 32. [Notes the suggestions use](#notes-the-suggestions-use)
+33. [Mares that out-produce themselves](#mares-that-out-produce-themselves)
 
 ## Installing
 
@@ -273,6 +274,21 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 - **Colts & Fillies:** horses under 3 are listed separately, a young stallion as a **Colt** and a young mare as a **Filly**, with age, genetic potential, top conformation and Breed Total.
 
 Click any column heading in the stallion, mare or Colts & Fillies tables to sort by it; click it again to reverse the order (a small arrow shows the direction). Empty values always sort to the bottom. Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
+
+## Mares that out-produce themselves
+
+The ledger compares each mare's foals with the mare herself: every foal's score against her own top conformation score. A mare with **at least two scored foals that average higher than she scored, with half or more beating her**, is marked **★ Out-produces herself** on her card and her page, and is listed in a card on the Analytics tab.
+
+On a mare's page, **Her foals compared with her** shows each foal, its sire, its score and the difference from her, then **What to look for in a stallion**:
+
+- the cross that has worked best so far, and sires whose foals scored below her;
+- the traits to look for (Good or better) where she is weak or her foals came out weaker than she is, and the traits her foals usually improve on;
+- the genetic potential to keep to or beat, and a note on fertility if she has had several failed coverings;
+- up to three **stallions in the ledger that fit** (available, same breed, not ruled out by your notes), with the traits each is good in and a Foal Calculator button.
+
+A stallion gets the same kind of record from his foals against their dams (at least three scored foals). Scores come from the Foals tab and the foals' own pages, so open those to fill it in.
+
+**This feeds Sell ideas:** an improver mare, her daughters, and a stallion whose foals beat their dams are kept off the sell list (listed under "Kept off the list because of their record"). A mare or stallion whose scored foals average well below herself or their dams gets a reason to sell. For horses that are for sale, the suggested price gets +10% for an improver mare or such a stallion and +5% for a daughter of an improver mare.
 
 ## Sell ideas
 

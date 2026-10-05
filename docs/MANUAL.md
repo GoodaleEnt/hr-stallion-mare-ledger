@@ -37,6 +37,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 29. [Updating](#updating)
 30. [Privacy](#privacy)
 31. [Troubleshooting](#troubleshooting)
+32. [Notes the suggestions use](#notes-the-suggestions-use)
 
 ## Installing
 
@@ -183,6 +184,27 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 ## Separate goals for mares and stallions
 
 In **Highlight goals**, tick **Separate goals for mares & fillies and for stallions & colts** if the two should have different goals. Two buttons then appear: **Mares & fillies** and **Stallions & colts**. Click one to edit that set; a line under them says which set you are editing. Each horse's goal boxes, the "fit your goals" counts, the outlines, Analytics and the goal suggestions then use the goals for its own sex. The foal partner suggestions count a foal as fitting if it would fit either set. Un-tick the box to go back to one set for everyone; your two sets are kept if you tick it again. Saved goal sets keep the whole arrangement.
+
+## Notes the suggestions use
+
+There are two kinds of notes, and the ledger **reads them for plain phrases**. It does not guess: whatever it recognised is listed back to you, so you can see what it will do.
+
+**Overall notes** (the **My notes** panel under Highlight goals):
+
+- `max stud fee 500000` (or "fees under 500k") leaves out other players' stallions that cost more.
+- `avoid inbreeding` makes the inbreeding limit stricter (under 3.1% instead of 12.5%).
+- `fertility matters` gives a stallion's fertility extra weight.
+- `keep all mares` (or stallions, fillies, colts) means Sell ideas never lists them.
+
+**Notes on a horse** (the **Notes** box on its page, with the phrases it understood shown as tags):
+
+- `keep`, `don't sell`, `never sell` or `foundation`: never suggested for sale.
+- `sell` or `for sale soon`: suggested for sale, with "Your note says to sell" as a reason.
+- `don't breed`: left out of breeding suggestions (a mare with this note gets none).
+- `pair with <name>`: that partner is ranked higher, with your note as a reason.
+- `avoid <name>` or `don't breed to <name>`: never suggested together.
+
+These apply to Breeding suggestions, the Foal Calculator's suggested partners, the pairing ideas on Analytics and Sell ideas. The Breeding suggestions page shows a "From your notes" line and how many stallions your notes left out. Names are matched loosely (part of a name is enough). Notes are saved when you click away from the box.
 
 ## Goal suggestions
 

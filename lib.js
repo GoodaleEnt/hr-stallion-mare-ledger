@@ -983,7 +983,11 @@
   function breedingSuggestions(state, mareLife, limit) {
     mareLife = String(mareLife || '');
     var mInfo = state.horseInfo && state.horseInfo[mareLife];
-    var out = { mareName: (mInfo && mInfo.name) || ('#' + mareLife), status: mareBreedStatus(state, mareLife), error: '', suggestions: [], considered: 0, noData: 0, tooRelated: 0, notAvailable: 0 };
+    var out = { mareName: (mInfo && mInfo.name) || ('#' + mareLife), status: mareBreedStatus(state, mareLife), error: '', suggestions: [], considered: 0, noData: 0, tooRelated: 0, notAvailable: 0, byNotes: 0, noteEffects: [] };
+    var overallRules = overallNoteRules(state), mareRules = horseNoteRules(state, mareLife);
+    if (mareRules.noBreed) { out.error = 'no-breed'; return out; }
+    var maxFeeNote = overallRules.maxFee, coiLimit = overallRules.avoidInbreeding ? 3.125 : 12.5;
+    overallRules.understood.concat(mareRules.understood).forEach(function (u) { out.noteEffects.push(u); });
     if (!mInfo || mInfo.sex !== 'mare') { out.error = 'not-a-mare'; return out; }
     if (isYoungInfo(mInfo)) { out.error = 'young'; return out; }
     var mMeta = (state.horseMeta && state.horseMeta[mareLife]) || {};
@@ -995,6 +999,8 @@
       if (!sInfo || sInfo.sex !== 'stallion' || isYoungInfo(sInfo)) return;
       if (!sameBreed(sInfo, mInfo)) return;
       if (!stallionAvailable(state, life)) { out.notAvailable++; return; }
+      var noteFx = partnerNoteEffect(state, mareLife, life);
+      if (noteFx.skip) { out.byNotes++; return; }
       var sMeta = (state.horseMeta && state.horseMeta[life]) || {};
       if (isSoldLife(state, life) || sMeta.status === 'Retired' || sMeta.status === 'Deceased') return;
       if (sInfo.geneticPotential == null || mInfo.geneticPotential == null) { out.noData++; return; }
@@ -1006,7 +1012,7 @@
       var estBT = conf ? breedTotal(gp, conf) : null;
       var common = commonAncestors(mAnc, ancestorMap(state, life, 3));
       var coi = estimateCoi(common);
-      if (coi > 12.5) { out.tooRelated++; return; }
+      if (coi > coiLimit) { out.tooRelated++; return; }
       var shared = [], fixes = [];
       if (mInfo.confTraits && sInfo.confTraits) {
         Object.keys(mInfo.confTraits).forEach(function (t) {
@@ -1043,7 +1049,9 @@
       else if (terms) reasons.push('Cost: ' + terms.summary);
       else reasons.push('Stud fee not known yet (open his page or his Breed page to record it)');
       if (hist.foals || hist.failed) reasons.push('Bred together before: ' + (hist.foals ? hist.foals + ' foal' + (hist.foals === 1 ? '' : 's') + (hist.bestScore ? ' (best score ' + hist.bestScore + ')' : '') : '') + (hist.foals && hist.failed ? ', ' : '') + (hist.failed ? hist.failed + ' failed covering' + (hist.failed === 1 ? '' : 's') : ''));
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus;
+      if (maxFeeNote && !yours && terms && (terms.currency || 'HRC') === 'HRC' && terms.fee > maxFeeNote) { out.byNotes++; return; }
+      if (noteFx.reason) reasons.push(noteFx.reason);
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + noteFx.bonus;
       list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -1351,6 +1359,85 @@
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
   }
 
+  // ---------- notes the suggestions can use ----------
+  // The ledger has no AI: it looks for plain phrases in the notes you write and shows what it understood.
+  // On a horse: "keep" / "don't sell" / "foundation" (never suggested for sale), "sell" (suggested for sale),
+  // "don't breed" (left out of breeding suggestions), "pair with <name>" (preferred partner), "avoid <name>"
+  // (never suggested together). In your overall notes: "max fee 500000", "avoid inbreeding", "fertility matters",
+  // "keep all mares" (also stallions, fillies, colts).
+  function splitNames(s) {
+    return String(s || '').split(/\s*(?:,|\band\b|\/|&)\s*/).map(function (x) { return x.replace(/[.!"']/g, '').trim(); }).filter(function (x) { return x.length >= 3; });
+  }
+  function parseNotes(text, overall) {
+    var out = { keep: false, sell: false, noBreed: false, pairWith: [], avoid: [], maxFee: null, avoidInbreeding: false, fertilityMatters: false, keepGroups: {}, understood: [] };
+    var raw = String(text || '');
+    if (!raw.trim()) return out;
+    function say(t) { if (out.understood.indexOf(t) === -1) out.understood.push(t); }
+    raw.split(/[\n;]+|\.\s+/).forEach(function (line) {
+      var l = line.toLowerCase().trim();
+      if (!l) return;
+      var m;
+      // groups: "keep all mares", "never sell any stallions"
+      var gm = /\b(?:keep|never sell|do not sell|don'?t sell)\s+(?:all|every|any|the)?\s*(mares|stallions|fillies|colts)\b/.exec(l);
+      if (gm) {
+        var key = gm[1] === 'mares' ? 'mare' : gm[1] === 'stallions' ? 'stallion' : gm[1] === 'fillies' ? 'filly' : 'colt';
+        out.keepGroups[key] = true;
+        say('Never suggest selling any ' + gm[1]);
+        return;
+      }
+      if (overall) {
+        if (/\b(fee|hrc|stud)\b/.test(l)) {
+          m = /(?:max(?:imum)?(?:\s+stud)?\s+fee|fees?\s+(?:under|below|up to)|under|below|no more than|up to|not (?:more|over|above))\s*\$?\s*([0-9][0-9,.]*)\s*(k|m)?/.exec(l);
+          if (m) {
+            var n = parseFloat(m[1].replace(/,/g, ''));
+            if (m[2] === 'k') n *= 1000; else if (m[2] === 'm') n *= 1000000;
+            if (n > 0) { out.maxFee = n; say('Leave out other players\' stallions that cost more than ' + n.toLocaleString('en-US') + ' HRC'); }
+          }
+        }
+        if (/(avoid|no|low|minimi[sz]e|limit|keep down)\s+(?:any\s+)?(inbreeding|inbred|coi)|inbreeding.*\b(avoid|low|minimi[sz]e)/.test(l)) { out.avoidInbreeding = true; say('Be stricter about inbreeding (under 3.1%)'); }
+        if (/fertil/.test(l) && /(prefer|matters?|important|high|good|favou?r|priority|care)/.test(l)) { out.fertilityMatters = true; say('Give a stallion\'s fertility extra weight'); }
+        return;
+      }
+      var negSell = /\b(do not|don'?t|never|not)\s+(?:to\s+)?sell/.test(l) || /\bnot for sale\b/.test(l);
+      if (negSell || /\bkeep\b/.test(l) || /\bfoundation\b/.test(l) || /\bbreeding stock\b/.test(l)) { out.keep = true; say('Keep: not suggested for sale'); }
+      else if (/\b(sell|selling|for sale|rehome|re-home)\b/.test(l)) { out.sell = true; say('Sell: suggested for sale'); }
+      if (/\b(do not|don'?t|never|no|stop)\s+(?:to\s+)?(?:breed|breeding)\b/.test(l) || /\bnot for breeding\b|\bretire[d]? from breeding\b|\bnon-?breeding\b/.test(l)) {
+        if (!/\b(with|to)\s+\S+/.test(l.replace(/\b(do not|don'?t|never|no|stop)\s+(?:to\s+)?(?:breed|breeding)\b/, ''))) { out.noBreed = true; say('Not for breeding: left out of breeding suggestions'); return; }
+      }
+      var neg = /\b(avoid|don'?t|do not|never|not)\b/.test(l);
+      m = /\b(?:avoid)\s+([^;\n]+)/.exec(l);
+      if (m) { splitNames(m[1]).forEach(function (nm) { out.avoid.push(nm); say('Never pair with ' + nm); }); return; }
+      m = /\b(?:pair|breed|bred|cross|mate|match|put)(?:ed)?\s+(?:\w+\s+)?(?:with|to)\s+([^;\n]+)/.exec(l);
+      if (m) {
+        splitNames(m[1]).forEach(function (nm) {
+          if (neg) { out.avoid.push(nm); say('Never pair with ' + nm); } else { out.pairWith.push(nm); say('Prefer pairing with ' + nm); }
+        });
+      }
+    });
+    return out;
+  }
+  function nameMatches(list, name) {
+    var n = String(name || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!n) return false;
+    return (list || []).some(function (it) {
+      var i = String(it || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return i.length >= 3 && (n.indexOf(i) > -1 || i.indexOf(n) > -1);
+    });
+  }
+  function overallNoteRules(state) { return parseNotes(state && state.settings && state.settings.notes, true); }
+  function horseNoteRules(state, life) { return parseNotes(state && state.horseMeta && state.horseMeta[life] && state.horseMeta[life].notes); }
+  // What the notes of the two horses say about pairing them: { skip, bonus, reason }
+  function partnerNoteEffect(state, aLife, bLife) {
+    var a = horseNoteRules(state, aLife), b = horseNoteRules(state, bLife);
+    var aName = (state.horseInfo[aLife] && state.horseInfo[aLife].name) || '', bName = (state.horseInfo[bLife] && state.horseInfo[bLife].name) || '';
+    var out = { skip: false, bonus: 0, reason: '' };
+    if (a.noBreed || b.noBreed) { out.skip = true; return out; }
+    if (nameMatches(a.avoid, bName) || nameMatches(b.avoid, aName)) { out.skip = true; return out; }
+    if (nameMatches(a.pairWith, bName)) { out.bonus = 2; out.reason = 'Your note on ' + (aName || 'her') + ' says to pair with ' + bName; }
+    else if (nameMatches(b.pairWith, aName)) { out.bonus = 2; out.reason = 'Your note on ' + (bName || 'him') + ' says to pair with ' + aName; }
+    return out;
+  }
+
   // ---------- disciplines (wiki: Competitions) ----------
   // The conformation traits that count in each discipline. Genetic-potential stats also count in the game, but the
   // ledger only saves the total genetic potential, so this fit is from conformation alone.
@@ -1411,7 +1498,9 @@
   function pairIdeas(state, life, limit) {
     life = String(life || '');
     var info = state.horseInfo && state.horseInfo[life];
-    var out = { life: life, name: (info && info.name) || ('#' + life), kind: '', mine: [], other: [], error: '', hasGoal: false, notAvailable: 0 };
+    var out = { life: life, name: (info && info.name) || ('#' + life), kind: '', mine: [], other: [], error: '', hasGoal: false, notAvailable: 0, byNotes: 0 };
+    var overallRules = overallNoteRules(state);
+    if (horseNoteRules(state, life).noBreed) { out.error = 'no-breed'; return out; }
     if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) { out.error = 'unknown'; return out; }
     if (isYoungInfo(info)) { out.error = 'young'; return out; }
     var isMare = info.sex === 'mare';
@@ -1434,7 +1523,10 @@
       if (!isMare && mareBreedStatus(state, cl).status) return;
       if (!sameBreed(ci, info)) return;
       if (isMare && !stallionAvailable(state, cl)) { out.notAvailable++; return; }
+      var noteFx = partnerNoteEffect(state, life, cl);
+      if (noteFx.skip) { out.byNotes++; return; }
       var maxFee = parseFloat(state.settings && state.settings.calcMaxFee);
+      if (overallRules.maxFee && (!(maxFee > 0) || overallRules.maxFee < maxFee)) maxFee = overallRules.maxFee;
       if (isMare && maxFee > 0 && !(!!myName && String(ci.ownerName || '').trim().toLowerCase() === myName)) {
         var tm = studTermsOf(state, cl);
         if (tm && (tm.currency || 'HRC') === 'HRC' && tm.fee > maxFee) return;
@@ -1446,7 +1538,7 @@
       var estBT = conf ? breedTotal(gp, conf) : null;
       var common = commonAncestors(myAnc, ancestorMap(state, cl, 3));
       var coi = estimateCoi(common);
-      if (coi > 12.5) return;
+      if (coi > (overallRules.avoidInbreeding ? 3.125 : 12.5)) return;
       var mI = isMare ? info : ci, sI = isMare ? ci : info;
       var shared = [], fixes = [];
       if (mI.confTraits && sI.confTraits) {
@@ -1459,7 +1551,7 @@
       }
       var fert = String(sI.fertility || '').toLowerCase().trim();
       var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
-      var fits = coi < 6.25 && goalSets.some(function (g) { return (g.minBT == null || (estBT != null && estBT >= g.minBT)) && (g.minConf == null || (conf != null && conf >= g.minConf)) && (g.minGP == null || gp >= g.minGP); });
+      var fits = coi < (overallRules.avoidInbreeding ? 3.125 : 6.25) && goalSets.some(function (g) { return (g.minBT == null || (estBT != null && estBT >= g.minBT)) && (g.minConf == null || (conf != null && conf >= g.minConf)) && (g.minGP == null || gp >= g.minGP); });
       var otherMet = goalCheck(state, cl).met;
       var mine = !!myName && String(ci.ownerName || '').trim().toLowerCase() === myName;
       var reasons = [];
@@ -1470,7 +1562,8 @@
       if (shared.length) reasons.push('Both weak in ' + shared.join(', '));
       if (myMet && otherMet) reasons.push('Both parents meet your goals');
       if (isMare && !mine) { var terms = studTermsOf(state, cl); if (terms) reasons.push('Cost: ' + terms.summary); }
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0);
+      if (noteFx.reason) reasons.push(noteFx.reason);
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus;
       list.push({ life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -1842,11 +1935,14 @@
       if (x.forSale) { forSale.push(Object.assign({ price: price }, x)); return; }
       var kind = x.young ? (x.sex === 'stallion' ? 'Colt' : 'Filly') : (x.sex === 'stallion' ? 'Stallion' : 'Mare');
       if ((x.young && !form.young) || (!x.young && x.sex === 'mare' && !form.mares) || (!x.young && x.sex === 'stallion' && !form.stallions)) return;
+      var noteRules = horseNoteRules(state, x.life), groupKey = x.young ? (x.sex === 'mare' ? 'filly' : 'colt') : x.sex;
+      if (noteRules.keep || overallNoteRules(state).keepGroups[groupKey]) return; // your notes say to keep her / him
       var reasons = [], score = 0;
+      if (noteRules.sell) { score += 3; reasons.push('Your note says to sell'); }
       var med = groupStats[x.sex].med, lowCut = groupStats[x.sex].lowCut, gname = GROUP_NAME[x.sex];
       var misses = goalsOn ? goalMisses(state, x.life) : [];
       var met = goalsOn && goalCheck(state, x.life).met;
-      if (met) return;
+      if (met && !noteRules.sell) return;
       if (misses.length) { score += misses.length * 3; reasons.push('Misses your goal' + (misses.length === 1 ? '' : 's') + ': ' + misses.join(', ')); }
       if (x.bt > 0 && med > 0 && x.bt < med * 0.92) { score += 2; reasons.push('Breed Total ' + (Math.round(x.bt * 10) / 10) + ' is below your ' + gname + ' median of ' + (Math.round(med * 10) / 10)); }
       if (x.bt > 0 && lowCut && x.bt <= lowCut) { score += 1; reasons.push('In the bottom quarter of your ' + gname + ' by Breed Total'); }
@@ -1866,7 +1962,7 @@
         if (done.length >= 5 && failed / done.length >= 0.4) { score += 2; reasons.push('Fails ' + Math.round(failed / done.length * 100) + '% of his resolved breedings'); }
         if (!recs.length) { score += 1; reasons.push('No breedings recorded'); }
       }
-      var qualifies = (form.mode === 'misses' && goalsOn) ? misses.length > 0 : (score >= 2 || (lowCut && x.bt > 0 && x.bt <= lowCut));
+      var qualifies = noteRules.sell || ((form.mode === 'misses' && goalsOn) ? misses.length > 0 : (score >= 2 || (lowCut && x.bt > 0 && x.bt <= lowCut)));
       if (!qualifies) return;
       if (!reasons.length) return;
       ideas.push(Object.assign({ kind: kind, score: score, reasons: reasons, price: price, misses: misses }, x));
@@ -2046,6 +2142,8 @@
       studs.forEach(function (s) {
         var sInfo = state.horseInfo[s.lifeNumber], sConf = bestConformation((state.horseMeta && state.horseMeta[s.lifeNumber]) || {}).best;
         if (!sameBreed(sInfo, mInfo)) return;
+        var pairFx = partnerNoteEffect(state, m.life, s.lifeNumber);
+        if (pairFx.skip) return;
         var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
         var confs = [mConf, sConf].filter(function (x) { return x > 0; });
         var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
@@ -2062,7 +2160,7 @@
             else if (b === 0 && a >= 2) fixes.push({ trait: t, from: 'mare' });
           });
         }
-        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi;
+        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + pairFx.bonus;
         pairs.push({
           mare: m.name, stallion: s.name, mareLife: m.life, stallionLife: s.lifeNumber, gp: Math.round(gp * 10) / 10,
           conf: conf != null ? Math.round(conf * 10) / 10 : null,
@@ -2120,6 +2218,10 @@
     purchaseOf: purchaseOf,
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
+    parseNotes: parseNotes,
+    overallNoteRules: overallNoteRules,
+    horseNoteRules: horseNoteRules,
+    partnerNoteEffect: partnerNoteEffect,
     stallionAvailable: stallionAvailable,
     HR_BREEDS: HR_BREEDS,
     DISCIPLINES: DISCIPLINES,

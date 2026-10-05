@@ -383,6 +383,7 @@
 
     html += backupReminderHtml();
     html += goalsPanelHtml();
+    html += notesPanelHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
@@ -1087,12 +1088,14 @@
       'That means stallions whose pages you have opened on Horse Reality (your own and other players\'). Open more stallions\' pages and they will show up here. ' +
       'Only stallions that can be used are listed: yours that are active, and any stallion with semen vials or an active public or private stud fee saved from his page. ' +
       'Ranked by the foal\'s estimated Breed Total, adjusted for conformation traits that cover each other, the stallion\'s fertility and inbreeding.</div>';
+    if (r.error === 'no-breed') return html + '<div class="empty"><h3>Your note says not to breed ' + L.esc(r.mareName) + '</h3><p>Remove "don\'t breed" from her notes to see suggestions.</p></div>';
     if (r.error === 'young') return html + '<div class="empty"><h3>' + L.esc(r.mareName) + ' is under 3</h3><p>A mare can only be bred from age 3.</p></div>';
     if (r.error) return html + '<div class="empty"><h3>Not a mare</h3><p>Breeding suggestions are for mares.</p></div>';
     if (r.status.status === 'pregnant') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6dbe9;border-color:#c8588f;color:#8a2a5c;"><strong>\u2665 She is in foal' + (r.status.stallion ? ' to ' + L.esc(r.status.stallion) : '') + (r.status.due ? ' \u2014 ' + L.esc(r.status.due.replace(/^Due /, 'due ')) : '') + '.</strong> These suggestions are for her next breeding.</div>';
     else if (r.status.status === 'covered') html += '<div class="card" style="padding:10px 14px;margin-bottom:14px;background:#f6e4a8;border-color:#d9a21b;color:#6b4f00;"><strong>\u2714 She is already covered' + (r.status.stallion ? ' by ' + L.esc(r.status.stallion) : '') + ' \u2014 waiting for the result.</strong> These suggestions are for her next breeding.</div>';
     html += '<p class="notes-line" style="margin:0 0 10px;">' + r.considered + ' stallion' + (r.considered === 1 ? '' : 's') + ' considered' +
-      (r.noData ? ' \u00b7 ' + r.noData + ' skipped (no genetic potential saved yet)' : '') + (r.tooRelated ? ' \u00b7 ' + r.tooRelated + ' left out (more than 12.5% inbred to her)' : '') + (r.notAvailable ? ' \u00b7 ' + r.notAvailable + ' left out (not active at stud and no semen vials)' : '') + '.</p>';
+      (r.noData ? ' \u00b7 ' + r.noData + ' skipped (no genetic potential saved yet)' : '') + (r.tooRelated ? ' \u00b7 ' + r.tooRelated + ' left out (more than 12.5% inbred to her)' : '') + (r.notAvailable ? ' \u00b7 ' + r.notAvailable + ' left out (not active at stud and no semen vials)' : '') + (r.byNotes ? ' \u00b7 ' + r.byNotes + ' left out by your notes' : '') + '.</p>';
+    if (r.noteEffects && r.noteEffects.length) html += '<div class="card" style="padding:8px 14px;margin-bottom:10px;"><strong style="font-size:13px;">From your notes:</strong> <span class="sub">' + r.noteEffects.map(L.esc).join(' \u00b7 ') + '</span></div>';
     if (!r.suggestions.length) return html + '<div class="empty"><h3>No stallions to suggest yet</h3><p>Open some stallions\' pages on Horse Reality (age 3 and over) so the ledger has them saved.</p></div>';
     r.suggestions.forEach(function (s, i) {
       html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;">' +
@@ -1615,7 +1618,8 @@
     if (!life || !state.horseInfo[life]) return '';
     var note = (state.horseMeta[life] && state.horseMeta[life].notes) || '';
     return '<div class="card profile-block" style="padding:12px 16px;margin:8px 0 8px;"><label for="note-' + L.esc(life) + '" style="font-weight:600;">Notes</label>' +
-      '<textarea id="note-' + L.esc(life) + '" data-action="update-note" data-life="' + L.esc(life) + '" rows="2" style="width:100%;margin-top:6px;" placeholder="Anything you want to remember about this horse (saved when you click away)">' + L.esc(note) + '</textarea></div>';
+      '<textarea id="note-' + L.esc(life) + '" data-action="update-note" data-life="' + L.esc(life) + '" rows="2" style="width:100%;margin-top:6px;" placeholder="Anything you want to remember. Words like keep, sell, don\'t breed, pair with &lt;name&gt; and avoid &lt;name&gt; are used for suggestions (saved when you click away)">' + L.esc(note) + '</textarea>' +
+      (function () { var u = L.parseNotes(note).understood; return u.length ? '<div style="margin-top:6px;">' + u.map(function (x) { return '<span class="tag" style="margin-right:6px;">' + L.esc(x) + '</span>'; }).join('') + '</div>' : '<p class="notes-line" style="margin:6px 0 0;">The ledger reads words like keep, sell, don\'t breed, pair with &lt;name&gt; and avoid &lt;name&gt; when it makes suggestions.</p>'; })() + '</div>';
   }
 
   // ---------- sell ideas: the suggestion form, horses to sell and what to ask ----------
@@ -1821,7 +1825,7 @@
       if (!life || !state.horseInfo[life]) return '';
       var r = L.pairIdeas(state, life, 10);
       var head = '<h3 style="margin:0 0 4px;font-size:16px;">Suggested ' + r.kind + ' for ' + L.esc(r.name) + '</h3>';
-      if (r.error) return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head + '<p class="notes-line" style="margin:0;">' + (r.error === 'young' ? 'Horses under 3 can\'t be bred yet.' : 'Pick a mare or a stallion.') + '</p></div>';
+      if (r.error) return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head + '<p class="notes-line" style="margin:0;">' + (r.error === 'young' ? 'Horses under 3 can\'t be bred yet.' : r.error === 'no-breed' ? 'Your note on this horse says not to breed it.' : 'Pick a mare or a stallion.') + '</p></div>';
       var pickAction = r.kind === 'stallions' ? 'calc-pick-stallion' : 'calc-pick-mare';
       function col(title, list) {
         var inner = list.length ? list.slice(0, 5).map(function (x) {
@@ -2288,6 +2292,7 @@
 
   // ---------- goals: highlight horses that meet your minimums / maximums ----------
   var goalsOpen = false;
+  var notesOpen = false;
   // classes for a horse's card or row: outlined if it meets your goals, and a big $ behind it if it is for sale
   function goalClass(life) {
     // outlined gold when every goal is met; outlined blue when exactly one goal box is missed ("off by one")
@@ -2331,6 +2336,28 @@
         return '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;">' + (t.who ? '<span class="tag" style="margin-right:6px;">' + L.esc(t.who) + '</span>' : '') + '<strong>' + kinds[t.kind] + ' ' + L.esc(t.label) + (t.current != null ? ' from ' + L.esc(t.current) : '') + ' to ' + L.esc(t.suggested) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(t.why) + '</span></span>' +
           '<button type="button" class="btn btn-sm" data-action="goal-apply" data-field="' + t.key + '" data-set="' + L.esc(t.set || 'goals') + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
       }).join('') + '</div>';
+  }
+  // My notes: free text the ledger reads for phrases it knows (keep, sell, don't breed, pair with, avoid, max fee...)
+  // and says what it understood. Horse notes are on each horse's page; these are for the whole ledger.
+  function notesPanelHtml() {
+    var text = (state.settings && state.settings.notes) || '';
+    var rules = L.parseNotes(text, true);
+    var horses = Object.keys(state.horseMeta || {}).map(function (l) {
+      var n = state.horseMeta[l] && state.horseMeta[l].notes;
+      return n ? { life: l, name: (state.horseInfo[l] && state.horseInfo[l].name) || ('#' + l), rules: L.parseNotes(n) } : null;
+    }).filter(function (h) { return h && h.rules.understood.length; });
+    var total = rules.understood.length + horses.length;
+    var html = '<details class="notes-panel"' + (notesOpen ? ' open' : '') + '><summary>My notes \u2014 used when making suggestions' + (total ? ' \u00b7 ' + total + ' understood' : '') + '</summary>' +
+      '<p class="notes-line" style="margin:6px 0;">Write notes about how you breed. The ledger has no guesswork: it looks for plain phrases and lists what it understood below. In your <strong>overall notes</strong> it knows <em>max stud fee 500000</em>, <em>avoid inbreeding</em>, <em>fertility matters</em> and <em>keep all mares</em> (or stallions, fillies, colts). On a <strong>horse\'s own page</strong> it knows <em>keep</em> / <em>don\'t sell</em>, <em>sell</em>, <em>don\'t breed</em>, <em>pair with &lt;name&gt;</em> and <em>avoid &lt;name&gt;</em>.</p>' +
+      '<textarea id="overall-notes" data-action="update-overall-notes" rows="5" style="width:100%;" placeholder="For example:&#10;Max stud fee 600000&#10;Avoid inbreeding&#10;Keep all mares">' + L.esc(text) + '</textarea>' +
+      '<div style="margin-top:8px;"><strong style="font-size:13px;">Understood from these notes</strong>' +
+      (rules.understood.length ? rules.understood.map(function (u) { return '<div class="an-tip info" style="margin-top:4px;">' + L.esc(u) + '</div>'; }).join('') : '<p class="notes-line" style="margin:4px 0 0;">Nothing recognised yet. Saved when you click away.</p>') + '</div>';
+    if (horses.length) {
+      html += '<div style="margin-top:10px;"><strong style="font-size:13px;">Understood from horse notes</strong>' + horses.slice(0, 15).map(function (h) {
+        return '<div class="an-tip info" style="margin-top:4px;"><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(h.life) + '">' + L.esc(h.name) + '</button>: ' + L.esc(h.rules.understood.join('; ')) + '</div>';
+      }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
+    }
+    return html + '</details>';
   }
   // Advice for the goal set(s) in use: one list, or (with separate goals) the mare and stallion lists together.
   function goalAdviceAll() {
@@ -3130,6 +3157,7 @@
     });
     app.addEventListener('toggle', function (e) {
       if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
+      if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
     }, true);
 
     app.onchange = function (e) {
@@ -3168,6 +3196,11 @@
         state.settings.goalsSplit = !!t.checked;
         state.settings.goalsUpdatedAt = Date.now();
         goalsOpen = true;
+        persist();
+      }
+      else if (action === 'update-overall-notes') {
+        state.settings.notes = t.value;
+        notesOpen = true;
         persist();
       }
       else if (action === 'update-note') {

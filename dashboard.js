@@ -384,6 +384,7 @@
     html += backupReminderHtml();
     html += goalsPanelHtml();
     html += notesPanelHtml();
+    html += purchasePanelHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
@@ -2304,6 +2305,8 @@
   // ---------- goals: highlight horses that meet your minimums / maximums ----------
   var goalsOpen = false;
   var notesOpen = false;
+  var buyOpen = false;
+  var buyScope = ''; // breed the purchase criteria are being edited for ('' = all breeds)
   var prefScope = ''; // breed the Preferred genetics choices apply to ('' = all breeds)
   // classes for a horse's card or row: outlined if it meets your goals, and a big $ behind it if it is for sale
   function goalClass(life) {
@@ -2349,6 +2352,52 @@
           '<button type="button" class="btn btn-sm" data-action="goal-apply" data-field="' + t.key + '" data-set="' + L.esc(t.set || 'goals') + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
       }).join('') + '</div>';
   }
+  // Purchase criteria: what a horse you are thinking of buying should have, per breed, with starting values taken from your
+  // own herd. Checked against any horse that is not yours when you open its page on Horse Reality.
+  function purchasePanelHtml() {
+    var all = (state.settings && state.settings.buyCriteria) || {};
+    var scopeKey = buyScope ? L.breedKeyOf(buyScope) : '';
+    var own = all[scopeKey] || {};
+    var eff = L.buyCriteriaOf(state, buyScope);
+    var adv = L.buyAdvice(state, buyScope);
+    var tipCount = adv.tips.length + (adv.traits && !(own.needTraits || []).length ? 1 : 0);
+    var breeds = {}, names = [];
+    Object.keys(state.horseInfo || {}).forEach(function (l) { var b = state.horseInfo[l].breed, k = L.breedKeyOf(b); if (k && !breeds[k]) { breeds[k] = true; names.push(b); } });
+    Object.keys(all).forEach(function (k) { if (k && !breeds[k]) { breeds[k] = true; names.push(L.HR_BREEDS.find(function (b) { return L.breedKeyOf(b) === k; }) || k); } });
+    function field(label, key, step) {
+      return '<div class="field"><label for="buy-' + key + '">' + label + '</label><input id="buy-' + key + '" type="number" min="0" step="' + step + '" data-action="update-buy" data-field="' + key + '" value="' + (own[key] != null ? L.esc(own[key]) : '') + '" placeholder="' + (scopeKey && eff.goals && key !== 'maxPrice' && eff.goals[key] != null ? 'all breeds: ' + L.esc(eff.goals[key]) : scopeKey && key === 'maxPrice' && eff.maxPrice ? 'all breeds: ' + L.esc(eff.maxPrice) : 'no limit') + '"></div>';
+    }
+    function sel(label, key, options) {
+      return '<div class="field"><label for="buy-' + key + '">' + label + '</label><select id="buy-' + key + '" data-action="update-buy" data-field="' + key + '" style="width:100%;">' +
+        options.map(function (o) { return '<option value="' + o[0] + '"' + (String(own[key] == null ? '' : own[key]) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
+    }
+    var need = own.needTraits || [];
+    var html = '<details class="buy-panel"' + (buyOpen ? ' open' : '') + '><summary>Purchase criteria \u2014 what a horse should have for you to buy it' + (tipCount ? ' \u00b7 ' + tipCount + ' suggestion' + (tipCount === 1 ? '' : 's') : '') + '</summary>' +
+      '<p class="notes-line" style="margin:6px 0;">Set what you look for in a horse to buy, for all breeds or one breed at a time. When you open a horse that is not yours on Horse Reality, the summary in the corner of the page checks it against these and says whether it would lift your own herd of that breed.</p>' +
+      '<div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><label for="buy-scope" style="font-size:13px;font-weight:600;">Set for</label><select id="buy-scope" data-action="buy-scope"><option value="">All breeds</option>' +
+        names.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === scopeKey ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>' + (scopeKey ? '<span class="sub" style="font-size:12.5px;">Empty fields use your all-breeds value.</span>' : '') + '</div>' +
+      '<div class="goals-grid">' + field('Min Genetic Potential', 'minGP', 'any') + field('Min top conformation', 'minConf', 'any') + field('Min Breed Total', 'minBT', 'any') + field('Highest price you will pay (HRC)', 'maxPrice', '1000') + '</div>' +
+      '<div class="goals-grid">' +
+        sel('Worst conformation trait accepted', 'traitWorst', [['', 'no limit'], ['GP', 'G+ (Good+)'], ['G', 'G (Good)'], ['A', 'A (Average)'], ['BA', 'BA (Below average)']]) + field('How many at that rating', 'traitWorstMax', '1') +
+        sel('Worst health rating accepted', 'healthWorst', [['', 'no limit'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']]) + field('How many at that rating (of 5)', 'healthWorstMax', '1') +
+        sel('Min fertility', 'minFert', [['', 'no limit'], ['poor', 'Poor'], ['fair', 'Fair'], ['average', 'Average'], ['good', 'Good'], ['excellent', 'Excellent']]) +
+      '</div>' +
+      '<div style="margin-top:8px;"><strong style="font-size:13px;">Traits it must be Good or better in</strong><div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;">' +
+        ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters'].map(function (t) {
+          return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="buy-trait" data-trait="' + t + '"' + (need.indexOf(t) > -1 ? ' checked' : '') + '> ' + t + '</label>';
+        }).join('') + '</div></div>';
+    if (adv.herdSize < 3) {
+      html += '<p class="notes-line" style="margin:10px 0 0;">Suggestions appear once at least 3 of your horses' + (scopeKey ? ' of this breed' : '') + ' are saved.</p>';
+    } else if (tipCount) {
+      html += '<div style="margin-top:10px;"><strong style="font-size:13px;">Suggestions from your herd (' + adv.herdSize + ' horses)</strong>' +
+        adv.tips.map(function (t) {
+          return '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;"><strong>' + (t.current != null ? 'Raise' : 'Set') + ' ' + L.esc(t.label) + (t.current != null ? ' from ' + L.esc(t.current) : '') + ' to ' + L.esc(t.suggested) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(t.why) + '</span></span>' +
+            '<button type="button" class="btn btn-sm" data-action="buy-apply" data-field="' + t.field + '" data-value="' + L.esc(t.suggested) + '">Apply</button></div>';
+        }).join('') +
+        (adv.traits && !need.length ? '<div class="an-tip tip" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;"><span style="flex:1 1 300px;"><strong>Require Good or better in ' + L.esc(adv.traits.traits.join(', ')) + '</strong><br><span class="sub" style="font-size:12.5px;">' + L.esc(adv.traits.why) + '</span></span><button type="button" class="btn btn-sm" data-action="buy-apply" data-traits="' + L.esc(adv.traits.traits.join(',')) + '">Apply</button></div>' : '') + '</div>';
+    }
+    return html + '</details>';
+  }
   // My notes: free text the ledger reads for phrases it knows (keep, sell, don't breed, pair with, avoid, max fee...)
   // and says what it understood. Horse notes are on each horse's page; these are for the whole ledger.
   function notesPanelHtml() {
@@ -2370,6 +2419,7 @@
       }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
     }
     html += preferredGenesHtml();
+    html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>';
     return html + '</details>';
   }
   // Genes you want to keep: a level for each (no preference / prefer / keep).
@@ -2962,6 +3012,17 @@
         goalsOpen = true;
         persist();
       }
+      else if (action === 'buy-apply') {
+        var bk2 = buyScope ? L.breedKeyOf(buyScope) : '';
+        var allB2 = Object.assign({}, state.settings.buyCriteria);
+        var ownB2 = Object.assign({}, allB2[bk2]);
+        if (t.getAttribute('data-traits')) ownB2.needTraits = t.getAttribute('data-traits').split(',');
+        else ownB2[t.getAttribute('data-field')] = t.getAttribute('data-value');
+        allB2[bk2] = ownB2;
+        state.settings.buyCriteria = allB2;
+        buyOpen = true;
+        persist();
+      }
       else if (action === 'goals-edit') { goalsEdit = t.getAttribute('data-sex') === 'stallion' ? 'stallion' : 'mare'; goalsOpen = true; render(); }
       else if (action === 'trash-restore') {
         if (L.restoreTrash(state, t.getAttribute('data-id'))) persist();
@@ -3260,6 +3321,7 @@
     app.addEventListener('toggle', function (e) {
       if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
       if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
+      if (e.target && e.target.classList && e.target.classList.contains('buy-panel')) buyOpen = e.target.open;
     }, true);
 
     app.onchange = function (e) {
@@ -3300,6 +3362,25 @@
         goalsOpen = true;
         persist();
       }
+      else if (action === 'buy-scope') { buyScope = t.value; buyOpen = true; render(); }
+      else if (action === 'update-buy' || action === 'buy-trait') {
+        var bk = buyScope ? L.breedKeyOf(buyScope) : '';
+        var allB = Object.assign({}, state.settings.buyCriteria);
+        var ownB = Object.assign({}, allB[bk]);
+        if (action === 'buy-trait') {
+          var tl = (ownB.needTraits || []).slice(), tn = t.getAttribute('data-trait'), ti = tl.indexOf(tn);
+          if (t.checked && ti === -1) tl.push(tn); else if (!t.checked && ti > -1) tl.splice(ti, 1);
+          if (tl.length) ownB.needTraits = tl; else delete ownB.needTraits;
+        } else {
+          var bf = t.getAttribute('data-field');
+          if (String(t.value).trim() === '') delete ownB[bf]; else ownB[bf] = String(t.value).trim();
+        }
+        if (Object.keys(ownB).length) allB[bk] = ownB; else delete allB[bk];
+        state.settings.buyCriteria = allB;
+        buyOpen = true;
+        persist();
+      }
+      else if (action === 'update-fit-banner') { state.settings.fitBanner = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'pref-scope') { prefScope = t.value; notesOpen = true; render(); }
       else if (action === 'update-prefer-gene') {
         var pgKey = prefScope ? L.breedKeyOf(prefScope) : '';

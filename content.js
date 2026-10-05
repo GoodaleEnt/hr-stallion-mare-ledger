@@ -1145,6 +1145,73 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // ---- fit summary on a horse's page ----
+  // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why
+  // (goal boxes, preferred and unwanted genes, notes, producer record). Click it to open the reasons, x to dismiss.
+  var fitTimers = [], fitDismissed = '', fitDebounce = null;
+  function removeFitBanner() { var e = document.getElementById('hr-fit-banner'); if (e) e.remove(); }
+  function renderFitBanner() {
+    var life = (window.__HR_TEST__ && window.__HR_TEST_LIFE__) || parseHorseIdFromUrl();
+    if (!life) { removeFitBanner(); return; }
+    if (fitDismissed === life) return;
+    HRStorage.getState(function (state) {
+      if (state.settings && state.settings.fitBanner === false) { removeFitBanner(); return; }
+      var f = HRLib.fitSummary(state, life);
+      if (f.verdict === 'nogoals') { removeFitBanner(); return; }
+      var colours = { fits: '#4C7A52', near: '#3A78C2', misses: '#9C4A3B', unknown: '#6E7260' };
+      var open = false;
+      try { open = sessionStorage.getItem('hrFitOpen') === '1'; } catch (e) { /* no storage */ }
+      var box = document.getElementById('hr-fit-banner');
+      if (!box) { box = document.createElement('div'); box.id = 'hr-fit-banner'; document.body.appendChild(box); }
+      else { open = box.getAttribute('data-open') === '1'; }
+      box.setAttribute('data-open', open ? '1' : '0');
+      box.style.cssText = 'position:fixed;left:12px;bottom:12px;max-width:340px;z-index:2147483646;background:#fff;color:#262A1E;border:1px solid #DBD5BE;border-left:6px solid ' + (colours[f.verdict] || colours.unknown) + ';border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.2);font:13px/1.4 system-ui,sans-serif;';
+      while (box.firstChild) box.removeChild(box.firstChild);
+      var head = document.createElement('div');
+      head.style.cssText = 'display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;';
+      var title = document.createElement('div');
+      title.style.cssText = 'flex:1;font-weight:600;';
+      title.textContent = 'HR Ledger: ' + f.headline;
+      var arrow = document.createElement('span');
+      arrow.textContent = open ? '\u25be' : '\u25b8';
+      var close = document.createElement('span');
+      close.textContent = '\u00d7';
+      close.title = 'Hide for this page';
+      close.style.cssText = 'font-size:18px;line-height:1;padding:0 2px;';
+      head.appendChild(title); head.appendChild(arrow); head.appendChild(close);
+      head.addEventListener('click', function (e) {
+        if (e.target === close) { fitDismissed = life; removeFitBanner(); return; }
+        var nowOpen = box.getAttribute('data-open') !== '1';
+        box.setAttribute('data-open', nowOpen ? '1' : '0');
+        try { sessionStorage.setItem('hrFitOpen', nowOpen ? '1' : '0'); } catch (err) { /* no storage */ }
+        renderFitBanner();
+      });
+      box.appendChild(head);
+      if (open) {
+        var list = document.createElement('div');
+        list.style.cssText = 'padding:0 10px 8px;border-top:1px solid #EEE9D6;';
+        f.lines.forEach(function (l) {
+          var row = document.createElement('div');
+          row.style.cssText = 'padding:3px 0;color:' + (l.ok === true ? '#46592C' : l.ok === false ? '#9C4A3B' : '#6E7260') + ';';
+          row.textContent = (l.ok === true ? '\u2713 ' : l.ok === false ? '\u2717 ' : '\u2022 ') + l.text;
+          list.appendChild(row);
+        });
+        box.appendChild(list);
+      }
+    });
+  }
+  function scheduleFit() {
+    fitTimers.forEach(clearTimeout);
+    fitTimers = [1500, 4000, 9000, 16000].map(function (ms) { return setTimeout(renderFitBanner, ms); });
+  }
+  try {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes.hrLedger || !storageAlive() || !document.getElementById('hr-fit-banner')) return;
+      clearTimeout(fitDebounce);
+      fitDebounce = setTimeout(renderFitBanner, 2300); // after the storage layer's 2 s cache has expired
+    });
+  } catch (e) { /* storage events not available */ }
+
   // ---- conformation show results page ----
   // A show's results page lists every horse in each category (Foals / Mares / Stallions / Geldings) with its rank and
   // score. The score of each horse that is in the ledger (or is yours) raises its top conformation score, and the
@@ -1229,7 +1296,7 @@
       });
     });
   }
-  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrTest = { scrapeShowResults: scrapeShowResults, readShowResults: readShowResults };
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrTest = { scrapeShowResults: scrapeShowResults, readShowResults: readShowResults, renderFitBanner: renderFitBanner };
 
   // Per-trait conformation ratings from the horse page's genetics table
   // (.genetic_table_row: a trait name element, then its rating element —
@@ -1865,6 +1932,7 @@
   }
 
   function onPageReady() {
+    scheduleFit();
     injectLedgerButton();
     healOwnedStubs();
     scrapeHealth();

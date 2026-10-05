@@ -716,7 +716,9 @@
   function goalsOf(state, sex) {
     var st = (state && state.settings) || {};
     var raw = st[goalsKeyFor(state, sex)];
-    var g = raw || st.goals || {};
+    return normalizeGoals(raw || st.goals || {});
+  }
+  function normalizeGoals(g) {
     function num(v) { var x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; }
     var fert = String(g.minFert || '').toLowerCase();
     var traitWorst = ['GP', 'G', 'A', 'BA'].indexOf(g.traitWorst) > -1 ? g.traitWorst : null;
@@ -750,9 +752,12 @@
     return c;
   }
   function goalSections(state, life) {
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    return goalSectionsWith(state, life, goalsOf(state, info.sex));
+  }
+  function goalSectionsWith(state, life, g) {
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var info = (state.horseInfo && state.horseInfo[life]) || {};
-    var g = goalsOf(state, info.sex);
     var conf = bestConformation(meta).best;
     var bt = Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, conf));
     function r3(n) { return Math.round(n * 1000) / 1000; }
@@ -1359,6 +1364,170 @@
     if (p.price && p.currency !== sa.currency) return null;
     if (p.shipping && p.shippingCurrency !== sa.currency) return null;
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
+  }
+
+  // ---------- purchase criteria (per breed) ----------
+  // state.settings.buyCriteria = { '' : {...}, '<breed key>': {...} }: the same fields as goals (minGP, minConf, minBT,
+  // traitWorst/traitWorstMax, healthWorst/healthWorstMax, minFert) plus maxPrice (HRC) and needTraits (traits that
+  // must be Good or better). A breed's own value wins; otherwise the all-breeds value applies.
+  var BUY_FIELDS = ['minGP', 'minConf', 'minBT', 'traitWorst', 'traitWorstMax', 'healthWorst', 'healthWorstMax', 'minFert', 'maxPrice'];
+  function buyCriteriaOf(state, breed) {
+    var all = (state && state.settings && state.settings.buyCriteria) || {};
+    var general = all[''] || {}, own = (breed && all[breedKeyOf(breed)]) || {}, raw = {};
+    BUY_FIELDS.forEach(function (k) { raw[k] = own[k] != null && own[k] !== '' ? own[k] : general[k]; });
+    var need = own.needTraits && own.needTraits.length ? own.needTraits : (general.needTraits || []);
+    var mp = parseFloat(raw.maxPrice);
+    var goals = normalizeGoals(raw);
+    var any = Object.keys(goals).some(function (k) { return goals[k] != null; }) || need.length > 0 || mp > 0;
+    return { goals: goals, needTraits: need, maxPrice: mp > 0 ? mp : null, any: !!any };
+  }
+  function traitValue(info, trait) {
+    var ct = info && info.confTraits;
+    if (!ct) return null;
+    var key = Object.keys(ct).find(function (k) { return k.toLowerCase().replace(/\s+/g, '') === trait.toLowerCase(); });
+    return key ? traitRankOf(ct[key]) : null;
+  }
+  function purchaseSections(state, life, crit) {
+    var info = (state.horseInfo && state.horseInfo[life]) || {};
+    var s = goalSectionsWith(state, life, crit.goals);
+    s.need = { label: 'Traits needed', state: 'na', text: 'no goal' };
+    if (crit.needTraits.length) {
+      if (!info.confTraits) s.need = { label: 'Traits needed', state: 'na', text: 'no data yet' };
+      else {
+        var below = crit.needTraits.filter(function (t) { var r = traitValue(info, t); return r == null || r < 2; });
+        s.need = { label: 'Traits needed (Good or better)', state: below.length ? 'bad' : 'ok', text: below.length ? 'below Good in ' + below.join(', ') : 'Good or better in all' };
+      }
+    }
+    return s;
+  }
+  // Would this horse help the herd? Compared with your own (not sold or retired) horses of the same breed.
+  function herdBenefit(state, life) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life];
+    var out = { verdict: 'unknown', lines: [], herdSize: 0 };
+    if (!info) return out;
+    var herd = ownedHorses(state).filter(function (h) {
+      return String(h.lifeNumber) !== life && (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && sameBreed(h.info, info);
+    });
+    out.herdSize = herd.length;
+    if (herd.length < 3) { out.lines.push({ ok: null, text: 'Fewer than 3 of your horses of this breed are saved, so there is nothing to compare it with' }); return out; }
+    function vals(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
+    function pick(arr, p) { return arr.length ? arr[Math.min(arr.length - 1, Math.round((arr.length - 1) * p))] : 0; }
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var mine = { gp: Number(info.geneticPotential) || 0, conf: bestConformation(meta).best || 0 };
+    mine.bt = Math.max(Number(meta.btBest) || 0, breedTotal(mine.gp, mine.conf));
+    var pos = 0, neg = 0;
+    [['Genetic potential', mine.gp, vals(function (h) { return Number(h.info.geneticPotential) || 0; }), 0],
+     ['Top conformation', mine.conf, vals(function (h) { return bestConformation(h.meta).best; }), 1],
+     ['Breed Total', mine.bt, vals(function (h) { return horseBT(state, h.lifeNumber); }), 1]].forEach(function (m) {
+      var label = m[0], v = m[1], arr = m[2], dec = m[3];
+      if (!(v > 0)) { out.lines.push({ ok: null, text: label + ': not known yet' }); return; }
+      if (arr.length < 3) return;
+      var med = pick(arr, 0.5), top = pick(arr, 0.75), r = function (n) { return Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec); };
+      if (v >= top) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is in the top quarter of your ' + herd.length + ' (median ' + r(med) + ')' }); }
+      else if (v >= med) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is above your median of ' + r(med) }); }
+      else { neg++; out.lines.push({ ok: false, text: label + ' ' + r(v) + ' is below your median of ' + r(med) }); }
+    });
+    // traits your herd is weak in that this horse is strong in
+    var weak = [], covers = [];
+    ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters'].forEach(function (t) {
+      var ranks = herd.map(function (h) { return traitValue(h.info, t); }).filter(function (r) { return r != null; });
+      if (ranks.length < 3) return;
+      if (ranks.filter(function (r) { return r <= 1; }).length / ranks.length >= 0.5) {
+        weak.push(t);
+        var mr = traitValue(info, t);
+        if (mr != null && mr >= 2) covers.push(t);
+      }
+    });
+    if (covers.length) { pos++; out.lines.push({ ok: true, text: 'Strong (Good or better) in ' + covers.join(', ') + ', where your herd is weakest' }); }
+    else if (weak.length && info.confTraits) out.lines.push({ ok: null, text: 'Your herd is weakest in ' + weak.join(', ') + '; this horse is not strong there' });
+    out.verdict = pos >= 2 && neg === 0 ? 'helps' : pos > neg ? 'maybe' : 'no';
+    return out;
+  }
+  // Starting values for the purchase criteria, from your own herd of that breed ('' = all your horses)
+  function buyAdvice(state, breed) {
+    var herd = ownedHorses(state).filter(function (h) {
+      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && (!breed || breedKeyOf(h.info.breed) === breedKeyOf(breed));
+    });
+    var out = { herdSize: herd.length, tips: [], traits: null };
+    if (herd.length < 3) return out;
+    var cur = buyCriteriaOf(state, breed).goals;
+    function vals(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
+    function pick(arr, p) { return arr.length ? arr[Math.min(arr.length - 1, Math.round((arr.length - 1) * p))] : 0; }
+    [['minGP', 'Genetic Potential', vals(function (h) { return Number(h.info.geneticPotential) || 0; }), 0],
+     ['minConf', 'Top conformation', vals(function (h) { return bestConformation(h.meta).best; }), 1],
+     ['minBT', 'Breed Total', vals(function (h) { return horseBT(state, h.lifeNumber); }), 1]].forEach(function (m) {
+      if (m[2].length < 3) return;
+      var f = Math.pow(10, m[3]), target = Math.round(pick(m[2], 0.6) * f) / f;
+      if (cur[m[0]] == null || target > cur[m[0]]) out.tips.push({ field: m[0], label: m[1], current: cur[m[0]], suggested: target, why: 'A horse at ' + target + ' or more would be in the top ' + Math.round((1 - m[2].filter(function (v) { return v < target; }).length / m[2].length) * 100) + '% of your ' + herd.length + ' horses, so it lifts your herd.' });
+    });
+    var weak = [];
+    ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters'].forEach(function (t) {
+      var ranks = herd.map(function (h) { return traitValue(h.info, t); }).filter(function (r) { return r != null; });
+      if (ranks.length >= 3 && ranks.filter(function (r) { return r <= 1; }).length / ranks.length >= 0.5) weak.push(t);
+    });
+    if (weak.length) out.traits = { traits: weak, why: 'At least half of your horses are Below average or Average in these, so a horse that is Good or better there would help.' };
+    return out;
+  }
+
+  // ---------- why a horse fits (or does not fit) your criteria ----------
+  // Used for the summary on a horse's page on Horse Reality: your goal boxes, preferred and unwanted genes, what the
+  // horse's notes say and its producer record. Returns { verdict: 'fits' | 'near' | 'misses' | 'nogoals' | 'unknown',
+  // headline, lines: [{ ok: true | false | null, text }] }.
+  function fitSummary(state, life) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life];
+    var out = { life: life, name: (info && info.name) || '', verdict: 'unknown', headline: '', lines: [] };
+    if (!info) { out.headline = 'Not saved in the ledger yet'; out.lines.push({ ok: null, text: 'The ledger saves a horse when its page has loaded. This summary appears a moment later.' }); return out; }
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var buying = !!me && String(info.ownerName || '').trim().toLowerCase() !== me && !!String(info.ownerName || '').trim();
+    var crit = buying ? buyCriteriaOf(state, info.breed) : null;
+    var sec = buying && crit.any ? purchaseSections(state, life, crit) : goalSections(state, life), misses = [], criteria = 0;
+    var secList = [sec.conf, sec.gp, sec.bt, sec.traits, sec.health, sec.fertility];
+    if (sec.need) secList.push(sec.need);
+    secList.forEach(function (x) {
+      if (x.text === 'no goal') return;
+      if (x.skip) { out.lines.push({ ok: null, text: x.label + ': ' + x.text }); return; }
+      criteria++;
+      if (x.state === 'ok') out.lines.push({ ok: true, text: x.label + ': ' + x.text });
+      else if (x.state === 'bad') { out.lines.push({ ok: false, text: x.label + ': ' + x.text }); misses.push(x.label); }
+      else out.lines.push({ ok: null, text: x.label + ': not known yet' });
+    });
+    // genes
+    var genes = preferredGenesOf(state, life), badGenes = [], goodGenes = [];
+    genes.forEach(function (g) {
+      if (g.level === 'avoid') { badGenes.push(g.name); out.lines.push({ ok: false, text: 'Carries ' + g.name + ', a gene you don\'t want' }); }
+      else { goodGenes.push(g.name); out.lines.push({ ok: true, text: 'Carries ' + g.name + ', a gene you ' + (g.level === 'keep' ? 'want to keep' : 'prefer') }); }
+    });
+    var pm = preferenceMap(state, info.breed);
+    if (Object.keys(pm).length && !Object.keys(horseGenotype(state, life)).length) out.lines.push({ ok: null, text: 'Genes you care about: its colours have not been tested or saved yet' });
+    if (Object.keys(pm).length) criteria++;
+    // notes and producer record
+    var nr = horseNoteRules(state, life);
+    nr.understood.forEach(function (u) { out.lines.push({ ok: null, text: 'Your note: ' + u }); });
+    if (info.sex === 'mare') {
+      var pr = producerRecord(state, life);
+      if (pr.improver) out.lines.push({ ok: true, text: 'Out-produces herself: foals average ' + pr.avgFoal + ' vs her ' + pr.mareScore });
+      else if (pr.scored >= 2 && pr.avgDelta != null && pr.avgDelta < -3 && pr.better === 0) out.lines.push({ ok: false, text: 'Her scored foals average ' + pr.avgFoal + ', below her own ' + pr.mareScore });
+    } else if (info.sex === 'stallion') {
+      var sr = sireRecord(state, life);
+      if (sr.improver) out.lines.push({ ok: true, text: 'His foals beat their dams by ' + sr.avgDelta + ' on average' });
+      else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) out.lines.push({ ok: false, text: 'His scored foals average ' + sr.avgFoal + ', below their dams' });
+    }
+    var benefit = null;
+    if (buying) {
+      if (crit.maxPrice) out.lines.push({ ok: null, text: 'Your limit for this breed: ' + fmtMoney(crit.maxPrice) + ' HRC' });
+      benefit = herdBenefit(state, life);
+      benefit.lines.forEach(function (l) { out.lines.push(l); });
+    }
+    var total = misses.length + badGenes.length;
+    if (!criteria && !out.lines.some(function (l) { return l.ok !== null; })) { out.verdict = 'nogoals'; out.headline = 'Set goals to see how this horse fits'; return out; }
+    var names = misses.concat(badGenes.map(function (n) { return n + ' (unwanted)'; }));
+    if (!total) { out.verdict = 'fits'; out.headline = goodGenes.length && !criteria ? 'Carries a gene you prefer' : (buying ? 'Meets your purchase criteria' : 'Fits your criteria'); }
+    else if (total === 1) { out.verdict = 'near'; out.headline = 'Off by one: ' + names[0]; }
+    else { out.verdict = 'misses'; out.headline = 'Misses ' + total + ': ' + names.slice(0, 3).join(', ') + (names.length > 3 ? '\u2026' : ''); }
+    if (buying) { out.headline = 'Buying check \u2014 ' + out.headline; if (benefit && benefit.verdict === 'helps') out.headline += ' \u00b7 would help your herd'; else if (benefit && benefit.verdict === 'no') out.headline += ' \u00b7 would not lift your herd'; }
+    return out;
   }
 
   // ---------- preferred genetics ----------
@@ -2454,6 +2623,10 @@
     pairIdeas: pairIdeas,
     producerRecord: producerRecord,
     preferLoci: preferLoci,
+    fitSummary: fitSummary,
+    buyCriteriaOf: buyCriteriaOf,
+    herdBenefit: herdBenefit,
+    buyAdvice: buyAdvice,
     preferenceMap: preferenceMap,
     horseGenotype: horseGenotype,
     preferredGenesOf: preferredGenesOf,

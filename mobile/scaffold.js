@@ -213,6 +213,8 @@
     '.an-tip.warn{ border-color:var(--danger); }',
     '.an-tip.tip{ border-color:var(--accent-2); }',
     '.an-tip.info{ border-color:var(--accent); }',
+    '.buy-panel{ margin:0 0 14px; }',
+    '.buy-panel summary{ cursor:pointer; color:var(--text-muted); font-size:13px; }',
     '.notes-panel{ margin:0 0 14px; }',
     '.notes-panel summary{ cursor:pointer; color:var(--text-muted); font-size:13px; }',
     '#overall-notes{ background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; color:var(--text); font-family:inherit; }',

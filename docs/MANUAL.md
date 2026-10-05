@@ -40,6 +40,8 @@ A visual walkthrough of installing and using the extension. For a quick technica
 32. [Notes the suggestions use](#notes-the-suggestions-use)
 33. [Mares that out-produce themselves](#mares-that-out-produce-themselves)
 34. [Preferred genetics](#preferred-genetics)
+35. [Fit summary on Horse Reality pages](#fit-summary-on-horse-reality-pages)
+36. [Purchase criteria](#purchase-criteria)
 
 ## Installing
 
@@ -186,6 +188,24 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 ## Separate goals for mares and stallions
 
 In **Highlight goals**, tick **Separate goals for mares & fillies and for stallions & colts** if the two should have different goals. Two buttons then appear: **Mares & fillies** and **Stallions & colts**. Click one to edit that set; a line under them says which set you are editing. Each horse's goal boxes, the "fit your goals" counts, the outlines, Analytics and the goal suggestions then use the goals for its own sex. The foal partner suggestions count a foal as fitting if it would fit either set. Un-tick the box to go back to one set for everyone; your two sets are kept if you tick it again. Saved goal sets keep the whole arrangement.
+
+## Fit summary on Horse Reality pages
+
+When you open a horse's page on Horse Reality, a small card appears in the bottom-left corner of the page saying whether the horse fits your criteria and why. Its colour shows the verdict: **green** (fits), **blue** (off by one), **red** (misses two or more). Click it to open the reasons, each with a ✓ (met), ✗ (missed) or • (not known yet or a note):
+
+- each of your goal boxes (conformation, genetic potential, Breed Total, traits, health, fertility) with the horse's value and your minimum;
+- preferred and unwanted genes it carries (and a reminder if its colours have not been tested);
+- what your own notes on it say, and for a mare or stallion whether its foals beat their dams.
+
+The **×** hides it for that page, and a checkbox at the bottom of the **My notes** panel turns it off everywhere. It appears a moment after the page loads, once the ledger has saved the horse.
+
+**A horse that is not yours is checked as a purchase.** The card starts "Buying check", uses your **purchase criteria** for the horse's breed (or your goals if you have not set any), and adds whether the horse **would help your herd**: its genetic potential, top conformation and Breed Total against the median and top quarter of your own horses of the same breed, and whether it is strong in the traits your herd is weakest in.
+
+## Purchase criteria
+
+The **Purchase criteria** panel (under My notes, near the top of the dashboard) is where you set what a horse should have for you to buy it. Use the **Set for** drop-down to set it for **All breeds** or for one breed; for a breed, any field left empty uses your all-breeds value. The fields are the same as your goals (minimum genetic potential, top conformation and Breed Total, the worst trait and health ratings you accept, minimum fertility) plus the **highest price you will pay** and a list of traits the horse **must be Good or better in**. Your preferred and unwanted genes (set per breed under Preferred genetics) count as well.
+
+**Suggestions from your herd:** once at least three of your horses of that breed are saved, the panel suggests values with an **Apply** button: the level that would put a new horse in the top 40% of your herd for genetic potential, top conformation and Breed Total, and the traits that at least half of your horses are Below average or Average in.
 
 ## Preferred genetics
 

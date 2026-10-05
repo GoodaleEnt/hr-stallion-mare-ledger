@@ -1205,10 +1205,13 @@
         row.style.background = '';
         row.style.boxShadow = '';
         row.removeAttribute('data-hr-fit');
+        row.removeAttribute('title');
+        outer.querySelectorAll('[data-hr-info]').forEach(function (e) { e.remove(); });
         var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
         if (!link) return;
         var tm = /\/market\/trade\/(\d+)/.exec(link.getAttribute('href') || '');
         bidMark(outer, tm && state.marketBids && state.marketBids[tm[1]]);
+        if (tm) noteHighest(state, tm[1], outer);
         if (off) return;
         var name = (link.textContent || '').replace(/\s+/g, ' ').trim();
         var life = (tm && trades[tm[1]]) || '';
@@ -1220,11 +1223,14 @@
           var sex = sexImg ? (sexImg.getAttribute('alt') || '').toLowerCase() : '';
           life = findByName(name, breed, sex);
         }
+        if (life && state.marketBids && state.marketBids['life:' + life] && !(tm && state.marketBids[tm[1]])) bidMark(outer, state.marketBids['life:' + life]);
         var info = life && state.horseInfo && state.horseInfo[life];
         if (!info) return;
         if (me && String(info.ownerName || '').trim().toLowerCase() === me) return;
         var b = HRLib.herdBenefit(state, life);
-        if (b.verdict === 'unknown') return;
+        var ri = HRLib.marketRowInfo(state, life, { asking: rowMoney(outer, '.market-office-table-row-autobuy'), highest: rowMoney(outer, '.market-office-table-row-highestbid') });
+        if (ri) infoBadge(outer, ri, b);
+        if (b.verdict === 'unknown') { if (ri) row.title = ri.hover; return; }
         var good = b.verdict === 'helps' || b.verdict === 'maybe';
         var counts = HRLib.fitSummary(state, life).counts;
         var judged = counts.total > 0;
@@ -1250,7 +1256,7 @@
         row.setAttribute('data-hr-fit', state2);
         var head = state2 === 'gold' ? 'would lift your herd and fits all ' + counts.total + ' of your criteria' :
           good ? 'would lift your herd; fits ' + counts.matched + ' of ' + counts.total + ' criteria' + (counts.missing.length ? ' (missing ' + counts.missing.slice(0, 3).join(', ') + ')' : '') : 'would not lift your herd';
-        row.title = 'HR Ledger: ' + head + '\n' + b.lines.slice(0, 4).map(function (l) { return (l.ok === true ? '\u2713 ' : l.ok === false ? '\u2717 ' : '\u2022 ') + l.text; }).join('\n');
+        row.title = (ri ? ri.hover + '\n\n' : '') + 'Overall: ' + head;
       });
     });
   }
@@ -1430,8 +1436,47 @@
   var bidTimers = [];
   function scheduleBidScan() {
     bidTimers.forEach(clearTimeout);
-    bidTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(scanTradeStatus, ms); });
+    bidTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(function () { scanTradeStatus(); scrapeBidNotifications(); }, ms); });
   }
+  // The site's notifications say when an auction you bid on is over: that you were outbid or lost it, or that you won it.
+  // The listing (or the horse) the notification links to gets the outcome, which turns the mark on its Explore row into
+  // a red X or a green $ and puts the price into the sale price numbers.
+  function scrapeBidNotifications() {
+    var rows = document.querySelectorAll('tr.notifications-table, .notifications-table tr, .notification');
+    if (!rows.length && /notif/i.test(location.pathname)) rows = document.querySelectorAll('tr');
+    if (!rows.length) return;
+    var found = [];
+    rows.forEach(function (row) {
+      var text = String(row.textContent || '').replace(/\s+/g, ' ');
+      var kind = /\bout-?bid\b|lost (the |your )?(auction|bid|offer)|did not win|was not the highest|higher (bid|offer)|auction (has )?(ended|closed).*(another|someone)/i.test(text) ? 'lost'
+        : /\byou (have )?won\b|won the (auction|bid)|successfully (bought|purchased|won)|(bid|offer) (was )?(accepted|successful)/i.test(text) ? 'won' : '';
+      if (!kind) return;
+      var tl = row.querySelector('a[href*="/market/trade/"]'), hl = row.querySelector('a[href*="/horses/"]');
+      var tid = tl && (/\/market\/trade\/(\d+)/.exec(tl.getAttribute('href') || '') || [])[1];
+      var life = hl && (/\/horses\/(\d+)/.exec(hl.getAttribute('href') || '') || [])[1];
+      if (!tid && !life) return;
+      found.push({ kind: kind, tid: tid || '', life: life || '', name: ((tl || hl).textContent || '').replace(/\s+/g, ' ').trim(), date: parseRowDate(text) });
+    });
+    if (!found.length) return;
+    HRStorage.getState(function (state) {
+      var mb = Object.assign({}, state.marketBids), trades = state.marketTrades || {}, changed = [];
+      found.forEach(function (f) {
+        var key = f.tid;
+        if (!key && f.life) { key = Object.keys(trades).find(function (t) { return trades[t] === f.life && mb[t]; }) || ('life:' + f.life); }
+        var cur = mb[key] || {};
+        if (cur.outcome === f.kind) return;
+        mb[key] = Object.assign({}, cur, { outcome: f.kind, outcomeAt: f.date || today10Local(), status: f.kind === 'lost' ? 'outbid' : 'leading', seenAt: Date.now() }, f.life ? { life: f.life } : {}, f.kind === 'won' && !cur.amount && cur.highest ? { amount: cur.highest } : {});
+        changed.push(f);
+      });
+      if (!changed.length) return;
+      state.marketBids = mb;
+      HRStorage.setState(state, function () {
+        var lost = changed.filter(function (c) { return c.kind === 'lost'; }).length, won = changed.length - lost;
+        showToast('HR Ledger: ' + (lost ? lost + ' lost bid' + (lost === 1 ? '' : 's') : '') + (lost && won ? ' and ' : '') + (won ? won + ' won' : '') + ' noted from your notifications');
+      });
+    });
+  }
+  function today10Local() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function bidMark(outer, bid) {
     var host = outer.querySelector('.market-office-table-row-horse-info') || outer;
     host.querySelectorAll('[data-hr-bid]').forEach(function (e) { e.remove(); });
@@ -1440,14 +1485,45 @@
     var highest = 0;
     if (hb && !/n\/a/i.test(hb.textContent || '')) highest = parseInt(String(hb.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
     var mine = Number(bid.amount) || 0;
-    var out = bid.status === 'outbid' || (mine > 0 && highest > mine && bid.status !== 'leading');
+    var won = bid.outcome === 'won';
+    var out = bid.outcome === 'lost' || (!won && (bid.status === 'outbid' || (mine > 0 && highest > mine && bid.status !== 'leading')));
     var tag = document.createElement('span');
     tag.setAttribute('data-hr-bid', out ? 'outbid' : 'mine');
     tag.textContent = out ? 'X' : '$';
-    tag.title = out ? 'HR Ledger: you have been outbid' + (mine ? ' (your offer ' + mine.toLocaleString('en-US') + (highest ? ', highest bid ' + highest.toLocaleString('en-US') : '') + ')' : '') : 'HR Ledger: you made an offer' + (mine ? ' of ' + mine.toLocaleString('en-US') : '') + ' and it is the highest so far';
+    tag.title = won ? 'HR Ledger: you won this listing' + (mine ? ' with ' + mine.toLocaleString('en-US') : '') : out ? (bid.outcome === 'lost' ? 'HR Ledger: you lost this bid' : 'HR Ledger: you have been outbid') + (mine ? ' (your offer ' + mine.toLocaleString('en-US') + (highest || bid.highest ? ', highest bid ' + (highest || bid.highest).toLocaleString('en-US') : '') + ')' : '') : 'HR Ledger: you made an offer' + (mine ? ' of ' + mine.toLocaleString('en-US') : '') + ' and it is the highest so far';
     tag.style.cssText = 'display:inline-block;margin-left:6px;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;font:700 14px system-ui,sans-serif;color:#fff;vertical-align:middle;background:' + (out ? '#C0281E' : '#1E8449') + ';box-shadow:0 0 0 2px #fff;';
     var link = host.querySelector('a');
     if (link && link.parentNode) link.parentNode.insertBefore(tag, link.nextSibling); else host.appendChild(tag);
+  }
+  function rowMoney(outer, sel) {
+    var el = outer.querySelector(sel);
+    return el && !/n\/a/i.test(el.textContent || '') ? parseInt(String(el.textContent || '').replace(/[^0-9]/g, ''), 10) || 0 : 0;
+  }
+  // a small line under the horse's name on a market row: GP, conformation, traits, a typical price and the herd verdict,
+  // each green when it meets your purchase criteria for that sex and red when it does not
+  function infoBadge(outer, ri, benefit) {
+    var host = outer.querySelector('.market-office-table-row-horse-info') || outer;
+    var box = document.createElement('div');
+    box.setAttribute('data-hr-info', '1');
+    box.style.cssText = 'margin-top:3px;font:600 12px system-ui,sans-serif;line-height:1.6;';
+    box.title = ri.hover;
+    function pill(text, ok, bg) {
+      var sp = document.createElement('span');
+      sp.textContent = text;
+      sp.style.cssText = 'display:inline-block;margin:0 4px 2px 0;padding:0 6px;border-radius:9px;color:#fff;background:' + (bg || (ok === true ? '#1E8449' : ok === false ? '#C0281E' : '#6E7260')) + ';';
+      box.appendChild(sp);
+    }
+    ri.chips.forEach(function (c) { pill(c.label + ' ' + c.text + (c.ok === true ? ' ✓' : c.ok === false ? ' ✗' : ''), c.ok); });
+    if (ri.bench) pill('$ ~' + ri.bench.est.toLocaleString('en-US'), null, '#46592C');
+    var hv = benefit && benefit.verdict;
+    if (hv && hv !== 'unknown') pill(hv === 'helps' ? 'Helps herd' : hv === 'maybe' ? 'May help herd' : 'No herd lift', hv === 'no' ? false : true);
+    host.appendChild(box);
+  }
+  // the highest bid seen on a listing you bid on is kept with the bid, so a lost bid still tells what the horse went for
+  function noteHighest(state, tradeId, outer) {
+    var bid = state.marketBids && state.marketBids[tradeId];
+    var hi = bid ? rowMoney(outer, '.market-office-table-row-highestbid') : 0;
+    if (hi > (Number(bid && bid.highest) || 0)) saveBid(tradeId, { highest: hi });
   }
   function scheduleMarket() {
     marketTimers.forEach(clearTimeout);
@@ -1455,7 +1531,7 @@
   }
   // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
   // save. The rows are refreshed on load and when the tab is shown again.)
-  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus, scrapeMySales: scrapeMySales, checkPendingRetire: checkPendingRetire };
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus, scrapeMySales: scrapeMySales, scrapeBidNotifications: scrapeBidNotifications, checkPendingRetire: checkPendingRetire };
 
   // ---- fit summary on a horse's page ----
   // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why

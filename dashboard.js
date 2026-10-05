@@ -1654,7 +1654,7 @@
         '<span><strong>Price:</strong> ' + sel('pace', [['quick', 'Quick sale (15% under)'], ['fair', 'Fair'], ['high', 'Top dollar (15% over)']]) + '</span>' +
       '</div>';
     if (!r.goalsOn && f.mode === 'misses') html += '<div class="an-tip info">You have no highlight goals set, so horses are picked from the weaker end of your herd. Set goals under <em>Highlight goals</em> for sharper picks.</div>';
-    if (!r.comps) html += '<div class="an-tip info">No past sales with a known Breed Total yet, so prices start from what you paid for a horse. They get better as sales are recorded from your bank page.</div>';
+    if (!r.comps) html += '<div class="an-tip info">No past sales or market results with a known Breed Total yet, so prices start from what you paid for a horse. They get better as sales are recorded from your bank page and as bids you win or lose are noted from your notifications.</div>';
     if (!r.ideas.length) {
       html += '<p class="notes-line" style="margin:8px 0 0;">Nothing to suggest with these settings. Every horse you look at either meets your goals or is worth keeping.</p>';
     } else {
@@ -2307,6 +2307,8 @@
   var notesOpen = false;
   var buyOpen = false;
   var buyScope = ''; // breed the purchase criteria are being edited for ('' = all breeds)
+  var buySex = ''; // 'mare' (mares & fillies), 'stallion' (colts & stallions) or '' (both) — who the criteria being edited are for
+  function buyStoreKey() { return (buyScope ? L.breedKeyOf(buyScope) : '') + (buySex ? '|' + buySex : ''); }
   var prefScope = ''; // breed the Preferred genetics choices apply to ('' = all breeds)
   // classes for a horse's card or row: outlined if it meets your goals, and a big $ behind it if it is for sale
   function goalClass(life) {
@@ -2357,15 +2359,15 @@
   function purchasePanelHtml() {
     var all = (state.settings && state.settings.buyCriteria) || {};
     var scopeKey = buyScope ? L.breedKeyOf(buyScope) : '';
-    var own = all[scopeKey] || {};
-    var eff = L.buyCriteriaOf(state, buyScope);
-    var adv = L.buyAdvice(state, buyScope);
+    var own = all[buyStoreKey()] || {};
+    var eff = L.buyCriteriaOf(state, buyScope, buySex);
+    var adv = L.buyAdvice(state, buyScope, buySex);
     var tipCount = adv.tips.length + (adv.traits && !(own.needTraits || []).length ? 1 : 0);
     var breeds = {}, names = [];
     Object.keys(state.horseInfo || {}).forEach(function (l) { var b = state.horseInfo[l].breed, k = L.breedKeyOf(b); if (k && !breeds[k]) { breeds[k] = true; names.push(b); } });
-    Object.keys(all).forEach(function (k) { if (k && !breeds[k]) { breeds[k] = true; names.push(L.HR_BREEDS.find(function (b) { return L.breedKeyOf(b) === k; }) || k); } });
+    Object.keys(all).forEach(function (k0) { var k = k0.split("|")[0]; if (k && !breeds[k]) { breeds[k] = true; names.push(L.HR_BREEDS.find(function (b) { return L.breedKeyOf(b) === k; }) || k); } });
     function field(label, key, step) {
-      return '<div class="field"><label for="buy-' + key + '">' + label + '</label><input id="buy-' + key + '" type="number" min="0" step="' + step + '" data-action="update-buy" data-field="' + key + '" value="' + (own[key] != null ? L.esc(own[key]) : '') + '" placeholder="' + (scopeKey && eff.goals && key !== 'maxPrice' && eff.goals[key] != null ? 'all breeds: ' + L.esc(eff.goals[key]) : scopeKey && key === 'maxPrice' && eff.maxPrice ? 'all breeds: ' + L.esc(eff.maxPrice) : 'no limit') + '"></div>';
+      return '<div class="field"><label for="buy-' + key + '">' + label + '</label><input id="buy-' + key + '" type="number" min="0" step="' + step + '" data-action="update-buy" data-field="' + key + '" value="' + (own[key] != null ? L.esc(own[key]) : '') + '" placeholder="' + (own[key] == null && key !== 'maxPrice' && eff.goals && eff.goals[key] != null ? 'also set above: ' + L.esc(eff.goals[key]) : own[key] == null && key === 'maxPrice' && eff.maxPrice ? 'also set above: ' + L.esc(eff.maxPrice) : 'no limit') + '"></div>';
     }
     function sel(label, key, options) {
       return '<div class="field"><label for="buy-' + key + '">' + label + '</label><select id="buy-' + key + '" data-action="update-buy" data-field="' + key + '" style="width:100%;">' +
@@ -2374,11 +2376,11 @@
     var need = own.needTraits || [];
     var html = '<details class="buy-panel"' + (buyOpen ? ' open' : '') + '><summary>Purchase criteria \u2014 what a horse should have for you to buy it' + (tipCount ? ' \u00b7 ' + tipCount + ' suggestion' + (tipCount === 1 ? '' : 's') : '') + '</summary>' +
       '<p class="notes-line" style="margin:6px 0;">Set what you look for in a horse to buy, for all breeds or one breed at a time. When you open a horse that is not yours on Horse Reality, the summary in the corner of the page checks it against these and says whether it would lift your own herd of that breed.</p>' +
-      '<div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><label for="buy-scope" style="font-size:13px;font-weight:600;">Set for</label><select id="buy-scope" data-action="buy-scope"><option value="">All breeds</option>' +
-        names.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === scopeKey ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>' + (scopeKey ? '<span class="sub" style="font-size:12.5px;">Empty fields use your all-breeds value.</span>' : '') + '</div>' +
+      '<div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><label for="buy-sex" style="font-size:13px;font-weight:600;">Applies to</label><select id="buy-sex" data-action="buy-sex"><option value=""' + (buySex ? '' : ' selected') + '>Mares, fillies, colts and stallions</option><option value="mare"' + (buySex === 'mare' ? ' selected' : '') + '>Mares &amp; fillies</option><option value="stallion"' + (buySex === 'stallion' ? ' selected' : '') + '>Colts &amp; stallions</option></select><label for="buy-scope" style="font-size:13px;font-weight:600;">Set for</label><select id="buy-scope" data-action="buy-scope"><option value="">All breeds</option>' +
+        names.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === scopeKey ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>' + '<span class="sub" style="font-size:12.5px;">An empty field uses the next wider setting: this breed for both sexes, then all breeds for this sex, then all breeds for both.</span></div>' +
       '<div class="goals-grid">' + field('Min Genetic Potential', 'minGP', 'any') + field('Min top conformation', 'minConf', 'any') + field('Min Breed Total', 'minBT', 'any') + field('Highest price you will pay (HRC)', 'maxPrice', '1000') + '</div>' +
       '<div class="goals-grid">' +
-        sel('Worst conformation trait accepted', 'traitWorst', [['', 'no limit'], ['GP', 'G+ (Good+)'], ['G', 'G (Good)'], ['A', 'A (Average)'], ['BA', 'BA (Below average)']]) + field('How many at that rating', 'traitWorstMax', '1') +
+        sel('Lowest conformation trait rating allowed', 'traitWorst', [['', 'no limit'], ['GP', 'G+ (Good+)'], ['G', 'G (Good)'], ['A', 'A (Average)'], ['BA', 'BA (Below average)']]) + field('How many traits may sit at that rating', 'traitWorstMax', '1') +
         sel('Worst health rating accepted', 'healthWorst', [['', 'no limit'], ['good', 'Good'], ['average', 'Average'], ['fair', 'Fair'], ['poor', 'Poor']]) + field('How many at that rating (of 5)', 'healthWorstMax', '1') +
         sel('Min fertility', 'minFert', [['', 'no limit'], ['poor', 'Poor'], ['fair', 'Fair'], ['average', 'Average'], ['good', 'Good'], ['excellent', 'Excellent']]) +
       '</div>' +
@@ -3037,7 +3039,7 @@
         persist();
       }
       else if (action === 'buy-apply') {
-        var bk2 = buyScope ? L.breedKeyOf(buyScope) : '';
+        var bk2 = buyStoreKey();
         var allB2 = Object.assign({}, state.settings.buyCriteria);
         var ownB2 = Object.assign({}, allB2[bk2]);
         if (t.getAttribute('data-traits')) ownB2.needTraits = t.getAttribute('data-traits').split(',');
@@ -3391,8 +3393,9 @@
         persist();
       }
       else if (action === 'buy-scope') { buyScope = t.value; buyOpen = true; render(); }
+      else if (action === 'buy-sex') { buySex = t.value === 'mare' || t.value === 'stallion' ? t.value : ''; buyOpen = true; render(); }
       else if (action === 'update-buy' || action === 'buy-trait') {
-        var bk = buyScope ? L.breedKeyOf(buyScope) : '';
+        var bk = buyStoreKey();
         var allB = Object.assign({}, state.settings.buyCriteria);
         var ownB = Object.assign({}, allB[bk]);
         if (action === 'buy-trait') {

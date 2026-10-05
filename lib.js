@@ -1371,11 +1371,26 @@
   // traitWorst/traitWorstMax, healthWorst/healthWorstMax, minFert) plus maxPrice (HRC) and needTraits (traits that
   // must be Good or better). A breed's own value wins; otherwise the all-breeds value applies.
   var BUY_FIELDS = ['minGP', 'minConf', 'minBT', 'traitWorst', 'traitWorstMax', 'healthWorst', 'healthWorstMax', 'minFert', 'maxPrice'];
-  function buyCriteriaOf(state, breed) {
+  // Each field is looked up in this order: the breed for that sex, the breed, all breeds for that sex, all breeds. The
+  // sex scopes are stored as 'breedkey|mare' and 'breedkey|stallion' ('|mare' = all breeds); mares and fillies are
+  // 'mare', stallions and colts are 'stallion'.
+  function buyScopeKeys(breed, sex) {
+    var bk = breed ? breedKeyOf(breed) : '', sx = sex === 'mare' || sex === 'stallion' ? sex : '';
+    var keys = [];
+    if (bk && sx) keys.push(bk + '|' + sx);
+    if (bk) keys.push(bk);
+    if (sx) keys.push('|' + sx);
+    keys.push('');
+    return keys;
+  }
+  function buyCriteriaOf(state, breed, sex) {
     var all = (state && state.settings && state.settings.buyCriteria) || {};
-    var general = all[''] || {}, own = (breed && all[breedKeyOf(breed)]) || {}, raw = {};
-    BUY_FIELDS.forEach(function (k) { raw[k] = own[k] != null && own[k] !== '' ? own[k] : general[k]; });
-    var need = own.needTraits && own.needTraits.length ? own.needTraits : (general.needTraits || []);
+    var keys = buyScopeKeys(breed, sex), raw = {};
+    BUY_FIELDS.forEach(function (k) {
+      for (var i = 0; i < keys.length; i++) { var o = all[keys[i]]; if (o && o[k] != null && o[k] !== '') { raw[k] = o[k]; break; } }
+    });
+    var need = [];
+    for (var j = 0; j < keys.length; j++) { var oo = all[keys[j]]; if (oo && oo.needTraits && oo.needTraits.length) { need = oo.needTraits; break; } }
     var mp = parseFloat(raw.maxPrice);
     var goals = normalizeGoals(raw);
     var any = Object.keys(goals).some(function (k) { return goals[k] != null; }) || need.length > 0 || mp > 0;
@@ -1409,7 +1424,12 @@
     var herd = ownedHorses(state).filter(function (h) {
       return String(h.lifeNumber) !== life && (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && sameBreed(h.info, info);
     });
+    // a mare or filly is compared with your mares and fillies, a colt or stallion with your colts and stallions
+    var sameSex = herd.filter(function (h) { return h.info.sex === info.sex; });
+    var groupName = info.sex === 'stallion' ? 'colts & stallions' : 'mares & fillies';
+    if (sameSex.length >= 3) herd = sameSex; else groupName = 'horses';
     out.herdSize = herd.length;
+    out.group = groupName;
     if (herd.length < 3) { out.lines.push({ ok: null, text: 'Fewer than 3 of your horses of this breed are saved, so there is nothing to compare it with' }); return out; }
     function vals(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
     function pick(arr, p) { return arr.length ? arr[Math.min(arr.length - 1, Math.round((arr.length - 1) * p))] : 0; }
@@ -1424,9 +1444,9 @@
       if (!(v > 0)) { out.lines.push({ ok: null, text: label + ': not known yet' }); return; }
       if (arr.length < 3) return;
       var med = pick(arr, 0.5), top = pick(arr, 0.75), r = function (n) { return Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec); };
-      if (v >= top) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is in the top quarter of your ' + herd.length + ' (median ' + r(med) + ')' }); }
-      else if (v >= med) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is above your median of ' + r(med) }); }
-      else { neg++; out.lines.push({ ok: false, text: label + ' ' + r(v) + ' is below your median of ' + r(med) }); }
+      if (v >= top) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is in the top quarter of your ' + herd.length + ' ' + groupName + ' (median ' + r(med) + ')' }); }
+      else if (v >= med) { pos++; out.lines.push({ ok: true, text: label + ' ' + r(v) + ' is above your ' + groupName + ' median of ' + r(med) }); }
+      else { neg++; out.lines.push({ ok: false, text: label + ' ' + r(v) + ' is below your ' + groupName + ' median of ' + r(med) }); }
     });
     // traits your herd is weak in that this horse is strong in
     var weak = [], covers = [];
@@ -1445,13 +1465,13 @@
     return out;
   }
   // Starting values for the purchase criteria, from your own herd of that breed ('' = all your horses)
-  function buyAdvice(state, breed) {
+  function buyAdvice(state, breed, sex) {
     var herd = ownedHorses(state).filter(function (h) {
-      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && (!breed || breedKeyOf(h.info.breed) === breedKeyOf(breed));
+      return (h.info.sex === 'mare' || h.info.sex === 'stallion') && (!sex || h.info.sex === sex) && !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && (!breed || breedKeyOf(h.info.breed) === breedKeyOf(breed));
     });
     var out = { herdSize: herd.length, tips: [], traits: null };
     if (herd.length < 3) return out;
-    var cur = buyCriteriaOf(state, breed).goals;
+    var cur = buyCriteriaOf(state, breed, sex).goals;
     function vals(fn) { return herd.map(fn).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; }); }
     function pick(arr, p) { return arr.length ? arr[Math.min(arr.length - 1, Math.round((arr.length - 1) * p))] : 0; }
     [['minGP', 'Genetic Potential', vals(function (h) { return Number(h.info.geneticPotential) || 0; }), 0],
@@ -1468,6 +1488,87 @@
     });
     if (weak.length) out.traits = { traits: weak, why: 'At least half of your horses are Below average or Average in these, so a horse that is Good or better there would help.' };
     return out;
+  }
+
+  // ---------- prices seen on the market ----------
+  // Past sales of yours plus what you saw on the market: the price you paid when you won a bid, and the highest bid on
+  // a listing you lost (what the winner paid was at least that). Each is { life, name, bt, price, source }.
+  function marketComps(state) {
+    var out = [], trades = state.marketTrades || {};
+    var bids = state.marketBids || {};
+    Object.keys(bids).forEach(function (k) {
+      var b = bids[k] || {};
+      var life = String(b.life || trades[k] || (k.indexOf('life:') === 0 ? k.slice(5) : ''));
+      if (!life) return;
+      var bt = horseBT(state, life), price = 0, source = '';
+      if (b.outcome === 'lost' && Number(b.highest) > 0) { price = Number(b.highest); source = 'lost bid'; }
+      else if (b.outcome === 'won' && Number(b.amount) > 0) { price = Number(b.amount); source = 'won bid'; }
+      if (!(bt > 0) || !price) return;
+      out.push({ life: life, name: ((state.horseInfo || {})[life] || {}).name || ('#' + life), bt: bt, price: price, source: source });
+    });
+    return out;
+  }
+  function priceComps(state) {
+    var comps = [];
+    Object.keys(state.horseMeta || {}).forEach(function (l) {
+      if (!isSoldLife(state, l)) return;
+      var sa = saleOf(state, l), bt = horseBT(state, l);
+      if (sa && sa.currency === 'HRC' && bt > 0) comps.push({ life: l, name: ((state.horseInfo || {})[l] || {}).name || ('#' + l), bt: bt, price: sa.price, source: 'sale' });
+    });
+    return comps.concat(marketComps(state));
+  }
+  // What horses of this Breed Total have gone for, from your sales and market results: { est, n } or null
+  function priceBenchmark(state, life) {
+    var bt = horseBT(state, life);
+    if (!(bt > 0)) return null;
+    var near = priceComps(state).filter(function (c) { return String(c.life) !== String(life); })
+      .sort(function (a, b) { return Math.abs(a.bt - bt) - Math.abs(b.bt - bt); }).slice(0, 3);
+    if (!near.length) return null;
+    return { est: roundPrice(median(near.map(function (c) { return c.price / c.bt; })) * bt), n: near.length };
+  }
+
+  // ---------- one market row: the numbers, the checks against your purchase criteria, the herd and the price ----------
+  // market = { asking, highest } (what the row shows). Returns { chips: [{ label, text, ok }], pass, bad, unknown, judged,
+  // benefit, hover, bench } or null when the horse is not saved.
+  function marketRowInfo(state, life, market) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life];
+    if (!info) return null;
+    market = market || {};
+    var meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var crit = buyCriteriaOf(state, info.breed, info.sex);
+    var sec = crit.any ? purchaseSections(state, life, crit) : goalSections(state, life);
+    var fs = fitSummary(state, life), benefit = herdBenefit(state, life);
+    var gp = Number(info.geneticPotential) || 0, conf = bestConformation(meta).best || 0, bt = horseBT(state, life);
+    var r1 = function (n) { return Math.round(n * 10) / 10; };
+    var chips = [];
+    function chip(label, text, section) { chips.push({ label: label, text: text, ok: section && section.text !== 'no goal' && section.state !== 'na' ? section.state === 'ok' : null }); }
+    chip('GP', gp > 0 ? String(gp) : '?', sec.gp);
+    chip('Conf', conf > 0 ? String(r1(conf)) : '?', sec.conf);
+    if (bt > 0 && sec.bt.text !== 'no goal') chip('BT', String(r1(bt)), sec.bt);
+    var tc = traitCounts(info);
+    var tsec = sec.traits.text !== 'no goal' ? sec.traits : (sec.need && sec.need.text !== 'no goal' ? sec.need : null);
+    if (tsec) chip('Traits', tc ? (tc.VG + tc.GP + tc.G) + ' good+' + (tc.BA ? ', ' + tc.BA + ' BA' : '') : '?', tsec);
+    var judged = [sec.gp, sec.conf, sec.bt, sec.traits, sec.health, sec.fertility, sec.need].filter(function (x) { return x && x.text !== 'no goal' && !x.skip; });
+    var bad = judged.filter(function (x) { return x.state === 'bad'; }), unknown = judged.filter(function (x) { return x.state === 'na'; });
+    var overPrice = !!(crit.maxPrice && market.asking && market.asking > crit.maxPrice);
+    var pass = judged.length > 0 && !bad.length && !unknown.length && !overPrice;
+    var bench = priceBenchmark(state, life);
+    var shown = market.asking || market.highest || 0, priceLine = '';
+    if (bench) {
+      priceLine = 'Similar horses (Breed Total ' + r1(bt) + ') have gone for about ' + fmtMoney(bench.est) + ' HRC (' + bench.n + ' of your sales and market results)';
+      if (shown) { var pct = Math.round((shown / bench.est - 1) * 100); priceLine += '; this one is ' + (Math.abs(pct) < 5 ? 'about the same' : Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below')); }
+    }
+    var groupName = info.sex === 'stallion' ? 'colts & stallions' : 'mares & fillies';
+    var lines = ['HR Ledger — ' + (info.name || '#' + life) + (info.breed ? ' · ' + info.breed : '') + ' · ' + groupName.split(' ')[0] + (info.age != null && info.age !== '' ? ' · age ' + info.age : ''),
+      'GP ' + (gp || '?') + '   Conf ' + (conf ? r1(conf) : '?') + '   Breed Total ' + (bt > 0 ? r1(bt) : '?') + (info.fertility ? '   Fertility ' + info.fertility : '')];
+    lines.push(!judged.length ? 'No purchase criteria set for ' + groupName + ' yet (Purchase criteria in the ledger)' :
+      pass ? '✓ Meets all ' + judged.length + ' of your purchase criteria for ' + groupName :
+      bad.length ? '✗ Misses: ' + bad.map(function (x) { return x.label; }).join(', ') : '• Not all known yet: ' + unknown.map(function (x) { return x.label; }).join(', '));
+    fs.lines.forEach(function (l) { lines.push((l.ok === true ? '✓ ' : l.ok === false ? '✗ ' : '• ') + l.text); });
+    if (overPrice) lines.push('✗ Asking ' + fmtMoney(market.asking) + ' is above your limit of ' + fmtMoney(crit.maxPrice));
+    if (priceLine) lines.push('$ ' + priceLine);
+    return { chips: chips, pass: pass, bad: bad.map(function (x) { return x.label; }), unknown: unknown.map(function (x) { return x.label; }), judged: judged.length, benefit: benefit, hover: lines.join('\n'), bench: bench };
   }
 
   // ---------- listing a horse for sale and retiring it ----------
@@ -1549,7 +1650,7 @@
     if (!info) { out.headline = 'Not saved in the ledger yet'; out.lines.push({ ok: null, text: 'The ledger saves a horse when its page has loaded. This summary appears a moment later.' }); return out; }
     var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var buying = !!me && String(info.ownerName || '').trim().toLowerCase() !== me && !!String(info.ownerName || '').trim();
-    var crit = buying ? buyCriteriaOf(state, info.breed) : null;
+    var crit = buying ? buyCriteriaOf(state, info.breed, info.sex) : null;
     var sec = buying && crit.any ? purchaseSections(state, life, crit) : goalSections(state, life), misses = [], criteria = 0;
     var secList = [sec.conf, sec.gp, sec.bt, sec.traits, sec.health, sec.fertility];
     if (sec.need) secList.push(sec.need);
@@ -1584,7 +1685,7 @@
     }
     var benefit = null;
     if (buying) {
-      if (crit.maxPrice) out.lines.push({ ok: null, text: 'Your limit for this breed: ' + fmtMoney(crit.maxPrice) + ' HRC' });
+      if (crit.maxPrice) out.lines.push({ ok: null, text: 'Your price limit: ' + fmtMoney(crit.maxPrice) + ' HRC' });
       benefit = herdBenefit(state, life);
       out.benefit = benefit.verdict;
       benefit.lines.forEach(function (l) { out.lines.push(l); });
@@ -2354,13 +2455,8 @@
   function sellIdeas(state) {
     var form = sellFormOf(state);
     var goalsOn = anyGoals(state);
-    // past sales that give a price per Breed Total point
-    var comps = [];
-    Object.keys(state.horseMeta || {}).forEach(function (l) {
-      if (!isSoldLife(state, l)) return;
-      var sa = saleOf(state, l), bt = horseBT(state, l);
-      if (sa && sa.currency === 'HRC' && bt > 0) comps.push({ life: l, name: ((state.horseInfo || {})[l] || {}).name || ('#' + l), bt: bt, price: sa.price });
-    });
+    // past sales (and market results you saw) that give a price per Breed Total point
+    var comps = priceComps(state);
     var herd = ownedHorses(state).filter(function (h) {
       return !isSoldLife(state, h.lifeNumber) && !isArchivedHorse(h) && h.meta.status !== 'Companion' &&
         (h.info.sex === 'mare' || h.info.sex === 'stallion');
@@ -2698,6 +2794,10 @@
     recordSoldByOwner: recordSoldByOwner,
     askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
+    marketRowInfo: marketRowInfo,
+    marketComps: marketComps,
+    priceComps: priceComps,
+    priceBenchmark: priceBenchmark,
     herdBenefit: herdBenefit,
     buyAdvice: buyAdvice,
     preferenceMap: preferenceMap,

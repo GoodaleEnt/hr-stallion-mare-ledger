@@ -1145,6 +1145,102 @@
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
 
+  // ---- market board: colour the rows of horses you have already looked at ----
+  // On the Explore pages of the market, a row whose horse is saved in the ledger gets a green background if it would
+  // lift your herd (compared with your own horses of the same breed) and a red one if it would not. The horse is found
+  // from a market listing you opened (the listing's number is remembered with the horse), from a life number written in
+  // its name, or from an exact name + breed + sex that only one saved horse has.
+  var marketTimers = [], marketDebounce = null;
+  function rememberTrade(tradeId, life) {
+    if (!tradeId || !life) return;
+    HRStorage.getState(function (state) {
+      var tr = Object.assign({}, state.marketTrades);
+      if (tr[tradeId] === life) return;
+      tr[tradeId] = life;
+      var keys = Object.keys(tr);
+      if (keys.length > 600) keys.slice(0, keys.length - 600).forEach(function (k) { delete tr[k]; });
+      state.marketTrades = tr;
+      HRStorage.setState(state);
+    });
+  }
+  function scrapeTradePage() {
+    var m = /\/market\/trade\/(\d+)/.exec(location.pathname);
+    if (!m) return;
+    var a = document.querySelector('a[href*="/horses/"]');
+    var lm = a && /\/horses\/(\d+)/.exec(a.getAttribute('href') || '');
+    if (lm) rememberTrade(m[1], lm[1]);
+  }
+  function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function highlightMarket(force) {
+    if (!force && !/\/market\//.test(location.pathname)) return;
+    var outers = document.querySelectorAll('.market-office-table-row-outer');
+    if (!outers.length) return;
+    HRStorage.getState(function (state) {
+      var off = state.settings && state.settings.marketHighlight === false;
+      var trades = state.marketTrades || {}, me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      var index = null;
+      function findByName(name, breed, sex) {
+        if (!index) {
+          index = {};
+          Object.keys(state.horseInfo || {}).forEach(function (l) {
+            var n = normName(state.horseInfo[l].name);
+            if (n.length >= 3) (index[n] = index[n] || []).push(l);
+          });
+        }
+        // market names often carry extras ("Name/68.4", "Name | 1E-5G", "Name - GP 556"): try the whole name, then the part before them
+        var tries = [name, name.split(/s*[/|]s*/)[0], name.split(/s+-s+/)[0]];
+        for (var t = 0; t < tries.length; t++) {
+          var hits = (index[normName(tries[t])] || []).filter(function (l) {
+            var i = state.horseInfo[l];
+            return (!breed || HRLib.breedKeyOf(i.breed) === HRLib.breedKeyOf(breed)) && (!sex || !i.sex || i.sex === sex);
+          });
+          if (hits.length === 1) return hits[0];
+        }
+        return '';
+      }
+      outers.forEach(function (outer) {
+        var row = outer.querySelector('.market-office-table-row') || outer;
+        row.style.backgroundColor = '';
+        row.removeAttribute('data-hr-fit');
+        if (off) return;
+        var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
+        if (!link) return;
+        var tm = /\/market\/trade\/(\d+)/.exec(link.getAttribute('href') || '');
+        var name = (link.textContent || '').replace(/\s+/g, ' ').trim();
+        var life = (tm && trades[tm[1]]) || '';
+        if (!life) { var nm = /(?:^|\D)(\d{8})(?:\D|$)/.exec(name); if (nm && state.horseInfo && state.horseInfo[nm[1]]) life = nm[1]; }
+        if (!life) {
+          var p = outer.querySelector('.market-office-table-row-horse-info p');
+          var breed = p ? (p.firstChild && p.firstChild.textContent || '').replace(/\s+/g, ' ').trim() : '';
+          var sexImg = outer.querySelector('img.sex');
+          var sex = sexImg ? (sexImg.getAttribute('alt') || '').toLowerCase() : '';
+          life = findByName(name, breed, sex);
+        }
+        var info = life && state.horseInfo && state.horseInfo[life];
+        if (!info) return;
+        if (me && String(info.ownerName || '').trim().toLowerCase() === me) return;
+        var b = HRLib.herdBenefit(state, life);
+        if (b.verdict === 'unknown') return;
+        var good = b.verdict === 'helps' || b.verdict === 'maybe';
+        row.style.backgroundColor = good ? 'rgba(76,122,82,0.28)' : 'rgba(156,74,59,0.28)';
+        row.setAttribute('data-hr-fit', good ? 'lifts' : 'no');
+        row.title = 'HR Ledger: ' + (good ? 'would lift your herd' : 'would not lift your herd') + '\n' + b.lines.slice(0, 4).map(function (l) { return (l.ok === true ? '\u2713 ' : l.ok === false ? '\u2717 ' : '\u2022 ') + l.text; }).join('\n');
+      });
+    });
+  }
+  function scheduleMarket() {
+    marketTimers.forEach(clearTimeout);
+    marketTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(highlightMarket, ms); });
+  }
+  try {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes.hrLedger || !storageAlive() || !/\/market\//.test(location.pathname)) return;
+      clearTimeout(marketDebounce);
+      marketDebounce = setTimeout(highlightMarket, 2300);
+    });
+  } catch (e) { /* storage events not available */ }
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket };
+
   // ---- fit summary on a horse's page ----
   // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why
   // (goal boxes, preferred and unwanted genes, notes, producer record). Click it to open the reasons, x to dismiss.
@@ -1933,6 +2029,10 @@
 
   function onPageReady() {
     scheduleFit();
+    scheduleMarket();
+    scrapeTradePage();
+    var refTrade = parseHorseIdFromUrl() && /\/market\/trade\/(\d+)/.exec(document.referrer || '');
+    if (refTrade) rememberTrade(refTrade[1], parseHorseIdFromUrl());
     injectLedgerButton();
     healOwnedStubs();
     scrapeHealth();

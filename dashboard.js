@@ -2419,7 +2419,8 @@
       }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
     }
     html += preferredGenesHtml();
-    html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>';
+    html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-market-highlight"' + (state.settings.marketHighlight === false ? '' : ' checked') + '> Colour market rows green or red for horses I have looked at (would lift my herd or not)</label>';
     return html + '</details>';
   }
   // Genes you want to keep: a level for each (no preference / prefer / keep).
@@ -3380,6 +3381,7 @@
         buyOpen = true;
         persist();
       }
+      else if (action === 'update-market-highlight') { state.settings.marketHighlight = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-fit-banner') { state.settings.fitBanner = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'pref-scope') { prefScope = t.value; notesOpen = true; render(); }
       else if (action === 'update-prefer-gene') {

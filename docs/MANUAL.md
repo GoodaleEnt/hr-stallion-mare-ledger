@@ -42,6 +42,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 34. [Preferred genetics](#preferred-genetics)
 35. [Fit summary on Horse Reality pages](#fit-summary-on-horse-reality-pages)
 36. [Purchase criteria](#purchase-criteria)
+37. [Market board colours](#market-board-colours)
 
 ## Installing
 
@@ -206,6 +207,14 @@ The **×** hides it for that page, and a checkbox at the bottom of the **My note
 The **Purchase criteria** panel (under My notes, near the top of the dashboard) is where you set what a horse should have for you to buy it. Use the **Set for** drop-down to set it for **All breeds** or for one breed; for a breed, any field left empty uses your all-breeds value. The fields are the same as your goals (minimum genetic potential, top conformation and Breed Total, the worst trait and health ratings you accept, minimum fertility) plus the **highest price you will pay** and a list of traits the horse **must be Good or better in**. Your preferred and unwanted genes (set per breed under Preferred genetics) count as well.
 
 **Suggestions from your herd:** once at least three of your horses of that breed are saved, the panel suggests values with an **Apply** button: the level that would put a new horse in the top 40% of your herd for genetic potential, top conformation and Breed Total, and the traits that at least half of your horses are Below average or Average in.
+
+## Market board colours
+
+On the market's **Explore** pages, a listing whose horse the ledger has already saved gets its row colour changed: **green** if the horse would lift your herd, **red** if it would not. Hover the row to see why (the first few reasons from the herd comparison). A row with no colour is a horse the ledger doesn't know or can't compare (fewer than 3 of your horses of that breed are saved, or its genetic potential and scores are not known yet).
+
+The comparison is the "would it help your herd" check from the fit summary: the horse's genetic potential, top conformation and Breed Total against your own horses of the same breed, and whether it is strong in the traits your herd is weakest in. It lifts the herd when it beats your median in at least two of these and falls below it in none (green also covers one where it is ahead on balance); otherwise it is red.
+
+The market page doesn't give a horse's life number, so the ledger finds the horse in three ways: a listing you have opened before (the ledger remembers which horse it was), a life number written in the horse's name, or an exact name, breed and sex that only one saved horse has (a name followed by "/score" or "| tags" is matched on the part before it). Horses that are yours are not coloured. A checkbox at the bottom of the **My notes** panel turns the colours off.
 
 ## Preferred genetics
 

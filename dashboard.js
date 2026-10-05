@@ -467,7 +467,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
+    html += saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -1143,7 +1143,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
+    html += saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -2450,6 +2450,29 @@
         '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.round(c.p * 100) + '%;background:var(--' + (c.level === 'avoid' ? 'danger' : 'accent') + ');"></span></span><span class="mono">' + Math.round(c.p * 100) + '%</span></div>';
     }).join('') + '<p class="notes-line" style="margin:6px 0 0;">The chance the foal has at least one copy. A gene neither parent is tested for counts as not there.</p></div>';
   }
+  // For a horse that is listed for sale (or was): what you ask and how it changed; and when it was retired.
+  function saleHistoryPanelHtml(life) {
+    var meta = state.horseMeta[life];
+    if (!meta) return '';
+    var sum = L.askSummary(meta);
+    var forSale = meta.status === 'For Sale', retired = meta.status === 'Retired', sold = meta.status === 'Sold' && (meta.soldTo || meta.soldAt);
+    if (!sum && !retired && !sold) return '';
+    var money = function (n) { return n ? L.esc(L.fmtMoney(n)) + ' HRC' : '\u2014'; };
+    var html = '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;' + (forSale ? 'border-color:var(--accent-2);' : '') + '"><strong>' + (retired ? 'Retired' : sold ? 'Sold' : forSale ? 'For sale' : 'Sale history') + '</strong>';
+    if (retired) html += ' <span class="tag">retired' + (meta.retiredAt ? ' ' + L.esc(L.fmtDate(meta.retiredAt)) : '') + '</span>';
+    if (sold) html += ' <span class="tag">sold' + (meta.soldTo ? ' to ' + L.esc(meta.soldTo) : '') + (meta.soldAt ? ' \u00b7 noticed ' + L.esc(L.fmtDate(meta.soldAt)) : '') + '</span>';
+    if (forSale && sum) html += ' <span class="tag" style="color:var(--accent-strong);">asking ' + money(sum.last.buyout || sum.last.bid) + '</span>';
+    if (sum) {
+      html += '<p class="notes-line" style="margin:6px 0;">' + (meta.forSaleSince ? 'Listed since ' + L.esc(L.fmtDate(meta.forSaleSince)) + (sum.days != null ? ' (' + sum.days + ' day' + (sum.days === 1 ? '' : 's') + ')' : '') + '. ' : '') +
+        sum.count + ' asking price' + (sum.count === 1 ? '' : 's') + ' recorded' + (sum.changes ? ', ' + sum.changes + ' change' + (sum.changes === 1 ? '' : 's') : '') + (sum.lowest && sum.highest && sum.lowest !== sum.highest ? '; lowest ' + money(sum.lowest) + ', highest ' + money(sum.highest) : '') + '.</p>' +
+        '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Date</th><th class="num">Buyout</th><th class="num">Starting bid</th><th class="num">Change</th></tr></thead><tbody>' +
+        meta.askLog.map(function (e, i) {
+          var prev = i ? (meta.askLog[i - 1].buyout || meta.askLog[i - 1].bid) : 0, cur = e.buyout || e.bid, d = prev && cur ? cur - prev : null;
+          return '<tr><td>' + L.esc(L.fmtDate(e.date)) + '</td><td class="num mono">' + money(e.buyout) + '</td><td class="num mono">' + money(e.bid) + '</td><td class="num mono"' + (d ? ' style="color:var(--' + (d < 0 ? 'danger' : 'success') + ');"' : '') + '>' + (d ? (d > 0 ? '+' : '-') + L.esc(L.fmtMoney(Math.abs(d))) : '\u2014') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    return html + '<p class="notes-line" style="margin:6px 0 0;">' + (retired ? 'Marked Retired in the ledger. ' : '') + (sold ? 'Marked Sold in the ledger when its page showed a new owner' + (L.saleOf(state, life) ? '; the sale price is from your bank page.' : '; the sale price is filled in when your bank page is read.') + ' ' : '') + 'Prices are saved when you list a horse on the New sale form and when you open My Sales on Horse Reality.</p></div>';
+  }
   // The genes read for a horse (from Horse Reality's test, or entered by hand), each as a chip: green with a star if you
   // prefer or keep it, red with a cross if you do not want it.
   function geneticsPanelHtml(life) {
@@ -2952,7 +2975,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
+    html += saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);

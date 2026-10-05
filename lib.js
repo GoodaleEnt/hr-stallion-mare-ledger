@@ -1470,6 +1470,74 @@
     return out;
   }
 
+  // ---------- listing a horse for sale and retiring it ----------
+  // A horse you list gets the status For Sale and a log of the prices you ask (horseMeta[life].askLog); a price change
+  // adds a line. A horse you retire gets the status Retired and the date. A horse already Sold or Retired is not
+  // changed back to For Sale by a stale listing.
+  function setHorseStatusIn(state, life, status) {
+    life = String(life);
+    state.horseMeta = state.horseMeta || {};
+    state.horseMeta[life] = Object.assign({}, state.horseMeta[life], { status: status });
+    var rec = (state.stallions || []).find(function (x) { return x.lifeNumber && String(x.lifeNumber) === life; });
+    if (rec) rec.status = (status === 'Sold' || status === 'Retired' || status === 'For Sale') ? status : 'Active';
+  }
+  function today10() { return new Date().toISOString().slice(0, 10); }
+  // ask = { buyout, bid } (either may be missing). Returns true if anything changed.
+  function recordAsk(state, life, ask) {
+    life = String(life || '');
+    if (!life) return false;
+    var meta = state.horseMeta && state.horseMeta[life] || {};
+    if (meta.status === 'Sold' || meta.status === 'Retired') return false;
+    var buyout = Number(ask && ask.buyout) > 0 ? Number(ask.buyout) : null, bid = Number(ask && ask.bid) > 0 ? Number(ask.bid) : null;
+    var log = Array.isArray(meta.askLog) ? meta.askLog.slice() : [];
+    var last = log[log.length - 1];
+    var changed = false;
+    if (meta.status !== 'For Sale') { setHorseStatusIn(state, life, 'For Sale'); meta = state.horseMeta[life]; changed = true; }
+    if ((buyout || bid) && (!last || (last.buyout || null) !== buyout || (last.bid || null) !== bid)) {
+      // a price you did not state this time keeps the one already known
+      var entry = { date: today10(), at: Date.now(), buyout: buyout != null ? buyout : (last && last.buyout) || null, bid: bid != null ? bid : (last && last.bid) || null };
+      if (!last || entry.buyout !== (last.buyout || null) || entry.bid !== (last.bid || null)) { log.push(entry); changed = true; }
+    }
+    if (changed) {
+      meta = Object.assign({}, state.horseMeta[life]);
+      meta.askLog = log.slice(-60);
+      if (!meta.forSaleSince) meta.forSaleSince = today10();
+      state.horseMeta[life] = meta;
+    }
+    return changed;
+  }
+  function recordRetired(state, life) {
+    life = String(life || '');
+    var meta = state.horseMeta && state.horseMeta[life] || {};
+    if (!life || meta.status === 'Retired') return false;
+    setHorseStatusIn(state, life, 'Retired');
+    state.horseMeta[life] = Object.assign({}, state.horseMeta[life], { retiredAt: today10() });
+    return true;
+  }
+  // A horse that was listed for sale (or marked For Sale) and now shows another owner has been sold: mark it Sold and
+  // keep who has it and when you noticed. The price comes from your bank page when it has been read.
+  function recordSoldByOwner(state, life) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life], meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var owner = info && String(info.ownerName || '').trim();
+    if (!life || !me || !owner || owner.toLowerCase() === me) return false;
+    if (meta.status === 'Sold' || meta.status === 'Retired') return false;
+    var listed = meta.status === 'For Sale' || (Array.isArray(meta.askLog) && meta.askLog.length > 0);
+    if (!listed) return false;
+    setHorseStatusIn(state, life, 'Sold');
+    state.horseMeta[life] = Object.assign({}, state.horseMeta[life], { soldAt: today10(), soldTo: owner });
+    return true;
+  }
+  // The tally of what you have asked: { count, first, last, lowest, highest, days } or null
+  function askSummary(meta) {
+    var log = meta && Array.isArray(meta.askLog) ? meta.askLog : [];
+    if (!log.length) return null;
+    var prices = log.map(function (e) { return e.buyout || e.bid || 0; }).filter(Boolean);
+    var since = meta.forSaleSince ? daysSince(meta.forSaleSince) : null;
+    return { count: log.length, changes: Math.max(0, log.length - 1), first: log[0], last: log[log.length - 1], lowest: prices.length ? Math.min.apply(null, prices) : null, highest: prices.length ? Math.max.apply(null, prices) : null, days: since != null ? Math.floor(since) : null };
+  }
+
   // ---------- why a horse fits (or does not fit) your criteria ----------
   // Used for the summary on a horse's page on Horse Reality: your goal boxes, preferred and unwanted genes, what the
   // horse's notes say and its producer record. Returns { verdict: 'fits' | 'near' | 'misses' | 'nogoals' | 'unknown',
@@ -2625,6 +2693,10 @@
     producerRecord: producerRecord,
     preferLoci: preferLoci,
     fitSummary: fitSummary,
+    recordAsk: recordAsk,
+    recordRetired: recordRetired,
+    recordSoldByOwner: recordSoldByOwner,
+    askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
     herdBenefit: herdBenefit,
     buyAdvice: buyAdvice,

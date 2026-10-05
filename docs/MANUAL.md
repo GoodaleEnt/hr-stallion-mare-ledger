@@ -43,6 +43,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 35. [Fit summary on Horse Reality pages](#fit-summary-on-horse-reality-pages)
 36. [Purchase criteria](#purchase-criteria)
 37. [Market board colours](#market-board-colours)
+38. [Listing, retiring and selling a horse](#listing-retiring-and-selling-a-horse)
 
 ## Installing
 
@@ -207,6 +208,16 @@ The **×** hides it for that page, and a checkbox at the bottom of the **My note
 The **Purchase criteria** panel (under My notes, near the top of the dashboard) is where you set what a horse should have for you to buy it. Use the **Set for** drop-down to set it for **All breeds** or for one breed; for a breed, any field left empty uses your all-breeds value. The fields are the same as your goals (minimum genetic potential, top conformation and Breed Total, the worst trait and health ratings you accept, minimum fertility) plus the **highest price you will pay** and a list of traits the horse **must be Good or better in**. Your preferred and unwanted genes (set per breed under Preferred genetics) count as well.
 
 **Suggestions from your herd:** once at least three of your horses of that breed are saved, the panel suggests values with an **Apply** button: the level that would put a new horse in the top 40% of your herd for genetic potential, top conformation and Breed Total, and the traits that at least half of your horses are Below average or Average in.
+
+## Listing, retiring and selling a horse
+
+The ledger keeps a horse's status up to date as things happen on Horse Reality:
+
+- **Listing for sale.** When you create a listing on the **New sale** form, the ledger marks the horse **For Sale** and saves the horse's buyout price and starting bid from the form. When you open your **My Sales** page it reads each listing's buyout price too. Every change of asking price adds a line, so a horse's page keeps a tally: the date you listed it, the current asking price, how many times you changed it, the lowest and highest, and a table of each price with the change from the one before.
+- **Retiring.** When one of your horses shows a **Retired** status on its page, it is marked **Retired** in the ledger with the date, and moves to the Retired tab like any other retired horse.
+- **Selling.** A horse you had listed that now shows another owner when you open its page is marked **Sold**, with who has it and when the ledger noticed. Reading your bank page (as before) fills in the sale price, date and buyer.
+
+A horse already Sold or Retired is never put back to For Sale by an old listing. Each of these shows in the **For sale / Retired / Sold** panel on the horse's page, and For Sale horses get the price check in Sell ideas.
 
 ## Market board colours
 

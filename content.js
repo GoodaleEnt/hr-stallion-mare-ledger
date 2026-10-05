@@ -738,6 +738,8 @@
         HRStorage.upsertHorseInfo(state, horseInfo.lifeNumber, horseInfo);
         passportCached = true;
       }
+      // a horse you had listed that now belongs to someone else has been sold
+      if (HRLib.recordSoldByOwner(state, horseInfo.lifeNumber)) passportCached = true;
 
       var matchId = HRLib.findStallionMatch(state.stallions, { stallionName: horseInfo.name, stallionLifeNumber: horseInfo.lifeNumber });
 
@@ -1252,6 +1254,75 @@
       });
     });
   }
+  // ---- your sales: asking prices of horses you list ----
+  // On your My Sales page (rows like the Explore rows) each listing's buyout price is saved with the horse, the horse is
+  // marked For Sale, and a price change adds a line to its asking-price history. On the New sale form, pressing the
+  // button that creates the listing saves the horse and the prices typed in the form.
+  function lifeForRow(state, outer, idx) {
+    var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
+    if (!link) return '';
+    var tm = /\/market\/trade\/(\d+)/.exec(link.getAttribute('href') || '');
+    var trades = state.marketTrades || {};
+    var name = (link.textContent || '').replace(/\s+/g, ' ').trim();
+    var life = (tm && trades[tm[1]]) || '';
+    if (!life) { var nm = /(?:^|\D)(\d{8})(?:\D|$)/.exec(name); if (nm && state.horseInfo && state.horseInfo[nm[1]]) life = nm[1]; }
+    if (!life) {
+      var tries = [name, name.split(/\s*[\/|]\s*/)[0], name.split(/\s+-\s+/)[0]];
+      for (var t = 0; t < tries.length && !life; t++) {
+        var hits = (idx[normName(tries[t])] || []);
+        if (hits.length === 1) life = hits[0];
+      }
+    }
+    return life;
+  }
+  function scrapeMySales() {
+    if (!(window.__HR_TEST__ && window.__HR_TEST_SALES__) && (!/\/market\/office\/my-sales/.test(location.pathname) || /\/(create|edit)/.test(location.pathname))) return;
+    var outers = document.querySelectorAll('.market-office-table-row-outer');
+    if (!outers.length) return;
+    HRStorage.getState(function (state) {
+      var idx = {};
+      Object.keys(state.horseInfo || {}).forEach(function (l) { var i = state.horseInfo[l]; if (String(i.ownerName || '').trim().toLowerCase() === String((state.settings && state.settings.myUsername) || '').trim().toLowerCase()) { var n = normName(i.name); if (n.length >= 3) (idx[n] = idx[n] || []).push(l); } });
+      var changed = 0, names = [];
+      outers.forEach(function (outer) {
+        var life = lifeForRow(state, outer, idx);
+        if (!life) return;
+        var ab = outer.querySelector('.market-office-table-row-autobuy');
+        var buyout = ab && !/n\/a/i.test(ab.textContent || '') ? parseInt(String(ab.textContent || '').replace(/[^0-9]/g, ''), 10) || 0 : 0;
+        if (HRLib.recordAsk(state, life, { buyout: buyout })) { changed++; names.push((state.horseInfo[life] && state.horseInfo[life].name) || ('#' + life)); }
+      });
+      if (!changed) return;
+      HRStorage.setState(state, function () { showToast('HR Ledger: ' + changed + ' sale listing' + (changed === 1 ? '' : 's') + ' updated in the ledger'); });
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!(window.__HR_TEST__ && window.__HR_TEST_SALES__) && !/\/market\/office\/my-sales\/horses\/create|\/market\/office\/my-sales\/.*\/edit/.test(location.pathname)) return;
+    var b = e.target && e.target.closest ? e.target.closest('button,input[type=submit],.btn') : null;
+    if (!b) return;
+    var label = String(b.textContent || b.value || '').toLowerCase();
+    if (/cancel|back|delete|remove/.test(label)) return;
+    var scope = b.closest('form') || document, life = '', buyout = 0, bid = 0, any = 0;
+    scope.querySelectorAll('input,select').forEach(function (el) {
+      var nm = String(el.name || el.id || '').toLowerCase();
+      if (/horse/.test(nm)) { var v = String(el.value || '').match(/\d{6,}/); if (v) life = v[0]; }
+      var n = parseInt(String(el.value || '').replace(/[^0-9]/g, ''), 10) || 0;
+      if (!n || el.type === 'hidden' || el.type === 'checkbox') return;
+      if (/autobuy|buyout|buy_out|buy-out/.test(nm)) buyout = n;
+      else if (/start|bid|minimum|min_price/.test(nm)) bid = n;
+      else if (/price/.test(nm) && !buyout) buyout = n;
+      if (n) any++;
+    });
+    if (!life) { var um = /horses?\/(\d{6,})|[?&]horse[_a-z]*=(\d{6,})/.exec(location.href); if (um) life = um[1] || um[2]; }
+    if (!life || !(buyout || bid)) return;
+    HRStorage.getState(function (state) {
+      if (HRLib.recordAsk(state, life, { buyout: buyout, bid: bid })) HRStorage.setState(state, function () { showToast('HR Ledger: marked For Sale, asking ' + (buyout || bid).toLocaleString('en-US')); });
+    });
+  }, true);
+  var salesTimers = [];
+  function scheduleSales() {
+    salesTimers.forEach(clearTimeout);
+    salesTimers = [1500, 4000].map(function (ms) { return setTimeout(scrapeMySales, ms); });
+  }
+
   // ---- your offers: a $ on listings you bid on, an X when you have been outbid ----
   // The ledger notes an offer when you press a Bid / Offer button on a listing page (with the amount in the box), and
   // reads the listing page's own wording ("outbid", "you are the highest bidder"). On the Explore pages a listing you
@@ -1324,7 +1395,7 @@
   }
   // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
   // save. The rows are refreshed on load and when the tab is shown again.)
-  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus };
+  if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket, scanTradeStatus: scanTradeStatus, scrapeMySales: scrapeMySales };
 
   // ---- fit summary on a horse's page ----
   // A small card in the corner of a Horse Reality horse page saying whether the horse fits your criteria and why
@@ -1618,6 +1689,9 @@
       info.statusPills = pills;
       info.statusPillsAt = Date.now();
       lastPillSig = sig;
+      // your own horse showing a Retired pill: mark it Retired in the ledger
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      if (me && String(info.ownerName || '').trim().toLowerCase() === me && pills.some(function (p) { return p.indexOf('retire') > -1; })) HRLib.recordRetired(state, id);
       HRStorage.setState(state);
     });
   }
@@ -2118,6 +2192,7 @@
     scheduleFit();
     scheduleMarket();
     scheduleBidScan();
+    scheduleSales();
     scrapeTradePage();
     var refTrade = parseHorseIdFromUrl() && /\/market\/trade\/(\d+)/.exec(document.referrer || '');
     if (refTrade) rememberTrade(refTrade[1], parseHorseIdFromUrl());

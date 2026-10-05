@@ -3312,18 +3312,22 @@
       }
     };
 
-    // <details> toggle events don't bubble, so listen in the capture phase.
-    app.addEventListener('input', function (e) {
-      if (e.target && e.target.id === 'list-filter') {
-        listFilterText = e.target.value;
-        applyListFilter();
-      }
-    });
-    app.addEventListener('toggle', function (e) {
-      if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
-      if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
-      if (e.target && e.target.classList && e.target.classList.contains('buy-panel')) buyOpen = e.target.open;
-    }, true);
+    // <details> toggle events don't bubble, so listen in the capture phase. wireEvents() runs on every redraw, so these
+    // are added only once (adding them each time piled up thousands of listeners and leaked memory).
+    if (!app.getAttribute('data-wired')) {
+      app.setAttribute('data-wired', '1');
+      app.addEventListener('input', function (e) {
+        if (e.target && e.target.id === 'list-filter') {
+          listFilterText = e.target.value;
+          applyListFilter();
+        }
+      });
+      app.addEventListener('toggle', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
+        if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
+        if (e.target && e.target.classList && e.target.classList.contains('buy-panel')) buyOpen = e.target.open;
+      }, true);
+    }
 
     app.onchange = function (e) {
       if (e.target.id === 'restore-file-input') {
@@ -3546,14 +3550,20 @@
   });
 
   // Live-update if a content script writes new data while this tab is open.
+  var liveTimer = null, liveState = null;
   chrome.storage.onChanged.addListener(function (changes, area) {
     if (area !== 'local' || !changes.hrLedger) return;
-    state = changes.hrLedger.newValue || HRStorage.defaultState();
-    if (!state.breedings) state.breedings = {};
-    if (!state.horseInfo) state.horseInfo = {};
-    if (!state.horseMeta) state.horseMeta = {};
-    if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
-    recompute();
-    render();
+    liveState = changes.hrLedger.newValue || HRStorage.defaultState();
+    // Pages writing several times in a row are folded into one redraw
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(function () {
+      state = liveState; liveState = null;
+      if (!state.breedings) state.breedings = {};
+      if (!state.horseInfo) state.horseInfo = {};
+      if (!state.horseMeta) state.horseMeta = {};
+      if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+      recompute();
+      render();
+    }, 400);
   });
 })();

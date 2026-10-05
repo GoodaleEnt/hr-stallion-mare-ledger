@@ -1232,13 +1232,8 @@
     marketTimers.forEach(clearTimeout);
     marketTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(highlightMarket, ms); });
   }
-  try {
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area !== 'local' || !changes.hrLedger || !storageAlive() || !/\/market\//.test(location.pathname)) return;
-      clearTimeout(marketDebounce);
-      marketDebounce = setTimeout(highlightMarket, 2300);
-    });
-  } catch (e) { /* storage events not available */ }
+  // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
+  // save. The rows are refreshed on load and when the tab is shown again.)
   if (typeof window !== 'undefined' && window.__HR_TEST__) window.__hrMarket = { highlightMarket: highlightMarket };
 
   // ---- fit summary on a horse's page ----
@@ -1300,13 +1295,12 @@
     fitTimers.forEach(clearTimeout);
     fitTimers = [1500, 4000, 9000, 16000].map(function (ms) { return setTimeout(renderFitBanner, ms); });
   }
-  try {
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area !== 'local' || !changes.hrLedger || !storageAlive() || !document.getElementById('hr-fit-banner')) return;
-      clearTimeout(fitDebounce);
-      fitDebounce = setTimeout(renderFitBanner, 2300); // after the storage layer's 2 s cache has expired
-    });
-  } catch (e) { /* storage events not available */ }
+  // Refresh when you come back to this tab (for example after changing a setting in the dashboard)
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible' || !storageAlive()) return;
+    clearTimeout(fitDebounce);
+    fitDebounce = setTimeout(function () { renderFitBanner(); highlightMarket(); }, 2300);
+  });
 
   // ---- conformation show results page ----
   // A show's results page lists every horse in each category (Foals / Mares / Stallions / Geldings) with its rank and
@@ -1540,9 +1534,12 @@
 
   // The Breed page's mare dropdown: mares you have covered, or that are in foal, say so in the list.
   // The option's own text is kept in data-hr-name; the page only reads the option's value.
+  var lastAnnotateAt = 0;
   function annotateBreedDropdown() {
     var select = document.getElementById('secondhorse');
     if (!select) return;
+    if (Date.now() - lastAnnotateAt < 4000) return;
+    lastAnnotateAt = Date.now();
     HRStorage.getState(function (state) {
       for (var i = 0; i < select.options.length; i++) {
         var opt = select.options[i];

@@ -1477,7 +1477,7 @@
   function fitSummary(state, life) {
     life = String(life || '');
     var info = state.horseInfo && state.horseInfo[life];
-    var out = { life: life, name: (info && info.name) || '', verdict: 'unknown', headline: '', lines: [] };
+    var out = { life: life, name: (info && info.name) || '', verdict: 'unknown', headline: '', lines: [], counts: { total: 0, matched: 0, missing: [], unknown: 0 }, benefit: '' };
     if (!info) { out.headline = 'Not saved in the ledger yet'; out.lines.push({ ok: null, text: 'The ledger saves a horse when its page has loaded. This summary appears a moment later.' }); return out; }
     var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var buying = !!me && String(info.ownerName || '').trim().toLowerCase() !== me && !!String(info.ownerName || '').trim();
@@ -1489,14 +1489,14 @@
       if (x.text === 'no goal') return;
       if (x.skip) { out.lines.push({ ok: null, text: x.label + ': ' + x.text }); return; }
       criteria++;
-      if (x.state === 'ok') out.lines.push({ ok: true, text: x.label + ': ' + x.text });
-      else if (x.state === 'bad') { out.lines.push({ ok: false, text: x.label + ': ' + x.text }); misses.push(x.label); }
-      else out.lines.push({ ok: null, text: x.label + ': not known yet' });
+      if (x.state === 'ok') { out.lines.push({ ok: true, text: x.label + ': ' + x.text }); out.counts.total++; out.counts.matched++; }
+      else if (x.state === 'bad') { out.lines.push({ ok: false, text: x.label + ': ' + x.text }); misses.push(x.label); out.counts.total++; out.counts.missing.push(x.label); }
+      else { out.lines.push({ ok: null, text: x.label + ': not known yet' }); out.counts.unknown++; }
     });
     // genes
     var genes = preferredGenesOf(state, life), badGenes = [], goodGenes = [];
     genes.forEach(function (g) {
-      if (g.level === 'avoid') { badGenes.push(g.name); out.lines.push({ ok: false, text: 'Carries ' + g.name + ', a gene you don\'t want' }); }
+      if (g.level === 'avoid') { badGenes.push(g.name); out.counts.total++; out.counts.missing.push(g.name + ' (unwanted)'); out.lines.push({ ok: false, text: 'Carries ' + g.name + ', a gene you don\'t want' }); }
       else { goodGenes.push(g.name); out.lines.push({ ok: true, text: 'Carries ' + g.name + ', a gene you ' + (g.level === 'keep' ? 'want to keep' : 'prefer') }); }
     });
     var pm = preferenceMap(state, info.breed);
@@ -1518,6 +1518,7 @@
     if (buying) {
       if (crit.maxPrice) out.lines.push({ ok: null, text: 'Your limit for this breed: ' + fmtMoney(crit.maxPrice) + ' HRC' });
       benefit = herdBenefit(state, life);
+      out.benefit = benefit.verdict;
       benefit.lines.forEach(function (l) { out.lines.push(l); });
     }
     var total = misses.length + badGenes.length;

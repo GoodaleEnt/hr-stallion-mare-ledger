@@ -210,9 +210,15 @@ The **Purchase criteria** panel (under My notes, near the top of the dashboard) 
 
 ## Market board colours
 
-On the market's **Explore** pages, a listing whose horse the ledger has already saved gets its row colour changed: **green** if the horse would lift your herd, **red** if it would not. Hover the row to see why (the first few reasons from the herd comparison). A row with no colour is a horse the ledger doesn't know or can't compare (fewer than 3 of your horses of that breed are saved, or its genetic potential and scores are not known yet).
+On the market's **Explore** pages, a listing whose horse the ledger has already saved gets its row coloured, with a bar down the left edge in the same colour:
 
-The comparison is the "would it help your herd" check from the fit summary: the horse's genetic potential, top conformation and Breed Total against your own horses of the same breed, and whether it is strong in the traits your herd is weakest in. It lifts the herd when it beats your median in at least two of these and falls below it in none (green also covers one where it is ahead on balance); otherwise it is red.
+- **Gold:** the horse would lift your herd **and** fits all of your criteria.
+- **Green fading to another colour:** the horse would lift your herd but misses some criteria. The row runs from green on the left to a colour on the right that shows how many criteria it meets: **red** for none, **orange** for about half, and getting closer to **gold** as it meets more.
+- **Red:** the horse would not lift your herd.
+
+Hover a row for the reason: for example "would lift your herd; fits 2 of 3 criteria (missing Conformation)" followed by the first few comparison lines. A row with no colour is a horse the ledger does not know, or cannot compare yet (fewer than 3 of your horses of that breed are saved, or its scores are not known).
+
+**Lifting the herd** is the "would it help my herd" check: the horse's genetic potential, top conformation and Breed Total against your own horses of the same breed, and whether it is strong in the traits your herd is weakest in. **Your criteria** are your purchase criteria for that breed (or your goals if you have not set any), the traits it must be Good or better in, and any unwanted gene it carries; a score the ledger does not know yet is not counted for or against it.
 
 The market page doesn't give a horse's life number, so the ledger finds the horse in three ways: a listing you have opened before (the ledger remembers which horse it was), a life number written in the horse's name, or an exact name, breed and sex that only one saved horse has (a name followed by "/score" or "| tags" is matched on the part before it). Horses that are yours are not coloured. A checkbox at the bottom of the **My notes** panel turns the colours off.
 

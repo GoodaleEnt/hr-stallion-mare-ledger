@@ -1200,7 +1200,8 @@
       }
       outers.forEach(function (outer) {
         var row = outer.querySelector('.market-office-table-row') || outer;
-        row.style.backgroundColor = '';
+        row.style.background = '';
+        row.style.boxShadow = '';
         row.removeAttribute('data-hr-fit');
         if (off) return;
         var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
@@ -1222,9 +1223,31 @@
         var b = HRLib.herdBenefit(state, life);
         if (b.verdict === 'unknown') return;
         var good = b.verdict === 'helps' || b.verdict === 'maybe';
-        row.style.backgroundColor = good ? 'rgba(76,122,82,0.28)' : 'rgba(156,74,59,0.28)';
-        row.setAttribute('data-hr-fit', good ? 'lifts' : 'no');
-        row.title = 'HR Ledger: ' + (good ? 'would lift your herd' : 'would not lift your herd') + '\n' + b.lines.slice(0, 4).map(function (l) { return (l.ok === true ? '\u2713 ' : l.ok === false ? '\u2717 ' : '\u2022 ') + l.text; }).join('\n');
+        var counts = HRLib.fitSummary(state, life).counts;
+        var judged = counts.total > 0;
+        var frac = judged ? counts.matched / counts.total : 1;
+        var allMet = judged && counts.matched === counts.total;
+        function rgb(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+        function mix(a, b2, t) { return [Math.round(a[0] + (b2[0] - a[0]) * t), Math.round(a[1] + (b2[1] - a[1]) * t), Math.round(a[2] + (b2[2] - a[2]) * t)]; }
+        var GREEN = [34, 160, 84], RED = [204, 48, 40], ORANGE = [236, 140, 30], GOLD = [255, 196, 0];
+        // none of the criteria = red, about half = orange, all of them = gold
+        function matchColour(f) { return f < 0.5 ? mix(RED, ORANGE, f / 0.5) : mix(ORANGE, GOLD, (f - 0.5) / 0.5); }
+        var state2, bar;
+        if (good && allMet) {
+          state2 = 'gold'; bar = GOLD;
+          row.style.background = rgb(GOLD, 0.7);
+        } else if (good) {
+          state2 = 'lifts'; var mc = matchColour(frac); bar = mc;
+          row.style.background = 'linear-gradient(90deg,' + rgb(GREEN, 0.7) + ' 0%,' + rgb(GREEN, 0.7) + ' 30%,' + rgb(mc, 0.7) + ' 100%)';
+        } else {
+          state2 = 'no'; bar = RED;
+          row.style.background = rgb(RED, 0.6);
+        }
+        row.style.boxShadow = 'inset 8px 0 0 ' + rgb(bar, 1);
+        row.setAttribute('data-hr-fit', state2);
+        var head = state2 === 'gold' ? 'would lift your herd and fits all ' + counts.total + ' of your criteria' :
+          good ? 'would lift your herd; fits ' + counts.matched + ' of ' + counts.total + ' criteria' + (counts.missing.length ? ' (missing ' + counts.missing.slice(0, 3).join(', ') + ')' : '') : 'would not lift your herd';
+        row.title = 'HR Ledger: ' + head + '\n' + b.lines.slice(0, 4).map(function (l) { return (l.ok === true ? '\u2713 ' : l.ok === false ? '\u2717 ' : '\u2022 ') + l.text; }).join('\n');
       });
     });
   }

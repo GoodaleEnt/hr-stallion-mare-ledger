@@ -466,7 +466,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
+    html += preferredGeneTagHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -906,7 +906,7 @@
         var breedMisses = breedSt.status ? L.goalMisses(state, m.mareLifeNumber) : [];
         html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + (breedMisses.length ? ' mare-below' : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
           mareBreedBadgeHtml(breedSt, breedMisses) +
-          goalStripHtml(m.mareLifeNumber) + improverTagHtml(m.mareLifeNumber) +
+          goalStripHtml(m.mareLifeNumber) + improverTagHtml(m.mareLifeNumber) + preferredGeneTagHtml(m.mareLifeNumber) +
           (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
@@ -1142,7 +1142,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
+    html += preferredGeneTagHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -2190,6 +2190,7 @@
         '<p class="notes-line">' + uniq.map(function (g) { return ancestorLabel(g.life); }).join(' · ') + '</p></div>';
     }
 
+    html += preferredChancesHtml(calcStallion, calcMare);
     html += colourSectionHtml(calcStallion, calcMare);
     return html;
   }
@@ -2367,7 +2368,35 @@
         return '<div class="an-tip info" style="margin-top:4px;"><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(h.life) + '">' + L.esc(h.name) + '</button>: ' + L.esc(h.rules.understood.join('; ')) + '</div>';
       }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
     }
+    html += preferredGenesHtml();
     return html + '</details>';
+  }
+  // Genes you want to keep: a level for each (no preference / prefer / keep).
+  function preferredGenesHtml() {
+    var pm = L.preferenceMap(state), count = Object.keys(pm).length;
+    return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Preferred genetics' + (count ? ' (' + count + ' chosen)' : '') + '</strong>' +
+      '<p class="notes-line" style="margin:4px 0 8px;"><strong>Prefer</strong>: a horse with the gene is less likely to be suggested for sale, and a pairing that could give a foal the gene ranks higher. <strong>Keep</strong>: a horse with the gene is never suggested for sale, and pairings ranked higher still. Needs the horse\'s colours tested (or entered under Extra genes).</p>' +
+      '<div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' + L.preferLoci().map(function (l) {
+        var cur = pm[l.id] || '';
+        return '<div class="field"><label for="pg-' + l.id + '">' + L.esc(l.name) + '</label><select id="pg-' + l.id + '" data-action="update-prefer-gene" data-gene="' + l.id + '">' +
+          '<option value=""' + (cur ? '' : ' selected') + '>No preference</option><option value="prefer"' + (cur === 'prefer' ? ' selected' : '') + '>Prefer</option><option value="keep"' + (cur === 'keep' ? ' selected' : '') + '>Keep</option></select></div>';
+      }).join('') + '</div></div>';
+  }
+  function preferredChancesHtml(aLife, bLife) {
+    var ch = L.foalPreferredChances(state, aLife, bLife);
+    if (!ch.length) return '';
+    return '<div class="card" style="padding:12px 16px;margin-bottom:14px;"><strong>Your preferred genes</strong>' + ch.map(function (c) {
+      return '<div style="display:grid;grid-template-columns:150px 1fr 56px;gap:10px;align-items:center;padding:3px 0;font-size:13.5px;"><span>' + L.esc(c.name) + ' <span class="sub">(' + (c.level === 'keep' ? 'keep' : 'prefer') + ')</span></span>' +
+        '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.round(c.p * 100) + '%;background:var(--accent);"></span></span><span class="mono">' + Math.round(c.p * 100) + '%</span></div>';
+    }).join('') + '<p class="notes-line" style="margin:6px 0 0;">The chance the foal has at least one copy. A gene neither parent is tested for counts as not there.</p></div>';
+  }
+  // A star tag for a horse that carries a gene you prefer.
+  function preferredGeneTagHtml(life) {
+    var g = L.preferredGenesOf(state, life);
+    if (!g.length) return '';
+    return '<div style="margin:0 0 6px;">' + g.map(function (x) {
+      return '<span class="tag" style="margin-right:6px;color:var(--accent-strong);border-color:var(--accent-strong);" title="A gene you ' + (x.level === 'keep' ? 'want to keep' : 'prefer') + '">\u2726 ' + L.esc(x.name) + '</span>';
+    }).join('') + '</div>';
   }
   // Advice for the goal set(s) in use: one list, or (with separate goals) the mare and stallion lists together.
   function goalAdviceAll() {
@@ -2839,7 +2868,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
+    html += preferredGeneTagHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
@@ -3236,6 +3265,13 @@
         state.settings.goalsSplit = !!t.checked;
         state.settings.goalsUpdatedAt = Date.now();
         goalsOpen = true;
+        persist();
+      }
+      else if (action === 'update-prefer-gene') {
+        var pgm = Object.assign({}, state.settings.preferGenes);
+        if (t.value) pgm[t.getAttribute('data-gene')] = t.value; else delete pgm[t.getAttribute('data-gene')];
+        state.settings.preferGenes = pgm;
+        notesOpen = true;
         persist();
       }
       else if (action === 'update-overall-notes') {

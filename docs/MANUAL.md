@@ -39,6 +39,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 31. [Troubleshooting](#troubleshooting)
 32. [Notes the suggestions use](#notes-the-suggestions-use)
 33. [Mares that out-produce themselves](#mares-that-out-produce-themselves)
+34. [Preferred genetics](#preferred-genetics)
 
 ## Installing
 
@@ -185,6 +186,15 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 ## Separate goals for mares and stallions
 
 In **Highlight goals**, tick **Separate goals for mares & fillies and for stallions & colts** if the two should have different goals. Two buttons then appear: **Mares & fillies** and **Stallions & colts**. Click one to edit that set; a line under them says which set you are editing. Each horse's goal boxes, the "fit your goals" counts, the outlines, Analytics and the goal suggestions then use the goals for its own sex. The foal partner suggestions count a foal as fitting if it would fit either set. Un-tick the box to go back to one set for everyone; your two sets are kept if you tick it again. Saved goal sets keep the whole arrangement.
+
+## Preferred genetics
+
+To give more weight to keeping certain genes in your herd, open the **My notes** panel (under Highlight goals) and choose a level for each gene under **Preferred genetics**: **No preference**, **Prefer** or **Keep**. The genes offered are the colour genes the ledger knows (Cream, Dun, Grey, Leopard complex, PATN1, Splashed white, W20, Sooty, Flaxen, Silver, Champagne, Roan, Tobiano, Sabino); Extension and Agouti are base colours and are left out.
+
+- **A horse with the gene** (one copy is enough, from Horse Reality's test or from genes you entered under Extra genes) gets a **✦** tag with the gene's name on its card and page. Untested counts as not there.
+- **Sell ideas:** with **Prefer**, the horse is less likely to be suggested for sale (its score drops and the reason says it carries a gene you prefer). With **Keep**, it is never suggested for sale and is listed under "Kept off the list because of their record".
+- **Breeding suggestions, the Foal Calculator's suggested partners and the pairing ideas on Analytics:** a pairing that could give a foal the gene ranks higher, more so for **Keep** than **Prefer**, and the reason says the chance (for example "Foal has a 50% chance of Leopard complex").
+- **Foal Calculator:** a **Your preferred genes** card shows the chance, for the pair you picked, that the foal has each preferred gene.
 
 ## Notes the suggestions use
 

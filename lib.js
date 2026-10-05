@@ -1051,7 +1051,9 @@
       if (hist.foals || hist.failed) reasons.push('Bred together before: ' + (hist.foals ? hist.foals + ' foal' + (hist.foals === 1 ? '' : 's') + (hist.bestScore ? ' (best score ' + hist.bestScore + ')' : '') : '') + (hist.foals && hist.failed ? ', ' : '') + (hist.failed ? hist.failed + ' failed covering' + (hist.failed === 1 ? '' : 's') : ''));
       if (maxFeeNote && !yours && terms && (terms.currency || 'HRC') === 'HRC' && terms.fee > maxFeeNote) { out.byNotes++; return; }
       if (noteFx.reason) reasons.push(noteFx.reason);
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + noteFx.bonus;
+      var geneFx = preferredGeneBonus(state, mareLife, life);
+      geneFx.reasons.forEach(function (r) { reasons.push(r); });
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + noteFx.bonus + geneFx.bonus;
       list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -1357,6 +1359,61 @@
     if (p.price && p.currency !== sa.currency) return null;
     if (p.shipping && p.shippingCurrency !== sa.currency) return null;
     return { cost: cost, profit: sa.price - cost, currency: sa.currency };
+  }
+
+  // ---------- preferred genetics ----------
+  // Genes you want to keep in the herd: state.settings.preferGenes = { LP: 'prefer' | 'keep', ... }.
+  // A horse "has" a gene if it has at least one copy of the gene's interesting allele (the dominant one, or the
+  // recessive one for flaxen), from Horse Reality's test or from genes entered by hand. Untested counts as not there.
+  // Extension and Agouti are base colours and are not offered. Used by sell ideas (keep, or less likely to be
+  // suggested), the partner suggestions (a foal that is likely to carry it ranks higher) and the Foal Calculator.
+  function interestingAllele(l) { return l.recessive ? l.alleles[1] : l.alleles[0]; }
+  function preferLoci() { return ALL_LOCI.filter(function (l) { return l.id !== 'E' && l.id !== 'A'; }); }
+  function preferenceMap(state) {
+    var pg = (state && state.settings && state.settings.preferGenes) || {};
+    var out = {};
+    preferLoci().forEach(function (l) { if (pg[l.id] === 'prefer' || pg[l.id] === 'keep') out[l.id] = pg[l.id]; });
+    return out;
+  }
+  function horseGenotype(state, life) {
+    var info = state.horseInfo && state.horseInfo[life];
+    var man = manualGenes(state, life);
+    var g = Object.assign({}, man, parseColourGenes(info && info.testedColours));
+    return g;
+  }
+  // The preferred genes this horse has: [{ id, name, level }]
+  function preferredGenesOf(state, life) {
+    var pm = preferenceMap(state), g = horseGenotype(state, life), out = [];
+    preferLoci().forEach(function (l) {
+      if (!pm[l.id] || !g[l.id]) return;
+      if (g[l.id].indexOf(interestingAllele(l)) > -1) out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')), level: pm[l.id] });
+    });
+    return out;
+  }
+  // Chance that a foal of a x b has each preferred gene: [{ id, name, level, p }] (p 0 to 1)
+  function foalPreferredChances(state, aLife, bLife) {
+    var pm = preferenceMap(state);
+    if (!Object.keys(pm).length) return [];
+    var a = state.horseInfo[aLife] || {}, b = state.horseInfo[bLife] || {};
+    var res = colourOutcomes(a.testedColours, b.testedColours, manualGenes(state, aLife), manualGenes(state, bLife));
+    var out = [];
+    preferLoci().forEach(function (l) {
+      if (!pm[l.id]) return;
+      var gene = res.genes.find(function (g) { return g.id === l.id; });
+      var p = 0, allele = interestingAllele(l);
+      if (gene) gene.outcomes.forEach(function (o) { if (o.genotype.split(' / ').indexOf(allele) > -1) p += o.pct / 100; });
+      out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')), level: pm[l.id], p: p });
+    });
+    return out;
+  }
+  // Score bonus and reasons for a pairing from the preferred genes a foal could get
+  function preferredGeneBonus(state, aLife, bLife) {
+    var chances = foalPreferredChances(state, aLife, bLife), bonus = 0, reasons = [];
+    chances.forEach(function (c) {
+      bonus += (c.level === 'keep' ? 3 : 1.5) * c.p;
+      if (c.p >= 0.25) reasons.push('Foal has a ' + Math.round(c.p * 100) + '% chance of ' + c.name + ' (a gene you ' + (c.level === 'keep' ? 'want to keep' : 'prefer') + ')');
+    });
+    return { bonus: Math.round(bonus * 100) / 100, reasons: reasons };
   }
 
   // ---------- mares that out-produce themselves ----------
@@ -1700,7 +1757,9 @@
       if (myMet && otherMet) reasons.push('Both parents meet your goals');
       if (isMare && !mine) { var terms = studTermsOf(state, cl); if (terms) reasons.push('Cost: ' + terms.summary); }
       if (noteFx.reason) reasons.push(noteFx.reason);
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus;
+      var geneFx2 = preferredGeneBonus(state, life, cl);
+      geneFx2.reasons.forEach(function (r) { reasons.push(r); });
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus + geneFx2.bonus;
       list.push({ life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -2096,6 +2155,11 @@
         if (sr.improver) heldWhy = 'his foals beat their dams by ' + sr.avgDelta + ' on average';
         else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { score += 2; reasons.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', ' + Math.abs(sr.avgDelta) + ' below their dams'); }
       }
+      // genes you want to keep
+      var keepGenes = preferredGenesOf(state, x.life);
+      var hardGene = keepGenes.filter(function (g) { return g.level === 'keep'; });
+      if (!heldWhy && hardGene.length) heldWhy = 'carries ' + hardGene.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep';
+      else if (!heldWhy && keepGenes.length) { score -= 2; reasons.push('Carries ' + keepGenes.map(function (g) { return g.name; }).join(', ') + ' (a gene you prefer), so less likely to sell'); }
       if (heldWhy && !noteRules.sell) { held.push({ life: x.life, name: x.name, why: heldWhy, kind: 'record' }); return; }
       var med = groupStats[x.sex].med, lowCut = groupStats[x.sex].lowCut, gname = GROUP_NAME[x.sex];
       var misses = goalsOn ? goalMisses(state, x.life) : [];
@@ -2318,7 +2382,7 @@
             else if (b === 0 && a >= 2) fixes.push({ trait: t, from: 'mare' });
           });
         }
-        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + pairFx.bonus;
+        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + pairFx.bonus + preferredGeneBonus(state, m.life, s.lifeNumber).bonus;
         pairs.push({
           mare: m.name, stallion: s.name, mareLife: m.life, stallionLife: s.lifeNumber, gp: Math.round(gp * 10) / 10,
           conf: conf != null ? Math.round(conf * 10) / 10 : null,
@@ -2377,6 +2441,10 @@
     sellIdeas: sellIdeas,
     pairIdeas: pairIdeas,
     producerRecord: producerRecord,
+    preferLoci: preferLoci,
+    preferenceMap: preferenceMap,
+    preferredGenesOf: preferredGenesOf,
+    foalPreferredChances: foalPreferredChances,
     sireRecord: sireRecord,
     damImprover: damImprover,
     improverMares: improverMares,

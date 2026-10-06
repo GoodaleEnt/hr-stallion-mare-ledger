@@ -1562,27 +1562,21 @@
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];
         if (!a) return;
-        var host = li.querySelector('.content-wrapper .text') || li.querySelector('.content-wrapper') || li;
+        // a badge in the top-left corner of the card, over the picture
+        var host = li.querySelector('.content') || li;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
         var box = document.createElement('div');
         box.setAttribute('data-hr-advice', '1');
-        box.style.cssText = 'margin-top:4px;font:600 12px/1.45 system-ui,sans-serif;';
+        box.style.cssText = 'position:absolute;top:6px;left:6px;z-index:5;max-width:80%;font:700 12px/1.4 system-ui,sans-serif;pointer-events:auto;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
-        var tag = document.createElement('span');
-        tag.textContent = a.label;
-        tag.style.cssText = 'display:inline-block;padding:0 7px;border-radius:9px;color:#fff;background:' + COL[a.action] + ';margin-right:5px;';
-        box.appendChild(tag);
-        if (a.price && (a.action === 'sell' || a.action === 'consider')) {
-          var pr = document.createElement('span');
-          pr.textContent = '~' + a.price.toLocaleString('en-US');
-          pr.style.cssText = 'color:#46592C;margin-right:5px;';
-          box.appendChild(pr);
+        function pill(text, bg) {
+          var d = document.createElement('div');
+          d.textContent = text;
+          d.style.cssText = 'display:block;width:fit-content;margin-bottom:3px;padding:1px 8px;border-radius:10px;color:#fff;background:' + bg + ';box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;';
+          box.appendChild(d);
         }
-        if (a.best) {
-          var bl = document.createElement('div');
-          bl.style.cssText = 'margin-top:2px;color:#2E3B1F;';
-          bl.textContent = '→ ' + a.best.name + (a.best.estBT != null ? ' · BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : '');
-          box.appendChild(bl);
-        }
+        pill(a.label + (a.price && (a.action === 'sell' || a.action === 'consider') ? ' · ~' + a.price.toLocaleString('en-US') : ''), COL[a.action]);
+        if (a.best) pill('→ ' + a.best.name + (a.best.estBT != null ? ' · BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
         host.appendChild(box);
       });
     });

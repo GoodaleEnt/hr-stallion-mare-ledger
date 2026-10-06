@@ -1320,15 +1320,17 @@
     });
     var out = {};
     herd.forEach(function (x) {
-      var level = null;
+      var level = null, rankLevel = null;
+      if (x.pct != null) {
+        rankLevel = x.pct >= 0.8 ? 5 : x.pct >= 0.5 ? 4 : x.pct >= 0.3 ? 3 : x.pct >= 0.12 ? 2 : 1;
+        if (x.flags.met && rankLevel < 3) rankLevel = 3;
+        if ((x.hard || 0) >= 2 && rankLevel > 2 && x.pct < 0.5) rankLevel = 2;
+      }
       if (x.flags.sell) level = 1;
       else if (x.flags.core) level = 5;
-      else if (x.pct != null) {
-        level = x.pct >= 0.8 ? 5 : x.pct >= 0.5 ? 4 : x.pct >= 0.3 ? 3 : x.pct >= 0.12 ? 2 : 1;
-        if (x.flags.met && level < 3) level = 3;
-        if ((x.hard || 0) >= 2 && level > 2 && x.pct < 0.5) level = 2;
-      }
-      out[x.life] = { level: level, label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
+      else level = rankLevel;
+      var prot = !!x.flags.core && !x.flags.sell;
+      out[x.life] = { level: level, rankLevel: rankLevel, protectedHorse: prot, label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
     });
     return out;
   }
@@ -1342,7 +1344,8 @@
       var info = state.horseInfo && state.horseInfo[l], meta = (state.horseMeta && state.horseMeta[l]) || {}, r = rk[l];
       if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) return;
       if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased' || meta.status === 'Companion') return;
-      var a = { action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
+      var a = { action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, pips: r ? (r.rankLevel || r.level) : null, protectedHorse: !!(r && r.protectedHorse), label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
+      if (a.protectedHorse && a.level === 5 && a.pips && a.pips < 5) a.reasons.unshift('Protected as a keeper (see below), whatever its rank');
       if (a.rank && a.of) a.reasons.unshift('Ranks ' + a.rank + ' of ' + a.of + ' ' + a.group + ' (1 is the best)');
       if (r && r.level && r.level <= 2 && r.price && r.price.suggested) { a.price = r.price.suggested; a.reasons.push('Suggested asking price about ' + fmtMoney(a.price) + ' HRC'); }
       if (forSaleSet[l] || meta.status === 'For Sale') { a.action = 'forsale'; a.label = 'For sale'; a.reasons.unshift('Listed for sale'); }

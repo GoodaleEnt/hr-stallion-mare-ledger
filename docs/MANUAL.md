@@ -211,11 +211,11 @@ The **Purchase criteria** panel (under My notes, near the top of the dashboard) 
 
 ## Ranch page cards: keep or sell, and the best stallion
 
-On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a badge in the **top-left corner of the picture** showing where the horse sits between keeping and selling, compared with the rest of your herd:
+On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a badge **just under the picture** (above the name) showing where the horse sits between keeping and selling, compared with the rest of your herd:
 
 - **Level tag and five pips:** **Top keeper** (dark green, 5 pips), **Keep** (green), **Middle of the herd** (olive), **Consider selling** (amber) or **Sell** (red, 1 pip), with the horse's **rank** in its group (for example 12/60). A selling level also shows the asking price the ledger would use; a mare also shows **in foal** or **covered**; a listed horse shows **For sale**.
 - **Who it is ranked against:** the same breed and sex (mares & fillies, or colts & stallions), or all breeds of that sex when fewer than 6 of the breed. A group of fewer than 4 shows "Too few to rank".
-- **How it is ranked:** a blend of Breed Total, conformation and genetic potential (and your **breeder focus**, which counts more), pulled down by missed goals and unwanted genes, lifted by meeting every goal. A miss of under 1% on a number goal outside your focus is not counted. Notes, a proven producer record, a gene you keep, a stallion's failed coverings and a mare never bred adjust it. A keep note, a proven producer or a keep gene makes a horse a **Top keeper**; a sell note makes it **Sell**; a horse that meets every goal is never lower than Middle.
+- **How it is ranked:** a blend of Breed Total, conformation and genetic potential (and your **breeder focus**, which counts more), pulled down by missed goals and unwanted genes, lifted by meeting every goal. A miss of under 1% on a number goal outside your focus is not counted. Notes, a proven producer record, a gene you keep, a stallion's failed coverings and a mare never bred adjust it. A keep note, a proven producer or a keep gene makes a horse a **Top keeper** (shown with a ★, and the pips still follow its real rank); a sell note makes it **Sell**; a horse that meets every goal is never lower than Middle.
 - For an adult mare free to breed, an arrow and **the stallion the ledger would pick**, with the foal's estimated Breed Total.
 
 Hover the badge for the rank and every reason. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.

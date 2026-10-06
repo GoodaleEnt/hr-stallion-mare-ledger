@@ -1563,35 +1563,34 @@
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];
         if (!a) return;
-        // a badge in the top-left corner of the card, over the picture
-        var host = li.querySelector('.content') || li;
-        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        // a block between the picture and the name, so it never covers the horse
+        var host = li.querySelector('.content-wrapper') || li.querySelector('.content') || li;
         var box = document.createElement('div');
         box.setAttribute('data-hr-advice', '1');
-        box.style.cssText = 'position:absolute;top:6px;left:6px;z-index:5;max-width:85%;font:700 12px/1.4 system-ui,sans-serif;pointer-events:auto;';
+        box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:5px 6px 0;font:700 12px/1.4 system-ui,sans-serif;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
         function pill(text, bg) {
-          var d = document.createElement('div');
+          var d = document.createElement('span');
           d.textContent = text;
-          d.style.cssText = 'display:block;width:fit-content;margin-bottom:3px;padding:1px 8px;border-radius:10px;color:#fff;background:' + bg + ';box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;';
+          d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;background:' + bg + ';white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;';
           box.appendChild(d);
           return d;
         }
-        var head = pill(a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
-        // five pips: how far up the herd the horse sits (all filled = top keeper, one = sell), with its rank
-        if (a.level) {
-          var bar = document.createElement('div');
-          bar.style.cssText = 'display:flex;align-items:center;gap:2px;margin:0 0 3px;padding:2px 6px;width:fit-content;border-radius:8px;background:rgba(255,255,255,.88);box-shadow:0 1px 4px rgba(0,0,0,.35);';
+        pill((a.protectedHorse && a.level === 5 ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
+        // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
+        if (a.pips) {
+          var bar = document.createElement('span');
+          bar.style.cssText = 'display:inline-flex;align-items:center;gap:2px;';
           for (var i = 1; i <= 5; i++) {
             var pip = document.createElement('span');
-            pip.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:2px;background:' + (i <= a.level ? COL[a.action] || COL.nodata : '#CFD3C8') + ';';
+            pip.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:2px;background:' + (i <= a.pips ? (COL[['', 'sell', 'consider', 'middle', 'keep', 'top'][a.pips]] || COL.nodata) : '#CFD3C8') + ';';
             bar.appendChild(pip);
           }
-          if (a.rank && a.of) { var rk = document.createElement('span'); rk.textContent = a.rank + '/' + a.of; rk.style.cssText = 'margin-left:4px;color:#2E3B1F;font-weight:700;'; bar.appendChild(rk); }
+          if (a.rank && a.of) { var rk = document.createElement('span'); rk.textContent = a.rank + '/' + a.of; rk.style.cssText = 'margin-left:4px;color:#2E3B1F;'; bar.appendChild(rk); }
           box.appendChild(bar);
         }
         if (a.best) pill('\u2192 ' + a.best.name + (a.best.estBT != null ? ' \u00b7 BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
-        host.appendChild(box);
+        host.insertBefore(box, host.firstChild);
       });
     });
   }

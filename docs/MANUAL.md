@@ -211,7 +211,7 @@ The **Purchase criteria** panel (under My notes, near the top of the dashboard) 
 
 ## Ranch page cards: keep or sell, and the best stallion
 
-On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a badge **just under the picture** (above the name) showing where the horse sits between keeping and selling, compared with the rest of your herd:
+On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a badge **under the horse's age** showing where the horse sits between keeping and selling, compared with the rest of your herd:
 
 - **Level tag and five pips:** **Top keeper** (dark green, 5 pips), **Keep** (green), **Middle of the herd** (olive), **Consider selling** (amber) or **Sell** (red, 1 pip), with the horse's **rank** in its group (for example 12/60). A selling level also shows the asking price the ledger would use; a mare also shows **in foal** or **covered**; a listed horse shows **For sale**.
 - **Who it is ranked against:** the same breed and sex (mares & fillies, or colts & stallions), or all breeds of that sex when fewer than 6 of the breed. A group of fewer than 4 shows "Too few to rank".

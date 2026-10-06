@@ -1563,11 +1563,11 @@
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];
         if (!a) return;
-        // a block between the picture and the name, so it never covers the horse
+        // a block under the age line, so it never covers the horse or the name
         var host = li.querySelector('.content-wrapper') || li.querySelector('.content') || li;
         var box = document.createElement('div');
         box.setAttribute('data-hr-advice', '1');
-        box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:6px 6px 10px;margin:0 0 4px;position:relative;z-index:2;clear:both;flex:0 0 auto;font:700 12px/1.4 system-ui,sans-serif;';
+        box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:2px 6px 6px;margin:0;position:relative;z-index:2;clear:both;flex:0 0 auto;font:700 12px/1.4 system-ui,sans-serif;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
         function pill(text, bg) {
           var d = document.createElement('span');
@@ -1590,7 +1590,9 @@
           box.appendChild(bar);
         }
         if (a.best) pill('\u2192 ' + a.best.name + (a.best.estBT != null ? ' \u00b7 BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
-        host.insertBefore(box, host.firstChild);
+        // under the age line: between the name block and the stat icons
+        var info = host.querySelector('.information');
+        if (info && info.parentNode === host) host.insertBefore(box, info); else host.appendChild(box);
       });
     });
   }

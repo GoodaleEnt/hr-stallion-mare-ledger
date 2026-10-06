@@ -1557,7 +1557,8 @@
       });
       var advice;
       try { advice = HRLib.herdAdvice(state, lives); } catch (e) { return; }
-      var COL = { keep: '#1E8449', infoal: '#3A78C2', consider: '#B9770E', sell: '#C0281E', forsale: '#6E7260' };
+      // one colour per level, from a dark green (top keeper) to red (sell)
+      var COL = { top: '#146C3B', keep: '#1E8449', middle: '#7D8A2B', consider: '#B9770E', sell: '#C0281E', forsale: '#6E7260', nodata: '#8A8F85' };
       items.forEach(function (li) {
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];
@@ -1567,16 +1568,29 @@
         if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
         var box = document.createElement('div');
         box.setAttribute('data-hr-advice', '1');
-        box.style.cssText = 'position:absolute;top:6px;left:6px;z-index:5;max-width:80%;font:700 12px/1.4 system-ui,sans-serif;pointer-events:auto;';
+        box.style.cssText = 'position:absolute;top:6px;left:6px;z-index:5;max-width:85%;font:700 12px/1.4 system-ui,sans-serif;pointer-events:auto;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
         function pill(text, bg) {
           var d = document.createElement('div');
           d.textContent = text;
           d.style.cssText = 'display:block;width:fit-content;margin-bottom:3px;padding:1px 8px;border-radius:10px;color:#fff;background:' + bg + ';box-shadow:0 1px 4px rgba(0,0,0,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;';
           box.appendChild(d);
+          return d;
         }
-        pill(a.label + (a.price && (a.action === 'sell' || a.action === 'consider') ? ' · ~' + a.price.toLocaleString('en-US') : ''), COL[a.action]);
-        if (a.best) pill('→ ' + a.best.name + (a.best.estBT != null ? ' · BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
+        var head = pill(a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
+        // five pips: how far up the herd the horse sits (all filled = top keeper, one = sell), with its rank
+        if (a.level) {
+          var bar = document.createElement('div');
+          bar.style.cssText = 'display:flex;align-items:center;gap:2px;margin:0 0 3px;padding:2px 6px;width:fit-content;border-radius:8px;background:rgba(255,255,255,.88);box-shadow:0 1px 4px rgba(0,0,0,.35);';
+          for (var i = 1; i <= 5; i++) {
+            var pip = document.createElement('span');
+            pip.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:2px;background:' + (i <= a.level ? COL[a.action] || COL.nodata : '#CFD3C8') + ';';
+            bar.appendChild(pip);
+          }
+          if (a.rank && a.of) { var rk = document.createElement('span'); rk.textContent = a.rank + '/' + a.of; rk.style.cssText = 'margin-left:4px;color:#2E3B1F;font-weight:700;'; bar.appendChild(rk); }
+          box.appendChild(bar);
+        }
+        if (a.best) pill('\u2192 ' + a.best.name + (a.best.estBT != null ? ' \u00b7 BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
         host.appendChild(box);
       });
     });

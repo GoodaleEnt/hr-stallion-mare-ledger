@@ -2437,12 +2437,24 @@
         return '<div class="an-tip info" style="margin-top:4px;"><button type="button" class="link-btn" data-action="open-passport" data-life="' + L.esc(h.life) + '">' + L.esc(h.name) + '</button>: ' + L.esc(h.rules.understood.join('; ')) + '</div>';
       }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
     }
+    html += breederFocusHtml();
     html += preferredGenesHtml();
     html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-ranch-advice"' + (state.settings.ranchAdvice === false ? '' : ' checked') + '> Show Keep / Sell and the best stallion for each mare on the cards of my Horse Reality ranch page</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-learn"' + (state.settings.learn === false ? '' : ' checked') + '> Let the ledger learn from my foals, sales and bids to improve its breeding and purchase suggestions</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-market-highlight"' + (state.settings.marketHighlight === false ? '' : ' checked') + '> Colour market rows green or red for horses I have looked at (would lift my herd or not)</label>';
     return html + '</details>';
+  }
+  // What kind of breeder you are: horses strong in it are rated a bit higher, weak ones a bit lower
+  function breederFocusHtml() {
+    var f = state.settings.breederFocus || {};
+    return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Breeder focus</strong>' +
+      '<p class="notes-line" style="margin:4px 0 8px;">Tick what you breed for. Horses that are strong in it are less likely to be suggested for sale, rank higher as partners and count more when you look at a horse to buy; a missed goal in that area counts for more, and the ranch page cards weigh it more when placing a horse between keep and sell.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px 16px;">' + L.FOCUS_TYPES.map(function (t) {
+        return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;" title="' + L.esc(t.hint) + '"><input type="checkbox" data-action="update-focus" data-focus="' + t.key + '"' + (f[t.key] ? ' checked' : '') + '> ' + L.esc(t.label) + '</label>';
+      }).join('') + '</div>' +
+      (f.comp ? '<div class="field" style="margin-top:8px;max-width:260px;"><label for="focus-disc">Competition discipline</label><select id="focus-disc" data-action="update-focus-discipline" style="width:100%;"><option value="">Whichever suits the horse best</option>' +
+        L.DISCIPLINES.map(function (d) { return '<option' + (state.settings.focusDiscipline === d.name ? ' selected' : '') + '>' + L.esc(d.name) + '</option>'; }).join('') + '</select></div>' : '') + '</div>';
   }
   // Genes you want to keep: a level for each (no preference / prefer / keep).
   function preferredGenesHtml() {
@@ -3430,6 +3442,8 @@
         buyOpen = true;
         persist();
       }
+      else if (action === 'update-focus') { var bf = Object.assign({}, state.settings.breederFocus); if (t.checked) bf[t.getAttribute('data-focus')] = true; else delete bf[t.getAttribute('data-focus')]; state.settings.breederFocus = bf; notesOpen = true; persist(); }
+      else if (action === 'update-focus-discipline') { state.settings.focusDiscipline = t.value; notesOpen = true; persist(); }
       else if (action === 'update-ranch-advice') { state.settings.ranchAdvice = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-learn') { state.settings.learn = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-market-highlight') { state.settings.marketHighlight = !!t.checked; notesOpen = true; persist(); }

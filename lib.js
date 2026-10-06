@@ -2246,6 +2246,56 @@
     return out;
   }
 
+  // ---------- breeding timeline and foal ages (wiki: Breeding) ----------
+  // Day 2 after covering: a failed covering is announced. Day 4: a miscarriage (or a W/W foal) is announced. Day 5: the
+  // mare's page changes from "Covered X days ago" to "Due on ..." and the foal is certain. Birth comes 13.5 to 17 days
+  // after covering. A foal is unweaned until 6 months old and a horse can be bred from 3 years.
+  var COVERING_SETTLED_DAYS = 5, LAST_BIRTH_DAYS = 17;
+  function coveredAtOf(b) {
+    var at = b && (b.coveredAt || (b.date ? new Date(b.date + 'T00:00:00').getTime() : 0));
+    return at && !isNaN(at) ? at : 0;
+  }
+  // A line saying where a covering stands: { text, stage } or null. stage: 'early' | 'wait' | 'settled' | 'due' | 'overdue'
+  function coveringStage(b, now) {
+    var at = coveredAtOf(b);
+    if (!at || !b || (b.status !== 'Pending' && b.status !== 'Succeeded')) return null;
+    now = now || Date.now();
+    var d = (now - at) / DAY_MS, day = Math.floor(d) + 1, w = dueWindow(at, !b.coveredAt), due = dueWindowText(w);
+    if (d < 2) return { stage: 'early', text: 'Day ' + day + ': a failed covering is announced on day 2' };
+    if (d < 4) return { stage: 'wait', text: 'Day ' + day + ': a miscarriage would be announced on day 4' };
+    if (d < COVERING_SETTLED_DAYS) return { stage: 'wait', text: 'Day ' + day + ': after the daily roll over her page shows "Due on ..." if she is in foal' };
+    if (d <= LAST_BIRTH_DAYS) return { stage: b.status === 'Succeeded' ? 'due' : 'settled', text: (b.status === 'Succeeded' ? 'In foal' : 'Day ' + day + ': her page should say "Due on ..." if she is in foal') + '; birth expected ' + due };
+    return { stage: 'overdue', text: 'Past the longest pregnancy (' + LAST_BIRTH_DAYS + ' days)' };
+  }
+  // Is a Pending covering safe to call Failed? Only when her page was saved on day 5 or later and does not show her in
+  // foal, or when the longest pregnancy has passed with no foal. Between day 5 and 17 a Pending covering may be a real
+  // pregnancy that has not been seen yet.
+  function coveringLooksFailed(state, b, now) {
+    var at = coveredAtOf(b);
+    if (!at) return false;
+    now = now || Date.now();
+    if ((now - at) / DAY_MS > LAST_BIRTH_DAYS + 1) return true;
+    var info = b.mareLifeNumber && state.horseInfo && state.horseInfo[b.mareLifeNumber];
+    if (!info || !info.capturedAt || info.capturedAt < at + COVERING_SETTLED_DAYS * DAY_MS) return false;
+    var st = String((info.pregnancy && info.pregnancy.status) || '');
+    return !/pregnan|cover/i.test(st);
+  }
+  // A foal's age in game months: from its saved page, else from its birth time or date (a game month is 32 real hours)
+  function foalAgeInfo(state, b) {
+    var m = /\/horses\/(\d+)/.exec((b && b.foalUrl) || '');
+    var info = m && state.horseInfo ? state.horseInfo[m[1]] : null, months = info ? effectiveAgeMonths(info) : null;
+    if (months == null) {
+      var born = b && (b.bornAt || (b.dateBorn ? new Date(b.dateBorn + 'T00:00:00').getTime() : 0));
+      if (!born || isNaN(born)) return null;
+      months = Math.max(0, Math.floor((Date.now() - born) / GAME_MS_PER_MONTH));
+    }
+    var text = formatAgeMonths(months) || '0 months';
+    if (months < 6) text += ' · nursing, weaned at 6 months (' + (6 - months) + ' to go)';
+    else if (months < 36) text += ' · weaned, can be bred from 3 years';
+    else text += ' · breeding age';
+    return { months: months, text: text };
+  }
+
   // ---------- breeding calendar: foals due, mares ready, money, fee changes ----------
   // Days until the foal is due, from the site's due text ("Due in 5 days", "Due tomorrow"...). null if it can't be read.
   function dueDays(text) {
@@ -2820,6 +2870,9 @@
     sameBreed: sameBreed,
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
+    coveringStage: coveringStage,
+    coveringLooksFailed: coveringLooksFailed,
+    foalAgeInfo: foalAgeInfo,
     fmtTime: fmtTime,
     dueWindow: dueWindow,
     dueWindowText: dueWindowText,

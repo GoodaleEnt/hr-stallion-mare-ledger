@@ -992,7 +992,9 @@
   // computation over already-stored data, no scraping needed.
   var STALE_PENDING_DAYS = 6;
   function sweepStaleFailedCoverings(state) {
-    var candidates = HRLib.findReviewCandidates(state, STALE_PENDING_DAYS);
+    // between day 5 and day 17 a Pending covering may be a real pregnancy not seen yet: only call it failed when her page
+    // (saved on day 5 or later) shows she is not in foal, or the longest pregnancy has passed
+    var candidates = HRLib.findReviewCandidates(state, STALE_PENDING_DAYS).filter(function (c) { return HRLib.coveringLooksFailed(state, c.breeding); });
     candidates.forEach(function (c) { c.breeding.status = 'Failed'; });
     return candidates.length;
   }
@@ -1001,7 +1003,7 @@
       var marked = sweepStaleFailedCoverings(state);
       if (marked) {
         HRStorage.setState(state, function () {
-          showToast('HR Ledger: ' + marked + ' marked failed (no foal after ' + STALE_PENDING_DAYS + ' days)');
+          showToast('HR Ledger: ' + marked + ' marked failed (her page shows no pregnancy, or no foal after 17 days)');
         });
       }
     });

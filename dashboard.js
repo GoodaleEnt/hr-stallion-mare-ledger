@@ -336,8 +336,8 @@
     candidates.sort(function (a, b) { return b.days - a.days; });
     var html = '<div class="empty" style="border-color:#d97706;text-align:left;margin-bottom:16px;">' +
       '<h3 style="color:#d97706;">' + candidates.length + ' covering' + (candidates.length === 1 ? '' : 's') + ' ready to review</h3>' +
-      '<p style="margin-top:0;">Still marked Pending ' + REVIEW_DAYS + '+ days after breeding with no foal recorded yet. Horse Reality only notifies the ' +
-      '<em>mare\'s</em> owner when a covering fails, so check her page directly before this gets auto-marked Failed.</p>';
+      '<p style="margin-top:0;">Still marked Pending ' + REVIEW_DAYS + '+ days after breeding with no foal recorded yet. Horse Reality announces a failed covering on day 2 and a miscarriage on day 4, but only to the ' +
+      '<em>mare\'s</em> owner. From day 5 her page says "Due on ..." if she is in foal (the foal then comes 13.5 to 17 days after breeding). Check her page: a covering is only marked Failed on its own when her page, seen on day 5 or later, shows no pregnancy, or when 17 days have passed with no foal.</p>';
     html += '<div class="ledger">';
     candidates.forEach(function (c) {
       var b = c.breeding;
@@ -805,7 +805,8 @@
     var d = bredDate(b);
     return '<div class="mono" data-label="Date bred"' + (d.inferred ? ' title="Taken from another record for this mare"' : d.approx ? ' title="Approximate: the day this mare was first seen in foal"' : '') + '>' +
       (d.inferred || d.approx ? '<em>' + L.fmtDate(d.date) + '</em>' : L.fmtDate(d.date)) +
-      (b.coveredAt && !d.inferred ? '<div class="sub" style="font-size:11px;" title="The time you clicked Breed">' + L.esc(L.fmtTime(b.coveredAt)) + '</div>' : '') + '</div>';
+      (b.coveredAt && !d.inferred ? '<div class="sub" style="font-size:11px;" title="The time you clicked Breed">' + L.esc(L.fmtTime(b.coveredAt)) + '</div>' : '') +
+      (function () { var cs = L.coveringStage(b); return cs ? '<div class="sub" style="font-size:11px;">' + L.esc(cs.text) + '</div>' : ''; })() + '</div>';
   }
   // Foal's birth date: stored on the record, else from the foal's cached passport.
   function bornDate(b) {
@@ -834,7 +835,7 @@
     var priceCell = (b.price ? L.fmtMoney(b.price) + ' ' + (b.currency || 'HRC') : '—') + (b.feeType === 'Private' ? '<div class="sub">private rate</div>' : '') + (b.transport ? '<div class="sub">+ ' + L.esc(L.fmtMoney(b.transport)) + ' transport</div>' : '') + (b.studOwner ? '<div class="sub">paid to ' + L.esc(b.studOwner) + '</div>' : '');
     var foalHref = L.safeUrl(b.foalUrl);
     var foalThumb = b.foalImageUrl ? '<img class="foal-thumb" src="' + L.esc(b.foalImageUrl) + '" alt="">' : '';
-    var foalChip = b.foalName ? ('<span class="foal-chip">' + foalThumb + 'Foal: ' + (foalHref ? '<a href="' + L.esc(foalHref) + '" target="_blank" rel="noopener noreferrer">' + L.esc(b.foalName) + '<span class="ext">↗</span></a>' : L.esc(b.foalName)) + (b.foalScore > 0 && b.foalScore <= 100 ? ' · score ' + L.esc(b.foalScore) : '') + '</span>') : '';
+    var foalChip = b.foalName ? ('<span class="foal-chip">' + foalThumb + 'Foal: ' + (foalHref ? '<a href="' + L.esc(foalHref) + '" target="_blank" rel="noopener noreferrer">' + L.esc(b.foalName) + '<span class="ext">↗</span></a>' : L.esc(b.foalName)) + (b.foalScore > 0 && b.foalScore <= 100 ? ' · score ' + L.esc(b.foalScore) : '') + (function () { var fa = L.foalAgeInfo(state, b); return fa ? '<div class="sub" style="font-size:11px;">' + L.esc(fa.text) + '</div>' : ''; })() + '</span>') : '';
 
     var col2Label, col2Html;
     if (viewMode === 'mare') {

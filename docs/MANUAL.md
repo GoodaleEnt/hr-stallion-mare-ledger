@@ -209,6 +209,24 @@ The **Purchase criteria** panel (under My notes, near the top of the dashboard) 
 
 **Suggestions from your herd:** once at least three of your horses of that breed are saved, the panel suggests values with an **Apply** button: the level that would put a new horse in the top 40% of your herd (of that sex, when you chose one) for genetic potential, top conformation and Breed Total, and the traits that at least half of your horses are Below average or Average in.
 
+## Ranch page cards: keep or sell, and the best stallion
+
+On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a line under its name:
+
+- A coloured tag: **Keep** (green), **Keep · in foal** / **covered** (blue), **Consider selling** (amber), **Sell** (red) or **For sale** (grey). A sell tag also shows the price the ledger would ask. The verdict uses the same rules as **Sell ideas**: your goals, the bottom of your herd by Breed Total, genes you keep or avoid, how a mare's foals or a stallion's foals have scored, and your notes.
+- For an adult mare that is free to breed, an arrow and **the stallion the ledger would pick** with the foal's estimated Breed Total (for example "→ Sire One · BT 67.9 (yours)").
+
+Hover the line for the reasons, including why that stallion was chosen. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.
+
+## What the ledger learns
+
+Nothing is stored and nothing comes from outside: each time it is needed the ledger looks again at your own records, and the **Analytics** tab shows **What the ledger has learned**.
+
+- **Breeding.** Every foal with a saved score whose parents both have a show score shows how far the plain average of its parents was off. From at least 3 such foals the ledger learns how your foals really score against that average, whether they lean towards the better parent, how genetic potential comes out, and which stallions and mares keep beating or missing the prediction. Breeding suggestions, pairing ideas and the ranch card use the adjusted estimate, and say so ("Learned from your 6 scored foals..."). A stallion whose coverings fail much more or less often than his fertility predicts (the wiki's chances) is marked down or up once he has 5 resolved coverings. A few foals count for little; the effects grow with more.
+- **Buying.** How your bought horses resold (average profit by breed), and the genetic potential and conformation of the horses that have proved themselves as producers: with 3 of the same sex, the Purchase criteria panel suggests those levels ("Learned: ..."). The market row hover shows a **suggested top bid**: what similar horses went for (from your sales and the bids you won or lost) less the margin your resales earned (15% until you have resold 3).
+
+A checkbox in **My notes** turns learning off.
+
 ## Listing, retiring and selling a horse
 
 The ledger keeps a horse's status up to date as things happen on Horse Reality:

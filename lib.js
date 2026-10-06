@@ -973,6 +973,222 @@
     }
     return null;
   }
+  // ---------- learning from the ledger ----------
+  // Nothing is stored and nothing is guessed from outside: every time it is needed the ledger looks again at what has
+  // happened in your own records and adjusts its suggestions. Settings: state.settings.learn (false turns it off).
+  //
+  // Breeding: every foal with a score, whose parents both have a show score, is a lesson in how far the plain average of
+  // the parents misses. From these come an overall offset, a lean towards the better parent, an offset for genetic
+  // potential, and a (shrunk) effect for each stallion and mare whose foals keep beating or missing the prediction.
+  // Few samples count for little: each effect is pulled towards zero by n / (n + k).
+  // Buying: how your past purchases resold, which breeds earned most, the genetic potential and conformation of the
+  // horses that have proved themselves, and a suggested top bid from what horses like it have gone for.
+  function learningOn(state) { return !(state && state.settings && state.settings.learn === false); }
+  function learnSamples(state) {
+    var rows = [];
+    (state.stallions || []).forEach(function (s) {
+      var sLife = s.lifeNumber ? String(s.lifeNumber) : '';
+      var sInfo = sLife && state.horseInfo && state.horseInfo[sLife];
+      var sConf = bestConformation((sLife && state.horseMeta && state.horseMeta[sLife]) || {}).best;
+      (state.breedings[s.id] || []).forEach(function (b) {
+        if (b.status !== 'Foal Born') return;
+        var fl = foalLifeOf(b.foalUrl), fInfo = fl && state.horseInfo && state.horseInfo[fl], fMeta = fl && state.horseMeta && state.horseMeta[fl];
+        var score = b.foalScore > 0 && b.foalScore <= 100 ? b.foalScore : (fMeta && Number(fMeta.confBest) > 0 && Number(fMeta.confBest) <= 100 ? Number(fMeta.confBest) : 0);
+        var mLife = String(b.mareLifeNumber || ''), mInfo = mLife && state.horseInfo && state.horseInfo[mLife];
+        var mConf = bestConformation((mLife && state.horseMeta && state.horseMeta[mLife]) || {}).best;
+        var row = { sire: sLife || s.id, mare: mLife, breed: breedKeyOf((sInfo && sInfo.breed) || (mInfo && mInfo.breed) || ''), sConf: sConf, mConf: mConf, score: score, fGp: 0, pGp: 0 };
+        var fg = fInfo && Number(fInfo.geneticPotential), sg = sInfo && Number(sInfo.geneticPotential), mg = mInfo && Number(mInfo.geneticPotential);
+        if (fg > 0 && sg > 0 && mg > 0) { row.fGp = fg; row.pGp = (sg + mg) / 2; }
+        if ((score > 0 && sConf > 0 && mConf > 0) || row.fGp) rows.push(row);
+      });
+    });
+    return rows;
+  }
+  function learnedModel(state) {
+    var all = learnSamples(state);
+    var rows = all.filter(function (r) { return r.score > 0 && r.sConf > 0 && r.mConf > 0; });
+    var n = rows.length, out = { on: learningOn(state), n: n, conf: { off: 0, slope: 0, naiveErr: null, modelErr: null }, gp: { n: 0, off: 0 }, sire: {}, mare: {}, breed: {}, lines: [] };
+    var gpRows = all.filter(function (r) { return r.fGp > 0; });
+    if (gpRows.length) { out.gp.n = gpRows.length; out.gp.off = gpRows.reduce(function (t, r) { return t + (r.fGp - r.pGp); }, 0) / (gpRows.length + 5); }
+    if (n) {
+      var d = rows.map(function (r) { return r.score - (r.sConf + r.mConf) / 2; });
+      var xs = rows.map(function (r) { return (r.sConf - r.mConf) / 2; });
+      var md = d.reduce(function (a, b) { return a + b; }, 0) / n, mx = xs.reduce(function (a, b) { return a + b; }, 0) / n;
+      var sxx = 0, sxy = 0;
+      xs.forEach(function (x, i) { sxx += (x - mx) * (x - mx); sxy += (x - mx) * (d[i] - md); });
+      var slope = n >= 8 && sxx > 0 ? Math.max(-0.5, Math.min(0.5, sxy / sxx)) : 0;
+      var sh = n / (n + 8);
+      out.conf.slope = slope * sh;
+      out.conf.off = (md - slope * mx) * n / (n + 5);
+      var res = rows.map(function (r, i) { return d[i] - (out.conf.off + out.conf.slope * xs[i]); });
+      out.conf.naiveErr = Math.round(d.reduce(function (t, v) { return t + Math.abs(v); }, 0) / n * 10) / 10;
+      out.conf.modelErr = Math.round(res.reduce(function (t, v) { return t + Math.abs(v); }, 0) / n * 10) / 10;
+      var acc = function (key, bucket) {
+        var by = {};
+        rows.forEach(function (r, i) { if (!r[key]) return; (by[r[key]] = by[r[key]] || []).push(res[i]); });
+        Object.keys(by).forEach(function (k) { bucket[k] = { n: by[k].length, effect: by[k].reduce(function (a, b) { return a + b; }, 0) / (by[k].length + 3) }; });
+      };
+      acc('sire', out.sire); acc('mare', out.mare);
+      var byBreed = {};
+      rows.forEach(function (r, i) { if (r.breed) (byBreed[r.breed] = byBreed[r.breed] || []).push(res[i]); });
+      Object.keys(byBreed).forEach(function (k) { if (byBreed[k].length >= 4) out.breed[k] = { n: byBreed[k].length, effect: byBreed[k].reduce(function (a, b) { return a + b; }, 0) / (byBreed[k].length + 5) }; });
+    }
+    return out;
+  }
+  // The expected conformation score of a foal of this pair: { conf, plain, note } (the plain average of the parents, and
+  // what the ledger expects after learning from your foals)
+  function predictFoalConf(model, mConf, sConf, mareLife, sireKey, breed) {
+    var plain = (mConf + sConf) / 2;
+    if (!model || !model.on || model.n < 3) return { conf: plain, plain: plain, note: '' };
+    var pred = plain + model.conf.off + model.conf.slope * (sConf - mConf) / 2;
+    var se = model.sire[sireKey], me = model.mare[String(mareLife)], be = breed && model.breed[breed];
+    if (se) pred += se.effect;
+    if (me) pred += me.effect;
+    if (be) pred += be.effect;
+    pred = Math.max(0, Math.min(100, pred));
+    var bits = [];
+    if (Math.abs(model.conf.off) >= 0.5) bits.push('your foals score ' + Math.abs(Math.round(model.conf.off * 10) / 10) + (model.conf.off > 0 ? ' above' : ' below') + ' the parents’ average');
+    if (se && Math.abs(se.effect) >= 0.5) bits.push('his foals run ' + Math.abs(Math.round(se.effect * 10) / 10) + (se.effect > 0 ? ' above' : ' below') + ' that');
+    if (me && Math.abs(me.effect) >= 0.5) bits.push('her foals run ' + Math.abs(Math.round(me.effect * 10) / 10) + (me.effect > 0 ? ' above' : ' below'));
+    return { conf: pred, plain: plain, note: 'Learned from your ' + model.n + ' scored foals: ' + (bits.length ? bits.join('; ') : 'the plain average has been close') + ' (expected foal conformation ' + (Math.round(pred * 10) / 10) + ' instead of ' + (Math.round(plain * 10) / 10) + ')' };
+  }
+  // How a stallion's coverings have really gone against what his fertility predicts (wiki failure chances)
+  var FERT_FAIL = { excellent: 0.05, good: 0.10, average: 0.15, fair: 0.20, poor: 0.40 };
+  function learnedFailure(state, stallionLife) {
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(stallionLife); });
+    if (!rec) return null;
+    var done = (state.breedings[rec.id] || []).filter(function (b) { return b.status === 'Succeeded' || b.status === 'Failed' || b.status === 'Foal Born'; });
+    if (done.length < 5) return null;
+    var failed = done.filter(function (b) { return b.status === 'Failed'; }).length;
+    var info = state.horseInfo && state.horseInfo[stallionLife], exp = info && FERT_FAIL[String(info.fertility || '').toLowerCase().trim()];
+    return { n: done.length, failed: failed, rate: failed / done.length, expected: exp != null ? exp : null };
+  }
+
+  // ---- buying ----
+  function learnedBuying(state) {
+    var out = { on: learningOn(state), bought: 0, sold: 0, avgPct: null, byBreed: [], proven: [], tips: [] };
+    var pcts = [], by = {};
+    Object.keys(state.horseMeta || {}).forEach(function (l) {
+      var p = purchaseOf(state, l);
+      if (!p) return;
+      out.bought++;
+      var info = (state.horseInfo || {})[l] || {}, bk = breedKeyOf(info.breed), g = bk ? (by[bk] = by[bk] || { breed: info.breed, bought: 0, sold: 0, pcts: [] }) : null;
+      if (g) g.bought++;
+      var pr = profitOf(state, l);
+      if (pr && pr.cost > 0) { out.sold++; var pct = pr.profit / pr.cost; pcts.push(pct); if (g) { g.sold++; g.pcts.push(pct); } }
+    });
+    var avg = function (a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; };
+    out.avgPct = avg(pcts);
+    out.byBreed = Object.keys(by).map(function (k) { return { breed: by[k].breed, bought: by[k].bought, sold: by[k].sold, avgPct: avg(by[k].pcts) }; })
+      .filter(function (b) { return b.sold >= 1; }).sort(function (a, b) { return b.avgPct - a.avgPct; });
+    // horses that have proved themselves: mares that out-produce themselves, stallions whose foals beat their dams
+    ownedHorses(state).forEach(function (h) {
+      if (isSoldLife(state, h.lifeNumber) && h.meta.status === 'Sold') return;
+      var proven = h.info.sex === 'mare' ? producerRecord(state, h.lifeNumber).improver : h.info.sex === 'stallion' ? sireRecord(state, h.lifeNumber).improver : false;
+      if (!proven) return;
+      var gp = Number(h.info.geneticPotential) || 0, conf = bestConformation(h.meta).best || 0;
+      out.proven.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), sex: h.info.sex, breed: h.info.breed, gp: gp, conf: conf });
+    });
+    return out;
+  }
+  // Starting values for purchase criteria taken from the horses that proved themselves (needs 3 of that sex)
+  function learnedBuyTips(state, breed, sex) {
+    var lb = learnedBuying(state), tips = [];
+    if (!lb.on) return tips;
+    var pool = lb.proven.filter(function (p) { return (!sex || p.sex === sex) && (!breed || breedKeyOf(p.breed) === breedKeyOf(breed)); });
+    if (pool.length < 3) return tips;
+    function low(arr) { var a = arr.filter(function (v) { return v > 0; }).sort(function (x, y) { return x - y; }); return a.length >= 3 ? a[Math.floor((a.length - 1) * 0.25)] : 0; }
+    var who = (sex === 'stallion' ? 'colts & stallions' : sex === 'mare' ? 'mares & fillies' : 'horses');
+    [['minGP', 'Genetic Potential', low(pool.map(function (p) { return p.gp; })), 0], ['minConf', 'Top conformation', low(pool.map(function (p) { return p.conf; })), 1]].forEach(function (m) {
+      if (!m[2]) return;
+      var f = Math.pow(10, m[3]);
+      tips.push({ field: m[0], label: m[1], suggested: Math.floor(m[2] * f) / f, learned: true, why: 'Learned: ' + pool.length + ' of your ' + who + ' have proved themselves as producers, and three quarters of them are at or above ' + Math.floor(m[2] * f) / f + '.' });
+    });
+    return tips;
+  }
+  // A top bid for a horse: what similar horses have gone for, less the margin your own resales have left
+  function suggestedTopBid(state, life) {
+    var bench = priceBenchmark(state, life);
+    if (!bench) return null;
+    var lb = learnedBuying(state), margin = lb.on && lb.sold >= 3 && lb.avgPct != null ? Math.max(0.05, Math.min(0.4, lb.avgPct)) : 0.15;
+    return { bid: roundPrice(bench.est / (1 + margin)), margin: margin, learned: lb.on && lb.sold >= 3 && lb.avgPct != null, est: bench.est, sold: lb.sold };
+  }
+  // Everything the ledger has learned, as plain sentences for the dashboard
+  function learnedSummary(state) {
+    var m = learnedModel(state), lb = learnedBuying(state), breeding = [], buying = [];
+    if (m.n < 3) breeding.push('Not enough yet: the ledger needs at least 3 foals with a saved score whose parents both have a show score (it has ' + m.n + ').');
+    else {
+      breeding.push('From ' + m.n + ' scored foals: they score ' + Math.abs(Math.round(m.conf.off * 10) / 10) + (m.conf.off >= 0 ? ' above' : ' below') + ' the plain average of their parents' + (m.conf.slope ? ', and lean ' + (m.conf.slope > 0 ? 'towards the better parent' : 'towards the weaker parent') : '') + '. Breeding suggestions use this to estimate foals.');
+      if (m.conf.naiveErr != null) breeding.push('The plain average was off by ' + m.conf.naiveErr + ' points on average; with what was learned it is off by ' + m.conf.modelErr + ' (checked on the same foals, so it improves as more are born).');
+      var best = [];
+      ['sire', 'mare'].forEach(function (k) {
+        Object.keys(m[k]).forEach(function (id) { if (m[k][id].n >= 2 && Math.abs(m[k][id].effect) >= 1) best.push({ id: id, kind: k, n: m[k][id].n, effect: m[k][id].effect }); });
+      });
+      best.sort(function (a, b) { return b.effect - a.effect; });
+      var nameOf = function (id) { var i = state.horseInfo && state.horseInfo[id]; if (i && i.name) return i.name; var s = (state.stallions || []).find(function (x) { return x.id === id; }); return (s && s.name) || ('#' + id); };
+      best.slice(0, 3).filter(function (x) { return x.effect > 0; }).forEach(function (x) { breeding.push((x.kind === 'sire' ? 'Stallion ' : 'Mare ') + nameOf(x.id) + ': foals beat the prediction by ' + (Math.round(x.effect * 10) / 10) + ' (' + x.n + ' foals).'); });
+      best.slice(-3).reverse().filter(function (x) { return x.effect < 0; }).forEach(function (x) { breeding.push((x.kind === 'sire' ? 'Stallion ' : 'Mare ') + nameOf(x.id) + ': foals fall short of the prediction by ' + (Math.round(-x.effect * 10) / 10) + ' (' + x.n + ' foals).'); });
+    }
+    if (m.gp.n >= 3) breeding.push('Genetic potential: foals come out ' + Math.abs(Math.round(m.gp.off * 10) / 10) + (m.gp.off >= 0 ? ' above' : ' below') + ' their parents’ average (' + m.gp.n + ' foals).');
+    var fails = [];
+    (state.stallions || []).forEach(function (s) { if (!s.lifeNumber) return; var f = learnedFailure(state, s.lifeNumber); if (f && f.expected != null && Math.abs(f.rate - f.expected) >= 0.15) fails.push(s.name + ' fails ' + Math.round(f.rate * 100) + '% of ' + f.n + ' coverings (his fertility predicts ' + Math.round(f.expected * 100) + '%)'); });
+    fails.slice(0, 3).forEach(function (t) { breeding.push(t + '.'); });
+    if (lb.sold >= 1) buying.push('Of ' + lb.bought + ' horses you bought, ' + lb.sold + ' have been resold' + (lb.avgPct != null ? ' at an average ' + (lb.avgPct >= 0 ? 'profit' : 'loss') + ' of ' + Math.abs(Math.round(lb.avgPct * 100)) + '%' : '') + '.');
+    lb.byBreed.slice(0, 3).forEach(function (b) { buying.push(b.breed + ': ' + b.sold + ' resold at ' + (b.avgPct >= 0 ? '+' : '-') + Math.abs(Math.round(b.avgPct * 100)) + '%.'); });
+    if (lb.proven.length) buying.push(lb.proven.length + ' of your horses have proved themselves as producers; the Purchase criteria suggestions use their genetic potential and conformation once there are 3 of the same sex.');
+    var mc = marketComps(state);
+    if (mc.length) buying.push(mc.length + ' market result' + (mc.length === 1 ? '' : 's') + ' (bids you won or lost) feed the price numbers, with your sales.');
+    if (!buying.length) buying.push('Nothing yet: resell a bought horse, or let a horse of yours prove itself as a producer, and this fills in.');
+    return { on: m.on, breeding: breeding, buying: buying, model: m, buyingData: lb };
+  }
+
+  // ---------- ranch cards: keep or sell, and the best stallion for a mare ----------
+  // One verdict per horse of yours, for the cards on the ranch page: { action: 'keep' | 'consider' | 'sell' | 'forsale' |
+  // 'infoal', label, reasons: [text], price, best: { life, name, estBT, yours, cost } | null }.
+  // It uses the same rules as Sell ideas (with every group switched on), then, for an adult mare that is free to breed,
+  // the top partner from the breeding suggestions (which use what the ledger has learned from your foals).
+  function herdAdvice(state, lives) {
+    var st2 = Object.assign({}, state, { settings: Object.assign({}, state.settings, { sellForm: Object.assign({}, (state.settings && state.settings.sellForm) || {}, { mares: true, stallions: true, young: true }) }) });
+    var r = sellIdeas(st2), byLife = {}, held = {}, out = {};
+    r.ideas.forEach(function (x) { byLife[String(x.life)] = x; });
+    r.held.forEach(function (x) { held[String(x.life)] = x; });
+    var forSale = {};
+    r.forSale.forEach(function (x) { forSale[String(x.life)] = x; });
+    (lives || []).forEach(function (l) {
+      l = String(l);
+      var info = state.horseInfo && state.horseInfo[l], meta = (state.horseMeta && state.horseMeta[l]) || {};
+      if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) return;
+      if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased' || meta.status === 'Companion') return;
+      var a = { action: 'keep', label: 'Keep', reasons: [], price: null, best: null };
+      if (forSale[l]) { a.action = 'forsale'; a.label = 'For sale'; a.price = forSale[l].price && forSale[l].price.suggested; a.reasons.push('Listed for sale' + (a.price ? '; the ledger would ask about ' + fmtMoney(a.price) + ' HRC' : '')); }
+      else if (byLife[l]) {
+        var idea = byLife[l];
+        a.action = idea.score >= 3 ? 'sell' : 'consider'; a.label = idea.score >= 3 ? 'Sell' : 'Consider selling';
+        a.reasons = idea.reasons.slice(0, 4); a.price = idea.price && idea.price.suggested;
+        if (a.price) a.reasons.push('Suggested asking price about ' + fmtMoney(a.price) + ' HRC');
+      } else if (held[l]) { a.reasons.push('Keep: ' + held[l].why); }
+      else {
+        var gm = goalCheck(state, l);
+        a.reasons.push(gm.active ? (gm.met ? 'Meets all your goals' : 'Nothing strong enough to suggest selling') : 'Nothing suggests selling');
+      }
+      if (info.sex === 'mare' && a.action !== 'forsale') {
+        var bs = mareBreedStatus(state, l);
+        if (bs.status) { a.action = a.action === 'keep' ? 'infoal' : a.action; if (a.action === 'infoal') { a.label = bs.status === 'pregnant' ? 'Keep · in foal' : 'Keep · covered'; a.reasons.unshift((bs.status === 'pregnant' ? 'In foal' : 'Covered') + (bs.due ? ', ' + bs.due : '') + (bs.stallion ? ' by ' + bs.stallion : '')); } }
+        else if (!isYoungInfo(info) && a.action !== 'sell') {
+          var sg = breedingSuggestions(state, l, 1);
+          var top = sg.suggestions && sg.suggestions[0];
+          if (top) {
+            a.best = { life: top.life, name: top.name, estBT: top.estBT, yours: top.yours, cost: top.terms && top.terms.summary ? top.terms.summary : '' };
+            a.reasons.push('Best stallion to breed her to: ' + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
+            (top.reasons || []).slice(0, 3).forEach(function (t) { a.reasons.push('  ' + t); });
+          } else if (sg.error !== 'young') a.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')');
+        }
+      }
+      out[l] = a;
+    });
+    return out;
+  }
+
   // A stallion is worth suggesting only if he can actually be used: one of yours that is active, or (anyone's) one
   // that has semen vials or is currently offered at stud (a public or private stud fee saved from his page).
   function stallionAvailable(state, life) {
@@ -997,6 +1213,7 @@
     if (isYoungInfo(mInfo)) { out.error = 'young'; return out; }
     var mMeta = (state.horseMeta && state.horseMeta[mareLife]) || {};
     var mConf = bestConformation(mMeta).best;
+    var LM = learnedModel(state);
     var mAnc = ancestorMap(state, mareLife, 3);
     var list = [];
     Object.keys(state.horseInfo || {}).forEach(function (life) {
@@ -1014,6 +1231,10 @@
       var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
       var confs = [mConf, sConf].filter(function (x) { return x > 0; });
       var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+      // what the ledger has learned from your own foals adjusts the plain average of the parents
+      var learnedNote = '';
+      if (LM.on && LM.gp.n >= 3) gp += LM.gp.off;
+      if (LM.on && conf && sConf > 0 && mConf > 0) { var pf = predictFoalConf(LM, mConf, sConf, mareLife, String(life), breedKeyOf(mInfo.breed)); conf = pf.conf; learnedNote = pf.note; }
       var estBT = conf ? breedTotal(gp, conf) : null;
       var common = commonAncestors(mAnc, ancestorMap(state, life, 3));
       var coi = estimateCoi(common);
@@ -1041,15 +1262,18 @@
           else if (b.status === 'Failed') hist.failed++;
         });
       }
-      var reasons = [];
+      var reasons = [], learnedFail = 0;
       reasons.push(estBT != null
         ? 'Estimated foal Breed Total ' + (Math.round(estBT * 10) / 10) + ' (average genetic potential ' + (Math.round(gp * 10) / 10) + ', average top conformation ' + (Math.round(conf * 10) / 10) + ')'
         : 'Average genetic potential ' + (Math.round(gp * 10) / 10) + ' (neither has a show score saved yet, so Breed Total is not estimated)');
       reasons.push(common.length ? 'Estimated inbreeding ' + (Math.round(coi * 100) / 100) + '% (' + common.length + ' shared ancestor' + (common.length === 1 ? '' : 's') + ')' : 'No shared ancestors in the saved pedigrees (0% inbreeding)');
+      if (learnedNote) reasons.push(learnedNote);
       if (fixes.length) reasons.push('Covers her Below-average ' + fixes.join(', ') + ' (his rating there is Good or better)');
       if (shared.length) reasons.push('Watch: she and he are both Below average in ' + shared.join(', '));
       if (FERT_BONUS[fert] != null) reasons.push('His fertility is ' + sInfo.fertility + (FERT_BONUS[fert] > 0 ? ' (fewer failed coverings)' : FERT_BONUS[fert] < 0 ? ' (more failed coverings)' : ''));
       else reasons.push('His fertility is not recorded' + (isYoungInfo(sInfo) ? '' : ' (open his page after a fertility test)'));
+      var lf = LM.on ? learnedFailure(state, life) : null;
+      if (lf && lf.expected != null && Math.abs(lf.rate - lf.expected) >= 0.1) { learnedFail = (lf.expected - lf.rate) * 5; reasons.push('Learned: ' + lf.failed + ' of his ' + lf.n + ' coverings failed (' + Math.round(lf.rate * 100) + '%), against ' + Math.round(lf.expected * 100) + '% expected for his fertility'); }
       if (yours) reasons.push('Your own stallion: no stud fee');
       else if (terms) reasons.push('Cost: ' + terms.summary);
       else reasons.push('Stud fee not known yet (open his page or his Breed page to record it)');
@@ -1058,7 +1282,7 @@
       if (noteFx.reason) reasons.push(noteFx.reason);
       var geneFx = preferredGeneBonus(state, mareLife, life);
       geneFx.reasons.forEach(function (r) { reasons.push(r); });
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + noteFx.bonus + geneFx.bonus;
+      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
       list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -1487,6 +1711,12 @@
       if (ranks.length >= 3 && ranks.filter(function (r) { return r <= 1; }).length / ranks.length >= 0.5) weak.push(t);
     });
     if (weak.length) out.traits = { traits: weak, why: 'At least half of your horses are Below average or Average in these, so a horse that is Good or better there would help.' };
+    // what the horses that proved themselves look like replaces the herd-percentile tip for the same field
+    learnedBuyTips(state, breed, sex).forEach(function (t) {
+      if (cur[t.field] != null && t.suggested <= cur[t.field]) return;
+      out.tips = out.tips.filter(function (x) { return x.field !== t.field; });
+      out.tips.push({ field: t.field, label: t.label, current: cur[t.field], suggested: t.suggested, why: t.why });
+    });
     return out;
   }
 
@@ -1568,6 +1798,10 @@
     fs.lines.forEach(function (l) { lines.push((l.ok === true ? '✓ ' : l.ok === false ? '✗ ' : '• ') + l.text); });
     if (overPrice) lines.push('✗ Asking ' + fmtMoney(market.asking) + ' is above your limit of ' + fmtMoney(crit.maxPrice));
     if (priceLine) lines.push('$ ' + priceLine);
+    var tb = suggestedTopBid(state, life);
+    if (tb) lines.push('$ Suggested top bid about ' + fmtMoney(tb.bid) + ' HRC' + (tb.learned ? ' (leaves ' + Math.round(tb.margin * 100) + '% to resell, the average your ' + tb.sold + ' resales earned)' : ' (leaves 15% to resell; it adjusts once you have resold 3 horses you bought)'));
+    var lbk = learnedBuying(state).byBreed.find(function (b) { return breedKeyOf(b.breed) === breedKeyOf(info.breed); });
+    if (lbk) lines.push('\u2022 Learned: your ' + lbk.sold + ' resold ' + info.breed + ' horse' + (lbk.sold === 1 ? '' : 's') + ' made ' + (lbk.avgPct >= 0 ? '+' : '-') + Math.abs(Math.round(lbk.avgPct * 100)) + '% on average');
     return { chips: chips, pass: pass, bad: bad.map(function (x) { return x.label; }), unknown: unknown.map(function (x) { return x.label; }), judged: judged.length, benefit: benefit, hover: lines.join('\n'), bench: bench };
   }
 
@@ -2055,6 +2289,7 @@
     var myConf = bestConformation(meta).best;
     var myAnc = ancestorMap(state, life, 3);
     var myMet = goalCheck(state, life).met;
+    var LMp = learnedModel(state);
     var list = [];
     Object.keys(state.horseInfo || {}).forEach(function (cl) {
       var ci = state.horseInfo[cl];
@@ -2077,6 +2312,9 @@
       var gp = (Number(info.geneticPotential) + Number(ci.geneticPotential)) / 2;
       var confs = [myConf, cConf].filter(function (x) { return x > 0; });
       var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+      // adjusted by what the ledger has learned from your own foals
+      if (LMp.on && LMp.gp.n >= 3) gp += LMp.gp.off;
+      if (LMp.on && conf && myConf > 0 && cConf > 0) conf = predictFoalConf(LMp, isMare ? myConf : cConf, isMare ? cConf : myConf, isMare ? life : cl, String(isMare ? cl : life), breedKeyOf(info.breed)).conf;
       var estBT = conf ? breedTotal(gp, conf) : null;
       var common = commonAncestors(myAnc, ancestorMap(state, cl, 3));
       var coi = estimateCoi(common);
@@ -2870,6 +3108,14 @@
     sameBreed: sameBreed,
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
+    herdAdvice: herdAdvice,
+    learnedModel: learnedModel,
+    learnedSummary: learnedSummary,
+    learnedBuying: learnedBuying,
+    learnedBuyTips: learnedBuyTips,
+    suggestedTopBid: suggestedTopBid,
+    predictFoalConf: predictFoalConf,
+    learnedFailure: learnedFailure,
     coveringStage: coveringStage,
     coveringLooksFailed: coveringLooksFailed,
     foalAgeInfo: foalAgeInfo,

@@ -1309,6 +1309,14 @@
     });
   }
   function totalEarned(e) { return Object.keys(e || {}).reduce(function (n, c) { return n + e[c]; }, 0); }
+  // What the ledger has learned from your own records (see lib.js: learning from the ledger)
+  function learnedPanelHtml() {
+    var ls = L.learnedSummary(viewState());
+    var li = function (t) { return '<div class="an-tip info" style="margin-top:4px;">' + L.esc(t) + '</div>'; };
+    return '<div class="an-card" style="margin-bottom:18px;"><h3>What the ledger has learned' + (ls.on ? '' : ' (off)') + '</h3>' +
+      (ls.on ? '<strong style="font-size:13px;">Breeding</strong>' + ls.breeding.map(li).join('') + '<div style="margin-top:10px;"><strong style="font-size:13px;">Buying and prices</strong></div>' + ls.buying.map(li).join('') +
+        '<p class="notes-line" style="margin:8px 0 0;">Worked out again from your records each time, so it improves as foals are born, horses are sold and bids are won or lost. Turn it off under My notes.</p>' : '<p class="notes-line" style="margin:6px 0 0;">Learning is turned off under My notes.</p>') + '</div>';
+  }
   function renderAnalytics() {
     var html = topHeaderHtml();
     var a = L.analytics(viewState());
@@ -1325,6 +1333,8 @@
       '<div class="stat-tile"><div class="num mono">' + L.esc(L.moneyLine(o.earned)) + '</div><div class="label">Stud fees earned</div></div>' +
       '<div class="stat-tile"><div class="num mono">' + (o.avgScore != null ? Math.round(o.avgScore * 10) / 10 : '\u2014') + '</div><div class="label">Avg foal score (of 100)</div></div>' +
     '</div>';
+
+    html += learnedPanelHtml();
 
     // suggestions
     html += '<div class="an-card" style="margin-bottom:18px;"><h3>Suggestions</h3>';
@@ -2429,6 +2439,8 @@
     }
     html += preferredGenesHtml();
     html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-ranch-advice"' + (state.settings.ranchAdvice === false ? '' : ' checked') + '> Show Keep / Sell and the best stallion for each mare on the cards of my Horse Reality ranch page</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-learn"' + (state.settings.learn === false ? '' : ' checked') + '> Let the ledger learn from my foals, sales and bids to improve its breeding and purchase suggestions</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-market-highlight"' + (state.settings.marketHighlight === false ? '' : ' checked') + '> Colour market rows green or red for horses I have looked at (would lift my herd or not)</label>';
     return html + '</details>';
   }
@@ -3418,6 +3430,8 @@
         buyOpen = true;
         persist();
       }
+      else if (action === 'update-ranch-advice') { state.settings.ranchAdvice = !!t.checked; notesOpen = true; persist(); }
+      else if (action === 'update-learn') { state.settings.learn = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-market-highlight') { state.settings.marketHighlight = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-fit-banner') { state.settings.fitBanner = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'pref-scope') { prefScope = t.value; notesOpen = true; render(); }

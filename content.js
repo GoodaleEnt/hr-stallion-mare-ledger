@@ -1539,6 +1539,64 @@
     var hi = bid ? rowMoney(outer, '.market-office-table-row-highestbid') : 0;
     if (hi > (Number(bid && bid.highest) || 0)) saveBid(tradeId, { highest: hi });
   }
+  // ---- ranch page: a keep / sell verdict and the best stallion on each horse's card ----
+  // The ranch page lists horses as li.horse-item[data-horse="<life number>"]. Each of yours that is saved in the ledger
+  // gets a small block under its name: a coloured Keep / Consider selling / Sell / For sale tag, and for a mare that is
+  // free to breed the stallion the ledger would pick. Hover it for the reasons. A checkbox in My notes turns it off.
+  var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
+  function renderRanchAdvice() {
+    var items = document.querySelectorAll('li.horse-item[data-horse]');
+    if (!items.length) return;
+    HRStorage.getState(function (state) {
+      if (state.settings && state.settings.ranchAdvice === false) { items.forEach(function (li) { li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); }); }); return; }
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      var lives = [];
+      items.forEach(function (li) {
+        var l = li.getAttribute('data-horse'), info = state.horseInfo && state.horseInfo[l];
+        if (info && (!me || String(info.ownerName || '').trim().toLowerCase() === me)) lives.push(l);
+      });
+      var advice;
+      try { advice = HRLib.herdAdvice(state, lives); } catch (e) { return; }
+      var COL = { keep: '#1E8449', infoal: '#3A78C2', consider: '#B9770E', sell: '#C0281E', forsale: '#6E7260' };
+      items.forEach(function (li) {
+        li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
+        var a = advice[li.getAttribute('data-horse')];
+        if (!a) return;
+        var host = li.querySelector('.content-wrapper .text') || li.querySelector('.content-wrapper') || li;
+        var box = document.createElement('div');
+        box.setAttribute('data-hr-advice', '1');
+        box.style.cssText = 'margin-top:4px;font:600 12px/1.45 system-ui,sans-serif;';
+        box.title = 'HR Ledger\n' + a.reasons.join('\n');
+        var tag = document.createElement('span');
+        tag.textContent = a.label;
+        tag.style.cssText = 'display:inline-block;padding:0 7px;border-radius:9px;color:#fff;background:' + COL[a.action] + ';margin-right:5px;';
+        box.appendChild(tag);
+        if (a.price && (a.action === 'sell' || a.action === 'consider')) {
+          var pr = document.createElement('span');
+          pr.textContent = '~' + a.price.toLocaleString('en-US');
+          pr.style.cssText = 'color:#46592C;margin-right:5px;';
+          box.appendChild(pr);
+        }
+        if (a.best) {
+          var bl = document.createElement('div');
+          bl.style.cssText = 'margin-top:2px;color:#2E3B1F;';
+          bl.textContent = '→ ' + a.best.name + (a.best.estBT != null ? ' · BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : '');
+          box.appendChild(bl);
+        }
+        host.appendChild(box);
+      });
+    });
+  }
+  function scheduleRanch() {
+    ranchTimers.forEach(clearTimeout);
+    ranchTimers = [1500, 4000].map(function (ms) { return setTimeout(renderRanchAdvice, ms); });
+    var grid = document.querySelector('ul.horse-grid, ul.horses');
+    if (grid && !ranchObserver) {
+      // the list can be redrawn (filters, search): watch its direct children only, so adding our block never retriggers it
+      ranchObserver = new MutationObserver(function () { clearTimeout(ranchDebounce); ranchDebounce = setTimeout(renderRanchAdvice, 900); });
+      ranchObserver.observe(grid, { childList: true });
+    }
+  }
   function scheduleMarket() {
     marketTimers.forEach(clearTimeout);
     marketTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(highlightMarket, ms); });
@@ -2344,6 +2402,7 @@
   function onPageReady() {
     scheduleFit();
     scheduleMarket();
+    scheduleRanch();
     scheduleBidScan();
     scheduleSales();
     checkPendingRetire();

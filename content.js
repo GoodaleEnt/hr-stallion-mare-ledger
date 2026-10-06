@@ -1567,16 +1567,16 @@
         var host = li.querySelector('.content-wrapper') || li.querySelector('.content') || li;
         var box = document.createElement('div');
         box.setAttribute('data-hr-advice', '1');
-        box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:5px 6px 0;font:700 12px/1.4 system-ui,sans-serif;';
+        box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:6px 6px 10px;margin:0 0 4px;position:relative;z-index:2;clear:both;flex:0 0 auto;font:700 12px/1.4 system-ui,sans-serif;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
         function pill(text, bg) {
           var d = document.createElement('span');
           d.textContent = text;
-          d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;background:' + bg + ';white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;';
+          d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;background:' + bg + ';white-space:normal;text-align:center;max-width:100%;';
           box.appendChild(d);
           return d;
         }
-        pill((a.protectedHorse && a.level === 5 ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
+        pill((a.protectedHorse && a.action === 'top' ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
         // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
         if (a.pips) {
           var bar = document.createElement('span');

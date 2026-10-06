@@ -1353,10 +1353,15 @@
         var bs = mareBreedStatus(state, l);
         if (bs.status) { a.infoal = bs.status === 'pregnant' ? 'in foal' : 'covered'; a.reasons.unshift((bs.status === 'pregnant' ? 'In foal' : 'Covered') + (bs.due ? ', ' + bs.due : '') + (bs.stallion ? ' by ' + bs.stallion : '')); }
         else if (!isYoungInfo(info) && a.action !== 'sell' && a.action !== 'forsale') {
-          var sg = breedingSuggestions(state, l, 1), top = sg.suggestions && sg.suggestions[0];
+          var sg = breedingSuggestions(state, l, 20), top = sg.suggestions && sg.suggestions[0];
+          // the best of your own stallions, and a better one from the ledger (another player's, with a stud fee saved) when there is one
+          var ownTop = (sg.suggestions || []).find(function (t) { return t.yours; });
+          var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, yours: t.yours, cost: t.terms && t.terms.summary ? t.terms.summary : '' }; };
+          if (ownTop && top && top !== ownTop) a.bestOwn = pack(ownTop);
           if (top) {
-            a.best = { life: top.life, name: top.name, estBT: top.estBT, yours: top.yours, cost: top.terms && top.terms.summary ? top.terms.summary : '' };
-            a.reasons.push('Best stallion to breed her to: ' + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
+            a.best = pack(top);
+            if (a.bestOwn) a.reasons.push('Best of your own stallions: ' + a.bestOwn.name + (a.bestOwn.estBT != null ? ' (estimated foal Breed Total ' + a.bestOwn.estBT + ')' : ''));
+            a.reasons.push((a.bestOwn ? 'Better stallion in the ledger: ' : 'Best stallion to breed her to: ') + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
             (top.reasons || []).slice(0, 3).forEach(function (t) { a.reasons.push('  ' + t); });
           } else if (sg.error !== 'young') a.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')');
         }

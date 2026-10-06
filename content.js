@@ -1589,7 +1589,12 @@
           if (a.rank && a.of) { var rk = document.createElement('span'); rk.textContent = a.rank + '/' + a.of; rk.style.cssText = 'margin-left:4px;color:#2E3B1F;'; bar.appendChild(rk); }
           box.appendChild(bar);
         }
-        if (a.best) pill('\u2192 ' + a.best.name + (a.best.estBT != null ? ' \u00b7 BT ' + a.best.estBT : '') + (a.best.yours ? ' (yours)' : ''), '#2E3B1F');
+        function stud(b) { return b.name + (b.estBT != null ? ' \u00b7 BT ' + b.estBT : ''); }
+        // your own best stallion, and when the ledger knows a better one (another player's) that as well, with its fee
+        if (a.best && a.bestOwn) {
+          pill('\u2192 Yours: ' + stud(a.bestOwn), '#2E3B1F');
+          pill('\u2191 Better: ' + stud(a.best) + (a.best.cost ? ' \u00b7 ' + a.best.cost : ''), '#5B3E8A');
+        } else if (a.best) pill('\u2192 ' + stud(a.best) + (a.best.yours ? ' (yours)' : (a.best.cost ? ' \u00b7 ' + a.best.cost : '')), a.best.yours ? '#2E3B1F' : '#5B3E8A');
         // the very bottom of the card, so it sits in the same place on every card
         host.appendChild(box);
       });

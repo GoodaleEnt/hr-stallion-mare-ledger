@@ -1285,18 +1285,18 @@
       var genes = preferredGenesOf(state, life);
       var avoid = genes.filter(function (g) { return g.level === 'avoid'; }), keepG = genes.filter(function (g) { return g.level === 'keep'; });
       if (avoid.length) { adj -= 0.5; x.why.push('Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); }
-      if (keepG.length) { x.flags.core = true; x.why.push('Carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep'); }
-      if (nr.keep || overall.keepGroups[x.young ? (x.sex === 'mare' ? 'filly' : 'colt') : x.sex]) { x.flags.core = true; x.why.push('Your notes say to keep'); }
+      if (keepG.length) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you keep'); x.why.push('Carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep'); }
+      if (nr.keep || overall.keepGroups[x.young ? (x.sex === 'mare' ? 'filly' : 'colt') : x.sex]) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('your notes say to keep'); x.why.push('Your notes say to keep'); }
       if (nr.sell) { x.flags.sell = true; x.why.push('Your note says to sell'); }
       if (x.sex === 'mare') {
         var pr = producerRecord(state, life), dimp = damImprover(state, life);
-        if (pr.improver) { x.flags.core = true; x.why.push('Out-produces herself: foals average ' + pr.avgFoal + ' against her ' + pr.mareScore); }
-        else if (dimp) { x.flags.core = true; x.why.push('Her dam ' + dimp.name + ' out-produces herself'); }
+        if (pr.improver) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('she out-produces herself (foals average ' + pr.avgFoal + ' against her ' + pr.mareScore + ')'); x.why.push('Out-produces herself: foals average ' + pr.avgFoal + ' against her ' + pr.mareScore); }
+        else if (dimp) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('her dam ' + dimp.name + ' out-produces herself'); x.why.push('Her dam ' + dimp.name + ' out-produces herself'); }
         else if (pr.scored >= 2 && pr.avgDelta != null && pr.avgDelta < -3 && pr.better === 0) { adj -= 0.4; x.why.push('Her ' + pr.scored + ' scored foals average ' + pr.avgFoal + ', below her own ' + pr.mareScore); }
         if (!x.young && !Object.keys(state.breedings || {}).some(function (sid) { return (state.breedings[sid] || []).some(function (b) { return String(b.mareLifeNumber) === life; }); })) adj -= 0.15;
       } else {
         var sr = sireRecord(state, life);
-        if (sr.improver) { x.flags.core = true; x.why.push('His foals beat their dams by ' + sr.avgDelta + ' on average'); }
+        if (sr.improver) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('his foals beat their dams by ' + sr.avgDelta + ' on average'); x.why.push('His foals beat their dams by ' + sr.avgDelta + ' on average'); }
         else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { adj -= 0.4; x.why.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', below their dams'); }
         var lf = learnedFailure(state, life);
         if (lf && lf.rate >= 0.4) { adj -= 0.4; x.why.push('Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); }
@@ -1330,7 +1330,7 @@
       else if (x.flags.core) level = 5;
       else level = rankLevel;
       var prot = !!x.flags.core && !x.flags.sell;
-      out[x.life] = { level: level, rankLevel: rankLevel, protectedHorse: prot, label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
+      out[x.life] = { level: level, rankLevel: rankLevel, protectedHorse: prot, protectedWhy: prot ? (x.coreWhy || []) : [], label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
     });
     return out;
   }
@@ -1345,7 +1345,7 @@
       if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) return;
       if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased' || meta.status === 'Companion') return;
       var a = { action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, pips: r ? (r.rankLevel || r.level) : null, protectedHorse: !!(r && r.protectedHorse), label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
-      if (a.protectedHorse && a.level === 5 && a.pips && a.pips < 5) a.reasons.unshift('Protected as a keeper (see below), whatever its rank');
+      if (a.protectedHorse && r.protectedWhy.length) a.reasons.unshift('★ Protected as a keeper, whatever its rank: ' + r.protectedWhy.join('; '));
       if (a.rank && a.of) a.reasons.unshift('Ranks ' + a.rank + ' of ' + a.of + ' ' + a.group + ' (1 is the best)');
       if (r && r.level && r.level <= 2 && r.price && r.price.suggested) { a.price = r.price.suggested; a.reasons.push('Suggested asking price about ' + fmtMoney(a.price) + ' HRC'); }
       if (forSaleSet[l] || meta.status === 'For Sale') { a.action = 'forsale'; a.label = 'For sale'; a.reasons.unshift('Listed for sale'); }

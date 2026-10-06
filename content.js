@@ -1576,7 +1576,7 @@
           box.appendChild(d);
           return d;
         }
-        pill((a.protectedHorse && a.action === 'top' ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
+        pill((a.protectedHorse ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
         // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
         if (a.pips) {
           var bar = document.createElement('span');

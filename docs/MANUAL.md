@@ -291,7 +291,7 @@ The ledger follows the rules on the Horse Reality wiki:
 - **Time of breeding:** when you click Breed, the time is saved with the date and shown under the date in the ledger (and in the CSV export).
 - **Due date window:** a pregnancy lasts 13.5 to 17 days, so for a mare in foal whose due date the site hasn't shown, Foals due gives an estimated window counted from the covering.
 - **Ageing:** a game month is 32 real hours. The age read off a horse's page is moved forward by the time since you last saw it, so a horse that turns 3 shows up as an adult without you opening its page. If Horse Reality's data includes the exact time of birth it is used to land on the right hour, and a foal's official time of birth is saved and shown under its date born.
-- **Coverings to review:** a covering is settled 48 hours after breeding, so one still marked Pending after 3 days is listed for review (it is only marked Failed automatically after 6).
+- **Coverings to review:** a covering is settled 48 hours after breeding, so one still marked Pending on day 5 is listed for review (it is only marked Failed automatically after 6).
 - **Label ranges:** hover a conformation or health label to see the hidden number range it stands for (for example Good conformation is 70 to 84).
 - **Clinical Approved:** a stallion's Health & Fertility panel says whether he can qualify for the predicate (all five health stats and fertility 75 or more, checked at 7).
 

@@ -329,7 +329,7 @@
   // mare — only she does — so this points at her page directly instead of
   // silently trusting the auto-fail sweep that runs next time content.js
   // sees a horsereality.com page.
-  var REVIEW_DAYS = 3; // a covering is settled 48 hours after breeding (wiki: Life)
+  var REVIEW_DAYS = 5; // a covering is settled 48 hours after breeding (wiki: Life); it is listed for review on day 5
   function renderNeedsReviewHtml() {
     var candidates = HRLib.findReviewCandidates(state, REVIEW_DAYS);
     if (!candidates.length) return '';

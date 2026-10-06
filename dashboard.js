@@ -95,6 +95,12 @@
         // Older versions recorded any pregnant mare you viewed as yours; trust
         // the owner Horse Reality reports for her when we have it.
         var mareInfo = b.mareLifeNumber && state.horseInfo && state.horseInfo[b.mareLifeNumber];
+        // a stallion is never a mare: skip a record whose "mare" is a horse known to be a stallion, one of your own studs,
+        // or the stud of that very record (a misread row)
+        if (mareInfo && mareInfo.sex === 'stallion') return;
+        if (b.mareLifeNumber && state.stallions.some(function (x) { return x.lifeNumber && String(x.lifeNumber) === String(b.mareLifeNumber); })) return;
+        var recStud = state.stallions.find(function (x) { return x.id === b.stallionId; });
+        if (recStud && (String(recStud.name || '').trim().toLowerCase() === String(b.mareName).trim().toLowerCase() || (recStud.lifeNumber && b.mareLifeNumber && String(recStud.lifeNumber) === String(b.mareLifeNumber)))) return;
         if (mareInfo && mareInfo.ownerName && mareInfo.ownerName.trim().toLowerCase() !== myName) return;
         var key = L.mareKey(b);
         if (!map[key]) {

@@ -228,7 +228,7 @@ For a mare they also list **her foals as keepers**, for foals of hers that you o
 
 - A **colt** is a keeper only if he would **make your herd of stallions better** (the same check used on a horse you are thinking of buying; it needs 3 stallions of the breed saved).
 - A **filly** is a keeper if she is **better than her dam**: Breed Total at least 0.5 higher and better in at least two of Breed Total, conformation and genetic potential, without making your mares worse. Better in only part of that shows as "maybe".
-- A **daughter whose own foals average at least 1 point above her dam's foals** (2 scored foals each) **out-produces her dam**. That lowers the dam's rank (\u22120.3 each, up to two), and her own producer record then no longer protects her as a Top keeper. A note, a gene you keep or a keep-all setting still does.
+- A **daughter whose own foals average at least 1 point above her dam's foals** (2 scored foals each) **out-produces her dam**. That lowers the dam's rank (minus 0.3 each, up to two), and her own producer record then no longer protects her as a Top keeper. A note, a gene you keep or a keep-all setting still does.
 
 A foal's own page and card show how she or he compares with the dam.
 

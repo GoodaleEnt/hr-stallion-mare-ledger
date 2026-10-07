@@ -214,7 +214,10 @@
       var cells = row.querySelectorAll('td');
       if (cells.length < 4 || cleanText(cells[0]) !== 'OUT') return;
       var text = cleanText(cells[2]);
-      if (!/\b(bought|purchased)\b/i.test(text)) return;
+      // "You have bought ..." or, for a horse you made an offer on, "You placed an offer of 300 000 HRC on <horse> with foal <foal>
+      // and paid an additional 500 HRC for transport"
+      var isOffer = /\bplaced an offer of\b/i.test(text);
+      if (!isOffer && !/\b(bought|purchased)\b/i.test(text)) return;
       // the horse is the first link that points at a horse (the seller's link may come before it)
       var horseA = null;
       cells[2].querySelectorAll('a').forEach(function (a) { if (!horseA && lifeNumberFromUrl(a.href || '')) horseA = a; });
@@ -224,7 +227,7 @@
       // take the horse's own name out first, so a name with "for" in it cannot be taken for the price
       var clean = text.split(cleanText(horseA)).join(' ');
       var money = '([0-9\\s\\u00a0.,]+?)\\s*([A-Za-z]{2,4})\\b';
-      var price = new RegExp('\\bfor\\s+' + money, 'i').exec(clean);
+      var price = (isOffer ? new RegExp('\\boffer of\\s+' + money, 'i') : new RegExp('\\bfor\\s+' + money, 'i')).exec(clean);
       var ship = new RegExp('(?:additional|extra|plus|and|\\+)\\s+' + money + '\\s*(?:for\\s+)?(?:the\\s+)?(?:transport|shipping|delivery)', 'i').exec(clean)
         || new RegExp('(?:transport|shipping|delivery)(?:\\s+fee)?(?:\\s+of)?\\s+' + money, 'i').exec(clean);
       var sh = ship ? parseAmountAndCurrency(ship, fallback) : { amount: 0, currency: fallback };
@@ -235,7 +238,7 @@
         if (total) p = { amount: Math.max(0, total - sh.amount), currency: fallback };
       }
       if (!p.amount && !sh.amount) { unreadPurchases.push(text); return; }
-      out.push({ lifeNumber: life, name: parseHorseLabel(horseA), price: p.amount, currency: p.currency, shipping: sh.amount, shippingCurrency: sh.currency });
+      out.push({ lifeNumber: life, name: parseHorseLabel(horseA), price: p.amount, currency: p.currency, shipping: sh.amount, shippingCurrency: sh.currency, offer: isOffer });
     });
     if (unreadPurchases.length) console.warn('HR Ledger: bank rows that look like purchases but could not be read:', unreadPurchases);
     return out;
@@ -643,6 +646,16 @@
       // yourself — only fills in a price/shipping that isn't recorded yet.
       purchases.forEach(function (pu) {
         var meta = state.horseMeta[pu.lifeNumber] = Object.assign({}, state.horseMeta[pu.lifeNumber]);
+        if (pu.offer) {
+          // an offer may have been outbid: keep it aside until the horse is seen to be yours
+          var oi = state.horseInfo && state.horseInfo[pu.lifeNumber], oMe = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+          var mine = oi && oMe && String(oi.ownerName || '').trim().toLowerCase() === oMe;
+          if (!mine) {
+            var pend = { price: pu.price, currency: pu.currency, shipping: pu.shipping, shippingCurrency: pu.shippingCurrency };
+            if (JSON.stringify(meta.purchaseOffer) !== JSON.stringify(pend)) { meta.purchaseOffer = pend; purchasesSaved++; }
+            return;
+          }
+        }
         var rec = meta.purchase = Object.assign({}, meta.purchase);
         var changed = false;
         if (pu.price && !rec.price) { rec.price = pu.price; rec.currency = pu.currency; rec.recordedAt = Date.now(); changed = true; }
@@ -754,6 +767,18 @@
         HRStorage.upsertHorseInfo(state, horseInfo.lifeNumber, horseInfo);
         passportCached = true;
       }
+      // an offer made on this horse that was kept aside is her purchase once she is yours
+      (function () {
+        var pm = state.horseMeta && state.horseMeta[horseInfo.lifeNumber], pOwn = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+        if (pm && pm.purchaseOffer && pOwn && String(horseInfo.ownerName || '').trim().toLowerCase() === pOwn) {
+          var po = pm.purchaseOffer, cur = Object.assign({}, pm.purchase);
+          if (po.price && !cur.price) { cur.price = po.price; cur.currency = po.currency; cur.recordedAt = Date.now(); }
+          if (po.shipping && !cur.shipping) { cur.shipping = po.shipping; cur.shippingCurrency = po.shippingCurrency; }
+          state.horseMeta[horseInfo.lifeNumber] = Object.assign({}, pm, { purchase: cur });
+          delete state.horseMeta[horseInfo.lifeNumber].purchaseOffer;
+          passportCached = true;
+        }
+      })();
       // a horse that has been renamed (a name you gave her, or the seller's tagline replaced): breeding records that
       // were saved under the old name take the new one
       if (horseInfo.name) {

@@ -249,6 +249,16 @@ Nothing is stored and nothing comes from outside: each time it is needed the led
 
 A checkbox in **My notes** turns learning off.
 
+## Studs & Semen market
+
+On the market's **Studs & Semen** pages, a stallion the ledger has saved (open his page once) gets the same treatment as a horse for sale:
+
+- **Badges** under his name: **GP**, **Conf**, **BT**, **Traits** and **Fert** (green with a tick when he meets your purchase criteria for colts & stallions, red with a cross when not), the **stud fee**, and a verdict: **Better for N mares** (with the best mare and how much better), **Worse for your mares** or **Same as your studs**.
+- **Row colour:** gold when he meets all your criteria and is better for at least one of your mares, green fading towards a colour for how many criteria he meets when he is better but misses some, red when he would be worse for most of your mares, grey when he is about the same.
+- **Hover:** his numbers and fertility (with the wiki's chance of a failed covering), the **stud fee** in every currency shown and how it compares with what other studs of his Breed Total ask (from the fees you have saved), whether it is above your maximum stud fee, and **your mares that would suit him best and why**: for each, the estimated foal Breed Total, how much better or worse that is than a foal by your own best stallion, whether he is strong where she is Below average, and the inbreeding. Mares that are in foal or covered, or that your notes say not to breed, are left out.
+
+"Better" means the foal would be at least 0.5 Breed Total higher than with your best stallion of the breed (or higher than the mare herself when you have no stallion to compare), with no heavy inbreeding. The estimate uses what the ledger has learned from your own foals. The same checkbox in **My notes** turns the market colours off.
+
 ## Listing, retiring and selling a horse
 
 The ledger keeps a horse's status up to date as things happen on Horse Reality:

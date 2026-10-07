@@ -1225,6 +1225,9 @@
         row.removeAttribute('data-hr-fit');
         row.removeAttribute('title');
         outer.querySelectorAll('[data-hr-info]').forEach(function (e) { e.remove(); });
+        // a row of the Studs & Semen market: the life number is in the link
+        var studLink = outer.querySelector('a[href*="/market/studs-and-semen/"]');
+        if (studLink) { if (!off) studRow(state, outer, row, studLink, me); return; }
         var link = outer.querySelector('.market-office-table-row-horse-info a[href*="/market/trade/"]') || outer.querySelector('a[href*="/market/trade/"]');
         if (!link) return;
         var tm = /\/market\/trade\/(\d+)/.exec(link.getAttribute('href') || '');
@@ -1254,24 +1257,8 @@
         var judged = counts.total > 0;
         var frac = judged ? counts.matched / counts.total : 1;
         var allMet = judged && counts.matched === counts.total;
-        function rgb(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
-        function mix(a, b2, t) { return [Math.round(a[0] + (b2[0] - a[0]) * t), Math.round(a[1] + (b2[1] - a[1]) * t), Math.round(a[2] + (b2[2] - a[2]) * t)]; }
-        var GREEN = [34, 160, 84], RED = [204, 48, 40], ORANGE = [236, 140, 30], GOLD = [255, 196, 0];
-        // none of the criteria = red, about half = orange, all of them = gold
-        function matchColour(f) { return f < 0.5 ? mix(RED, ORANGE, f / 0.5) : mix(ORANGE, GOLD, (f - 0.5) / 0.5); }
-        var state2, bar;
-        if (good && allMet) {
-          state2 = 'gold'; bar = GOLD;
-          row.style.background = rgb(GOLD, 0.7);
-        } else if (good) {
-          state2 = 'lifts'; var mc = matchColour(frac); bar = mc;
-          row.style.background = 'linear-gradient(90deg,' + rgb(GREEN, 0.7) + ' 0%,' + rgb(GREEN, 0.7) + ' 30%,' + rgb(mc, 0.7) + ' 100%)';
-        } else {
-          state2 = 'no'; bar = RED;
-          row.style.background = rgb(RED, 0.6);
-        }
-        row.style.boxShadow = 'inset 8px 0 0 ' + rgb(bar, 1);
-        row.setAttribute('data-hr-fit', state2);
+        var state2 = good && allMet ? 'gold' : good ? 'lifts' : 'no';
+        paintRow(row, state2, frac, false);
         var head = state2 === 'gold' ? 'would lift your herd and fits all ' + counts.total + ' of your criteria' :
           good ? 'would lift your herd; fits ' + counts.matched + ' of ' + counts.total + ' criteria' + (counts.missing.length ? ' (missing ' + counts.missing.slice(0, 3).join(', ') + ')' : '') : 'would not lift your herd';
         row.title = (ri ? ri.hover + '\n\n' : '') + 'Overall: ' + head;
@@ -1513,6 +1500,39 @@
     var link = host.querySelector('a');
     if (link && link.parentNode) link.parentNode.insertBefore(tag, link.nextSibling); else host.appendChild(tag);
   }
+  // row colours: gold = fits everything, green fading to a colour for how many criteria are met, red = no, grey = about the same
+  var ROW_GREEN = [34, 160, 84], ROW_RED = [204, 48, 40], ROW_ORANGE = [236, 140, 30], ROW_GOLD = [255, 196, 0], ROW_GREY = [130, 134, 120];
+  function rowRgb(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  function rowMix(a, b, t) { return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
+  function paintRow(row, st, frac, plain) {
+    var bar, mc;
+    if (plain) { bar = ROW_GREY; row.style.background = rowRgb(ROW_GREY, 0.35); }
+    else if (st === 'gold') { bar = ROW_GOLD; row.style.background = rowRgb(ROW_GOLD, 0.7); }
+    else if (st === 'lifts') {
+      mc = frac < 0.5 ? rowMix(ROW_RED, ROW_ORANGE, frac / 0.5) : rowMix(ROW_ORANGE, ROW_GOLD, (frac - 0.5) / 0.5); bar = mc;
+      row.style.background = 'linear-gradient(90deg,' + rowRgb(ROW_GREEN, 0.7) + ' 0%,' + rowRgb(ROW_GREEN, 0.7) + ' 30%,' + rowRgb(mc, 0.7) + ' 100%)';
+    } else { bar = ROW_RED; row.style.background = rowRgb(ROW_RED, 0.6); }
+    row.style.boxShadow = 'inset 8px 0 0 ' + rowRgb(bar, 1);
+    row.setAttribute('data-hr-fit', plain ? 'same' : st);
+  }
+  // a stallion on the Studs & Semen market: his numbers, the fee, and whether he is better or worse than your own
+  // stallions for your free mares; the hover lists the mares that would suit him best and why
+  function studRow(state, outer, row, studLink, me) {
+    var m = /studs-and-semen\/(\d+)/.exec(studLink.getAttribute('href') || '');
+    if (!m) return;
+    var info = state.horseInfo && state.horseInfo[m[1]];
+    if (!info || (me && String(info.ownerName || '').trim().toLowerCase() === me)) return;
+    var fees = {};
+    [['hrc', 'HRC'], ['dp', 'DP'], ['ft', 'FT'], ['wt', 'WT']].forEach(function (p) {
+      var td = outer.querySelector('tr.market-item-price td.item-price-' + p[0]);
+      if (td && !td.classList.contains('disabled')) { var n = parseInt(String(td.textContent || '').replace(/[^0-9]/g, ''), 10); if (n) fees[p[1]] = n; }
+    });
+    var ri = HRLib.studRowInfo(state, m[1], fees);
+    if (!ri) return;
+    infoBadge(outer, ri, null);
+    row.title = ri.hover;
+    if (ri.paint) paintRow(row, ri.paint.state, ri.paint.frac, ri.paint.plain);
+  }
   function rowMoney(outer, sel) {
     var el = outer.querySelector(sel);
     return el && !/n\/a/i.test(el.textContent || '') ? parseInt(String(el.textContent || '').replace(/[^0-9]/g, ''), 10) || 0 : 0;
@@ -1533,6 +1553,7 @@
     }
     ri.chips.forEach(function (c) { pill(c.label + ' ' + c.text + (c.ok === true ? ' ✓' : c.ok === false ? ' ✗' : ''), c.ok); });
     if (ri.bench) pill('$ ~' + ri.bench.est.toLocaleString('en-US'), null, '#46592C');
+    (ri.extraPills || []).forEach(function (x) { pill(x.text, null, x.bg); });
     var hv = benefit && benefit.verdict;
     if (hv && hv !== 'unknown') pill(hv === 'helps' ? 'Helps herd' : hv === 'maybe' ? 'May help herd' : 'No herd lift', hv === 'no' ? false : true);
     host.appendChild(box);

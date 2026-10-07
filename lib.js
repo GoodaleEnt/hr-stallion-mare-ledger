@@ -1553,7 +1553,7 @@
     if (isYoungInfo(mInfo)) { out.error = 'young'; return out; }
     var mMeta = (state.horseMeta && state.horseMeta[mareLife]) || {};
     var mConf = bestConformation(mMeta).best;
-    var LM = learnedModel(state);
+    var LM = learnedModel(state), FXb = focusOf(state);
     var mAnc = ancestorMap(state, mareLife, 3);
     var list = [];
     Object.keys(state.horseInfo || {}).forEach(function (life) {
@@ -1579,15 +1579,23 @@
       var common = commonAncestors(mAnc, ancestorMap(state, life, 3));
       var coi = estimateCoi(common);
       if (coi > coiLimit) { out.tooRelated++; return; }
-      var shared = [], fixes = [];
+      var shared = [], fixes = [], tr = { n: 0, sum: 0, weak: 0, strong: 0 };
       if (mInfo.confTraits && sInfo.confTraits) {
         Object.keys(mInfo.confTraits).forEach(function (t) {
           var a = traitRankOf(mInfo.confTraits[t]), b = traitRankOf(sInfo.confTraits[t]);
           if (a == null || b == null) return;
           if (a === 0 && b === 0) shared.push(t);
           else if (a === 0 && b >= 2) fixes.push(t);
+          var ex = (a + b) / 2;
+          tr.n++; tr.sum += ex;
+          if (ex < 1) tr.weak++;
+          if (ex >= 2) tr.strong++;
         });
       }
+      // partners are ranked on the foal's expected conformation score, genetic potential and conformation stats (not on
+      // Breed Total, which depends on how the foal does in conformation shows); a breeder focus counts its measure more
+      var foalExp = { conf: conf, gp: gp, traitAvg: tr.n ? tr.sum / tr.n : null, weak: tr.weak, strong: tr.strong };
+      var baseScore = conf != null ? foalScoreOf(foalExp, FXb) / 2 : gp / 10;
       var fert = String(sInfo.fertility || '').toLowerCase().trim();
       var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
       var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
@@ -1603,8 +1611,9 @@
         });
       }
       var reasons = [], learnedFail = 0;
+      reasons.push('Expected foal: ' + (conf != null ? 'conformation score ' + (Math.round(conf * 10) / 10) + ', ' : 'no conformation score yet, ') + 'genetic potential ' + Math.round(gp) + (foalExp.traitAvg != null ? ', conformation stats: ' + tr.strong + ' of ' + tr.n + ' traits Good or better, ' + tr.weak + ' weak' : ''));
       reasons.push(estBT != null
-        ? 'Estimated foal Breed Total ' + (Math.round(estBT * 10) / 10) + ' (average genetic potential ' + (Math.round(gp * 10) / 10) + ', average top conformation ' + (Math.round(conf * 10) / 10) + ')'
+        ? 'For reference, estimated Breed Total ' + (Math.round(estBT * 10) / 10) + ' (average genetic potential ' + (Math.round(gp * 10) / 10) + ', average top conformation ' + (Math.round(conf * 10) / 10) + ')'
         : 'Average genetic potential ' + (Math.round(gp * 10) / 10) + ' (neither has a show score saved yet, so Breed Total is not estimated)');
       reasons.push(common.length ? 'Estimated inbreeding ' + (Math.round(coi * 100) / 100) + '% (' + common.length + ' shared ancestor' + (common.length === 1 ? '' : 's') + ')' : 'No shared ancestors in the saved pedigrees (0% inbreeding)');
       if (learnedNote) reasons.push(learnedNote);
@@ -1622,8 +1631,8 @@
       if (noteFx.reason) reasons.push(noteFx.reason);
       var geneFx = preferredGeneBonus(state, mareLife, life);
       geneFx.reasons.forEach(function (r) { reasons.push(r); });
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
-      list.push({ life: life, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
+      var score = baseScore + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
+      list.push({ life: life, conf: conf != null ? Math.round(conf * 10) / 10 : null, traitAvg: foalExp.traitAvg, weakTraits: tr.weak, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     // a breeder focus lifts partners that are strong in it (by how far above the others they stand)
     var FXp = focusOf(state);

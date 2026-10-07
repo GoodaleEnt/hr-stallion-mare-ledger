@@ -754,6 +754,15 @@
         HRStorage.upsertHorseInfo(state, horseInfo.lifeNumber, horseInfo);
         passportCached = true;
       }
+      // a horse that has been renamed (a name you gave her, or the seller's tagline replaced): breeding records that
+      // were saved under the old name take the new one
+      if (horseInfo.name) {
+        Object.keys(state.breedings || {}).forEach(function (sid) {
+          (state.breedings[sid] || []).forEach(function (b) {
+            if (String(b.mareLifeNumber) === String(horseInfo.lifeNumber) && b.mareName !== horseInfo.name) { b.mareName = horseInfo.name; passportCached = true; }
+          });
+        });
+      }
       // a horse you had listed that now belongs to someone else has been sold
       if (HRLib.recordSoldByOwner(state, horseInfo.lifeNumber)) passportCached = true;
 

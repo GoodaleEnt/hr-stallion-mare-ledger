@@ -126,6 +126,12 @@
         }
       });
     }
+    // the name on the horse's own page is the current one: a mare that has been renamed shows under the new name
+    Object.keys(map).forEach(function (k) {
+      var mi = map[k].mareLifeNumber && state.horseInfo && state.horseInfo[map[k].mareLifeNumber];
+      var nm = mi && String(mi.name || '').replace(/\u2186/g, '').replace(/^\s*!/, '').replace(/\s*\|\s*$/, '').replace(/\s+/g, ' ').trim();
+      if (nm) map[k].mareName = nm;
+    });
     maresIndex = Object.keys(map).map(function (k) { return map[k]; })
       .filter(function (m) { return isAdultHorse(m.mareLifeNumber) && !movedOut(m.mareLifeNumber); });
     maresIndex.forEach(function (m) {
@@ -786,8 +792,8 @@
     var tidy = function (n) { return String(n || '').replace(/ↆ/g, '').replace(/^\s*!/, '').replace(/\s*\|\s*$/, '').replace(/\s+/g, ' ').trim(); };
     var name = tidy(b.mareName);
     var info = b.mareLifeNumber && state.horseInfo ? state.horseInfo[b.mareLifeNumber] : null;
-    // a name that is only her life number (possibly followed by a code, "28040882|$") is replaced by her real name
-    if ((!name || /^\d+$/.test(name.split('|')[0].trim())) && info && info.name) name = tidy(info.name);
+    // her current name from her own page (a renamed mare, or a name that was only her life number, "28040882|$")
+    if (info && info.name) name = tidy(info.name);
     return name || b.mareName || '';
   }
   var rowSiblings = [];

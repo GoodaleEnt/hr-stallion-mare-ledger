@@ -2855,6 +2855,7 @@
       var confs = [myConf, cConf].filter(function (x) { return x > 0; });
       var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
       // adjusted by what the ledger has learned from your own foals
+      var FXq = focusOf(state);
       if (LMp.on && LMp.gp.n >= 3) gp += LMp.gp.off;
       if (LMp.on && conf && myConf > 0 && cConf > 0) conf = predictFoalConf(LMp, isMare ? myConf : cConf, isMare ? cConf : myConf, isMare ? life : cl, String(isMare ? cl : life), breedKeyOf(info.breed)).conf;
       var estBT = conf ? breedTotal(gp, conf) : null;
@@ -2862,22 +2863,28 @@
       var coi = estimateCoi(common);
       if (coi > (overallRules.avoidInbreeding ? 3.125 : 12.5)) return;
       var mI = isMare ? info : ci, sI = isMare ? ci : info;
-      var shared = [], fixes = [];
+      var shared = [], fixes = [], trq = { n: 0, sum: 0, weak: 0, strong: 0 };
       if (mI.confTraits && sI.confTraits) {
         Object.keys(mI.confTraits).forEach(function (t) {
           var a = traitRankOf(mI.confTraits[t]), b = traitRankOf(sI.confTraits[t]);
           if (a == null || b == null) return;
           if (a === 0 && b === 0) shared.push(t);
           else if (a === 0 && b >= 2) fixes.push(t);
+          var exq = (a + b) / 2;
+          trq.n++; trq.sum += exq;
+          if (exq < 1) trq.weak++;
+          if (exq >= 2) trq.strong++;
         });
       }
+      var foalQ = { conf: conf, gp: gp, traitAvg: trq.n ? trq.sum / trq.n : null, weak: trq.weak, strong: trq.strong };
       var fert = String(sI.fertility || '').toLowerCase().trim();
       var fertBonus = FERT_BONUS[fert] != null ? FERT_BONUS[fert] : 0;
       var fits = coi < (overallRules.avoidInbreeding ? 3.125 : 6.25) && goalSets.some(function (g) { return (g.minBT == null || (estBT != null && estBT >= g.minBT)) && (g.minConf == null || (conf != null && conf >= g.minConf)) && (g.minGP == null || gp >= g.minGP); });
       var otherMet = goalCheck(state, cl).met;
       var mine = !!myName && String(ci.ownerName || '').trim().toLowerCase() === myName;
       var reasons = [];
-      reasons.push(estBT != null ? 'Estimated foal Breed Total ' + (Math.round(estBT * 10) / 10) : 'Average genetic potential ' + (Math.round(gp * 10) / 10) + ' (no show score yet, so no Breed Total)');
+      reasons.push('Expected foal: ' + (conf != null ? 'conformation score ' + (Math.round(conf * 10) / 10) + ', ' : 'no conformation score yet, ') + 'genetic potential ' + Math.round(gp) + (foalQ.traitAvg != null ? ', conformation stats: ' + trq.strong + ' of ' + trq.n + ' traits Good or better, ' + trq.weak + ' weak' : ''));
+      if (estBT != null) reasons.push('For reference, estimated Breed Total ' + (Math.round(estBT * 10) / 10));
       if (out.hasGoal && !fits && goals.minBT != null && estBT != null && estBT < goals.minBT) reasons.push('Your goal is Breed Total ' + goals.minBT);
       reasons.push(common.length ? 'Estimated inbreeding ' + (Math.round(coi * 100) / 100) + '%' : 'No shared ancestors');
       if (fixes.length) reasons.push('Covers ' + fixes.join(', '));
@@ -2887,7 +2894,7 @@
       if (noteFx.reason) reasons.push(noteFx.reason);
       var geneFx2 = preferredGeneBonus(state, life, cl);
       geneFx2.reasons.forEach(function (r) { reasons.push(r); });
-      var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus + geneFx2.bonus;
+      var score = (conf != null ? foalScoreOf(foalQ, FXq) / 2 : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus + geneFx2.bonus;
       list.push({ life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
     });
     list.sort(function (a, b) { return b.score - a.score; });
@@ -3547,7 +3554,7 @@
     // other's Below-average conformation trait, and down for shared weak traits and inbreeding.
     var TRAIT_RANK = { 'below average': 0, 'average': 1, 'good': 2, 'good+': 3, 'good +': 3, 'very good': 4 };
     function traitRank(v) { var r = TRAIT_RANK[String(v || '').toLowerCase().trim()]; return r == null ? null : r; }
-    var pairs = [];
+    var pairs = [], LMa = learnedModel(state), FXa = focusOf(state);
     var studs = stallions.filter(function (s) { return s.status === 'Active' && s.lifeNumber && state.horseInfo[s.lifeNumber] && state.horseInfo[s.lifeNumber].geneticPotential != null; });
     mares.filter(function (m) { return !m.young && !m.pregnant && state.horseInfo[m.life].geneticPotential != null; }).forEach(function (m) {
       var mInfo = state.horseInfo[m.life], mConf = bestConformation((state.horseMeta && state.horseMeta[m.life]) || {}).best;
@@ -3556,9 +3563,10 @@
         if (!sameBreed(sInfo, mInfo)) return;
         var pairFx = partnerNoteEffect(state, m.life, s.lifeNumber);
         if (pairFx.skip) return;
-        var gp = (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
-        var confs = [mConf, sConf].filter(function (x) { return x > 0; });
-        var conf = confs.length ? confs.reduce(function (a, b) { return a + b; }, 0) / confs.length : null;
+        // the expected foal, adjusted by what the ledger has learned from your own foals
+        var est0 = pairEstimate(state, m.life, s.lifeNumber, LMa);
+        var gp = est0 ? est0.gp : (Number(mInfo.geneticPotential) + Number(sInfo.geneticPotential)) / 2;
+        var conf = est0 ? est0.conf : null;
         var estBT = conf ? breedTotal(gp, conf) : null;
         var common = commonAncestors(ancestorMap(state, m.life, 3), ancestorMap(state, s.lifeNumber, 3));
         var coi = estimateCoi(common);
@@ -3572,13 +3580,16 @@
             else if (b === 0 && a >= 2) fixes.push({ trait: t, from: 'mare' });
           });
         }
-        var score = (estBT != null ? estBT : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + pairFx.bonus + preferredGeneBonus(state, m.life, s.lifeNumber).bonus;
+        // ranked on the foal's expected conformation score, genetic potential and conformation stats, not on Breed Total
+        var foalExp = { conf: conf, gp: gp, traitAvg: est0 ? est0.traitAvg : null, weak: est0 ? est0.weak : 0, strong: est0 ? est0.strong : 0 };
+        var score = (conf != null ? foalScoreOf(foalExp, FXa) / 2 : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + pairFx.bonus + preferredGeneBonus(state, m.life, s.lifeNumber).bonus;
         pairs.push({
           mare: m.name, stallion: s.name, mareLife: m.life, stallionLife: s.lifeNumber, gp: Math.round(gp * 10) / 10,
           conf: conf != null ? Math.round(conf * 10) / 10 : null,
           estBT: estBT != null ? Math.round(estBT * 10) / 10 : null,
           coi: Math.round(coi * 100) / 100, shared: shared, fixes: fixes,
-          noScore: !(mConf > 0 && sConf > 0), score: score
+          noScore: !(mConf > 0 && sConf > 0), score: score,
+          traitN: est0 ? est0.traitN : 0, strong: foalExp.strong, weak: foalExp.weak
         });
       });
     });

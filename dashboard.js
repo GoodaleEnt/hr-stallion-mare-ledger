@@ -1341,10 +1341,10 @@
     if (!a.tips.length) html += '<div class="an-tip info">Nothing needs attention right now.</div>';
     a.tips.forEach(function (t) { html += '<div class="an-tip ' + t.level + '">' + L.esc(t.text) + '</div>'; });
     if (a.pairs.length) {
-      html += '<div style="margin-top:10px;"><strong>Pairing ideas</strong> <span class="sub" style="color:var(--text-muted);font-size:12px;">your free mares \u00d7 your active stallions, ranked by the foal\u2019s estimated Breed Total from both parents\u2019 genetic potential and top conformation, then adjusted for conformation traits that cover each other, shared weak traits, and an estimated inbreeding under 6.25%</span>';
+      html += '<div style="margin-top:10px;"><strong>Pairing ideas</strong> <span class="sub" style="color:var(--text-muted);font-size:12px;">your free mares \u00d7 your active stallions, ranked by the foal\u2019s expected conformation score, genetic potential and conformation stats (not Breed Total), then adjusted for conformation traits that cover each other, shared weak traits, and an estimated inbreeding under 6.25%</span>';
       a.pairs.forEach(function (p) {
         var line = L.esc(p.mare) + ' \u00d7 ' + L.esc(p.stallion) + ' \u2014 ' +
-          (p.estBT != null ? 'estimated foal BT <strong>' + p.estBT + '</strong> (avg GP ' + p.gp + ', avg top conformation ' + p.conf + ')' : 'average GP <strong>' + p.gp + '</strong> (no show score yet)') +
+          (p.conf != null ? 'expected foal conformation <strong>' + p.conf + '</strong>, GP <strong>' + Math.round(p.gp) + '</strong>' + (p.traitN ? ', stats ' + p.strong + '/' + p.traitN + ' good+, ' + p.weak + ' weak' : '') + ' (Breed Total ~' + p.estBT + ')' : 'average GP <strong>' + Math.round(p.gp) + '</strong> (no show score yet)') +
           ', inbreeding ' + p.coi + '%';
         var notes = [];
         if (p.fixes.length) notes.push('Covers: ' + p.fixes.map(function (f) { return L.esc(f.trait) + ' (' + f.from + ' is stronger)'; }).join(', '));

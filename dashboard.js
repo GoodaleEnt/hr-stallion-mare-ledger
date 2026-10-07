@@ -473,7 +473,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
+    html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife);
@@ -1150,7 +1150,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
+    html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -2483,6 +2483,18 @@
         '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.round(c.p * 100) + '%;background:var(--' + (c.level === 'avoid' ? 'danger' : 'accent') + ');"></span></span><span class="mono">' + Math.round(c.p * 100) + '%</span></div>';
     }).join('') + '<p class="notes-line" style="margin:6px 0 0;">The chance the foal has at least one copy. A gene neither parent is tested for counts as not there.</p></div>';
   }
+  // Keep or sell: the level, how it was worked out, and (for a mare or a foal of a mare of yours) the foals as keepers
+  function keeperPanelHtml(life) {
+    var info = state.horseInfo[life], me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    if (!info || !me || String(info.ownerName || '').trim().toLowerCase() !== me) return '';
+    var adv;
+    try { adv = L.herdAdvice(state, [life])[life]; } catch (e) { return ''; }
+    if (!adv) return '';
+    var colours = { top: 'var(--success)', keep: 'var(--success)', middle: 'var(--text-muted)', consider: '#B9770E', sell: 'var(--danger)', forsale: 'var(--text-muted)', nodata: 'var(--text-muted)' };
+    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Keep or sell</strong> <span class="tag" style="color:' + (colours[adv.action] || 'inherit') + ';">' + (adv.protectedHorse ? '\u2605 ' : '') + L.esc(adv.label) + (adv.rank && adv.of ? ' \u00b7 ' + adv.rank + '/' + adv.of : '') + '</span>' +
+      '<div style="margin-top:8px;white-space:pre-wrap;font-size:12.5px;line-height:1.55;">' + adv.reasons.map(function (t) { return L.esc(t); }).join('\n') + '</div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">The same information is in the hover on the ranch page cards. It is worked out again from your ledger each time.</p></div>';
+  }
   // For a horse that is listed for sale (or was): what you ask and how it changed; and when it was retired.
   function saleHistoryPanelHtml(life) {
     var meta = state.horseMeta[life];
@@ -3008,7 +3020,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
+    html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);

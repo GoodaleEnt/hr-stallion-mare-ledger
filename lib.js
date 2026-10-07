@@ -1219,6 +1219,104 @@
     return !!(m && parseFloat(m[2]) > 0 && parseFloat(m[1]) >= parseFloat(m[2]) * 0.99);
   }
 
+  // ---------- a mare's foals as keepers ----------
+  // Her foals that are yours are checked as possible replacements or additions:
+  //  - a colt must make your herd of stallions better (the same check as for a horse you are thinking of buying);
+  //  - a filly must be better than her dam (Breed Total, and conformation or genetic potential), and should not make
+  //    your herd of mares worse;
+  //  - a daughter whose own foals average clearly above her dam's foals out-produces her: that lowers the dam's rank.
+  // Returns { foals: [{ life, name, sex, young, bt, conf, gp, verdict, why }], betterProducers: [{ life, name, avgFoal, damAvg }] }
+  // verdict: 'keeper' (worth keeping), 'maybe', 'no', 'unknown' (not enough scores yet)
+  function foalsOfDam(state, damLife) {
+    damLife = String(damLife);
+    var seen = {}, out = [];
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      (state.breedings[sid] || []).forEach(function (b) {
+        if (String(b.mareLifeNumber) !== damLife || b.status !== 'Foal Born') return;
+        var fl = foalLifeOf(b.foalUrl);
+        if (fl && !seen[fl]) { seen[fl] = true; out.push(fl); }
+      });
+    });
+    Object.keys(state.horseInfo || {}).forEach(function (l) {
+      var i = state.horseInfo[l];
+      if (i && i.dam && String(i.dam.lifeNumber) === damLife && !seen[l]) { seen[l] = true; out.push(l); }
+    });
+    return out;
+  }
+  function foalKeeperInfo(state, damLife) {
+    damLife = String(damLife);
+    var out = { foals: [], betterProducers: [] };
+    var dInfo = state.horseInfo && state.horseInfo[damLife];
+    if (!dInfo) return out;
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var dBT = horseBT(state, damLife), dConf = bestConformation((state.horseMeta && state.horseMeta[damLife]) || {}).best, dGP = Number(dInfo.geneticPotential) || 0;
+    var r1 = function (n) { return Math.round(n * 10) / 10; };
+    var damProd = null;
+    foalsOfDam(state, damLife).forEach(function (fl) {
+      var fi = state.horseInfo && state.horseInfo[fl], fm = (state.horseMeta && state.horseMeta[fl]) || {};
+      if (!fi || (fi.sex !== 'mare' && fi.sex !== 'stallion')) return;
+      if (me && String(fi.ownerName || '').trim().toLowerCase() !== me) return;
+      if (isSoldLife(state, fl) || fm.status === 'Retired' || fm.status === 'Deceased') return;
+      var bt = horseBT(state, fl), conf = bestConformation(fm).best, gp = Number(fi.geneticPotential) || 0;
+      var row = { life: fl, name: fi.name || ('#' + fl), sex: fi.sex, young: isYoungInfo(fi), bt: bt, conf: conf, gp: gp, verdict: 'unknown', why: '' };
+      var hb = herdBenefit(state, fl);
+      if (fi.sex === 'stallion') {
+        if (hb.verdict === 'helps') { row.verdict = 'keeper'; row.why = 'would make your stallions better (' + hb.lines.filter(function (l) { return l.ok === true; }).slice(0, 2).map(function (l) { return l.text; }).join('; ') + ')'; }
+        else if (hb.verdict === 'maybe') { row.verdict = 'maybe'; row.why = 'might help your stallions, but not clearly'; }
+        else if (hb.verdict === 'no') { row.verdict = 'no'; row.why = 'would not make your stallions better'; }
+        else row.why = bt > 0 ? 'fewer than 3 of your stallions of this breed are saved to compare with' : 'scores not known yet';
+      } else {
+        var wins = 0, known = 0, bits = [];
+        [['Breed Total', bt, dBT], ['conformation', conf, dConf], ['genetic potential', gp, dGP]].forEach(function (m) {
+          if (!(m[1] > 0) || !(m[2] > 0)) return;
+          known++;
+          if (m[1] > m[2]) { wins++; bits.push(m[0] + ' ' + r1(m[1]) + ' against her ' + r1(m[2])); }
+        });
+        if (!known) row.why = 'scores not known yet';
+        else if (bt > 0 && dBT > 0 && bt >= dBT + 0.5 && wins >= 2 && hb.verdict !== 'no') { row.verdict = 'keeper'; row.why = 'better than her dam: ' + bits.join(', '); }
+        else if (wins >= 1 && hb.verdict !== 'no') { row.verdict = 'maybe'; row.why = 'beats her dam only in part: ' + bits.join(', '); }
+        else { row.verdict = 'no'; row.why = wins ? 'better than her dam in some ways, but would not make your mares better' : 'not better than her dam'; }
+        // a daughter whose own foals score clearly above her dam's foals
+        if (!fi.young || !isYoungInfo(fi)) {
+          damProd = damProd || producerRecord(state, damLife);
+          var dp = producerRecord(state, fl);
+          if (damProd.scored >= 2 && dp.scored >= 2 && dp.avgFoal != null && damProd.avgFoal != null && dp.avgFoal >= damProd.avgFoal + 1) {
+            out.betterProducers.push({ life: fl, name: row.name, avgFoal: dp.avgFoal, damAvg: damProd.avgFoal, n: dp.scored });
+            row.producer = 'her foals average ' + dp.avgFoal + ', above her dam’s ' + damProd.avgFoal;
+          }
+        }
+      }
+      out.foals.push(row);
+    });
+    var rank = { keeper: 0, maybe: 1, unknown: 2, no: 3 };
+    out.foals.sort(function (a, b) { return rank[a.verdict] - rank[b.verdict]; });
+    return out;
+  }
+  // Plain lines for the card hover and the horse's ledger page: her foals as keepers (for a mare) or how a foal compares
+  // with its dam and herd (for a foal of a mare of yours).
+  function keeperLines(state, life) {
+    life = String(life);
+    var info = state.horseInfo && state.horseInfo[life], lines = [];
+    if (!info) return lines;
+    var tag = { keeper: '✓ keeper', maybe: '• maybe', no: '✗ not needed', unknown: '• not clear yet' };
+    var fmt = function (f) { return (f.name) + ' (' + (f.sex === 'stallion' ? (f.young ? 'colt' : 'stallion') : (f.young ? 'filly' : 'mare')) + '): ' + tag[f.verdict] + ' — ' + f.why + (f.producer ? '; ' + f.producer : ''); };
+    if (info.sex === 'mare') {
+      var fk = foalKeeperInfo(state, life);
+      if (fk.foals.length) {
+        lines.push('HER FOALS AS KEEPERS (a colt must make your stallions better; a filly must be better than her)');
+        fk.foals.slice(0, 8).forEach(function (f) { lines.push('   ' + fmt(f)); });
+        if (fk.foals.length > 8) lines.push('   and ' + (fk.foals.length - 8) + ' more');
+      }
+      fk.betterProducers.forEach(function (b) { lines.push('✗ Her daughter ' + b.name + ' out-produces her (foals average ' + b.avgFoal + ' against her ' + b.damAvg + '), which lowers her rank'); });
+    }
+    var dl = info.dam && info.dam.lifeNumber ? String(info.dam.lifeNumber) : '';
+    if (dl && state.horseInfo && state.horseInfo[dl]) {
+      var mine = foalKeeperInfo(state, dl).foals.find(function (f) { return f.life === life; });
+      if (mine) lines.push('COMPARED WITH HER DAM ' + ((state.horseInfo[dl] && state.horseInfo[dl].name) || ('#' + dl)).toUpperCase() + ': ' + fmt(mine));
+    }
+    return lines;
+  }
+
   // ---------- ranch cards: where each horse sits between keeping and selling ----------
   // Every horse of yours is ranked against the rest of its group (mares & fillies or colts & stallions of the same breed,
   // or of all breeds when fewer than 6 of the breed) on a blend of Breed Total, conformation, genetic potential and, when
@@ -1237,7 +1335,7 @@
     }).map(function (h) {
       var life = String(h.lifeNumber), m = {};
       ['bt', 'conf', 'gp', 'comp', 'health', 'genes', 'producer'].forEach(function (k) { m[k] = focusMetric(state, life, k, FX.discipline); });
-      return { life: life, h: h, sex: h.info.sex, young: isYoungInfo(h.info), breed: breedKeyOf(h.info.breed), m: m, z: 0, adj: 0, why: [], flags: {} };
+      return { life: life, h: h, sex: h.info.sex, young: isYoungInfo(h.info), breed: breedKeyOf(h.info.breed), m: m, z: 0, adj: 0, why: [], flags: {}, parts: [], adjParts: [], over: [] };
     });
     var GROUP = { mare: 'mares & fillies', stallion: 'colts & stallions' };
     // groups: same breed and sex, or all breeds when the breed group is small
@@ -1265,46 +1363,55 @@
         if (st.n < 3) return;
         var z = Math.max(-2, Math.min(2, (x.m[k] - st.mean) / st.sd));
         num += w * z; den += w;
+        x.parts.push({ k: k, label: { bt: 'Breed Total', conf: 'Top conformation', gp: 'Genetic potential', comp: 'Competition fit', health: 'Health & fertility', genes: 'Genes', producer: 'Producer record' }[k] || k, value: x.m[k], mean: st.mean, z: z, w: w, focus: FX.keys.indexOf(k) > -1 });
         if (FX.keys.indexOf(k) > -1 && Math.abs(z) >= 0.6) x.why.push((z > 0 ? 'Strong' : 'Weak') + ' in your focus, ' + focusLabel(k) + (k === 'conf' || k === 'gp' || k === 'bt' ? ' (' + r1(x.m[k]) + ' against a group average of ' + r1(st.mean) + ')' : ''));
       });
       x.z = den ? num / den : null;
       var adj = 0;
+      function A(amt, text) { adj += amt; x.adjParts.push({ amt: amt, text: text }); }
       if (goalsOn) {
         var misses = goalMisses(state, life), sec = misses.length ? goalSections(state, life) : null, hard = 0, near = [];
         misses.forEach(function (lbl) {
           var key = focusKeyOfLabel(lbl), inFocus = FX.keys.indexOf(key) > -1;
           if (!inFocus && isNearMiss(sec, lbl)) { near.push(lbl); return; }
-          hard++; adj -= inFocus ? 0.55 : 0.35;
+          hard++; A(inFocus ? -0.55 : -0.35, 'Misses your ' + lbl + ' goal' + (inFocus ? ' (a focus area counts more)' : ''));
         });
         if (hard) x.why.push('Misses your goal' + (hard === 1 ? '' : 's') + ': ' + misses.filter(function (l) { return !(near.indexOf(l) > -1); }).join(', '));
-        if (near.length) x.why.push('Within 1% of your ' + near.join(', ') + ' goal (not counted against it)');
+        if (near.length) { x.why.push('Within 1% of your ' + near.join(', ') + ' goal (not counted against it)'); x.adjParts.push({ amt: 0, text: 'Within 1% of your ' + near.join(', ') + ' goal, so not counted against it' }); }
         x.hard = hard;
         var gc = goalCheck(state, life);
-        if (gc.active && gc.met) { adj += 0.3; x.flags.met = true; x.why.push('Meets all your goals'); }
+        if (gc.active && gc.met) { A(0.3, 'Meets all your goals'); x.flags.met = true; x.why.push('Meets all your goals'); }
       }
       var genes = preferredGenesOf(state, life);
       var avoid = genes.filter(function (g) { return g.level === 'avoid'; }), keepG = genes.filter(function (g) { return g.level === 'keep'; });
-      if (avoid.length) { adj -= 0.5; x.why.push('Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); }
+      if (avoid.length) { A(-0.5, 'Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); x.why.push('Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); }
       if (keepG.length) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you keep'); x.why.push('Carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep'); }
       if (nr.keep || overall.keepGroups[x.young ? (x.sex === 'mare' ? 'filly' : 'colt') : x.sex]) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('your notes say to keep'); x.why.push('Your notes say to keep'); }
       if (nr.sell) { x.flags.sell = true; x.why.push('Your note says to sell'); }
       if (x.sex === 'mare') {
         var pr = producerRecord(state, life), dimp = damImprover(state, life);
-        if (pr.improver) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('she out-produces herself (foals average ' + pr.avgFoal + ' against her ' + pr.mareScore + ')'); x.why.push('Out-produces herself: foals average ' + pr.avgFoal + ' against her ' + pr.mareScore); }
-        else if (dimp) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('her dam ' + dimp.name + ' out-produces herself'); x.why.push('Her dam ' + dimp.name + ' out-produces herself'); }
-        else if (pr.scored >= 2 && pr.avgDelta != null && pr.avgDelta < -3 && pr.better === 0) { adj -= 0.4; x.why.push('Her ' + pr.scored + ' scored foals average ' + pr.avgFoal + ', below her own ' + pr.mareScore); }
-        if (!x.young && !Object.keys(state.breedings || {}).some(function (sid) { return (state.breedings[sid] || []).some(function (b) { return String(b.mareLifeNumber) === life; }); })) adj -= 0.15;
+        var fkd = foalKeeperInfo(state, life);
+        x.foalInfo = fkd;
+        if (fkd.betterProducers.length) {
+          fkd.betterProducers.slice(0, 2).forEach(function (bp) { A(-0.3, 'Her daughter ' + bp.name + ' out-produces her (foals average ' + bp.avgFoal + ' against her ' + bp.damAvg + ')'); });
+          x.why.push('A daughter out-produces her');
+        }
+        if (pr.improver && fkd.betterProducers.length) { x.adjParts.push({ amt: 0, text: 'Her own record (foals above her) would protect her, but a daughter out-produces her, so it does not' }); }
+        else if (pr.improver) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('she out-produces herself (foals average ' + pr.avgFoal + ' against her ' + pr.mareScore + ')'); x.why.push('Out-produces herself: foals average ' + pr.avgFoal + ' against her ' + pr.mareScore); }
+        else if (dimp && !fkd.betterProducers.length) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('her dam ' + dimp.name + ' out-produces herself'); x.why.push('Her dam ' + dimp.name + ' out-produces herself'); }
+        else if (pr.scored >= 2 && pr.avgDelta != null && pr.avgDelta < -3 && pr.better === 0) { A(-0.4, 'Her ' + pr.scored + ' scored foals average ' + pr.avgFoal + ', below her own ' + pr.mareScore); x.why.push('Her ' + pr.scored + ' scored foals average ' + pr.avgFoal + ', below her own ' + pr.mareScore); }
+        if (!x.young && !Object.keys(state.breedings || {}).some(function (sid) { return (state.breedings[sid] || []).some(function (b) { return String(b.mareLifeNumber) === life; }); })) A(-0.15, 'Adult mare never bred');
       } else {
         var sr = sireRecord(state, life);
         if (sr.improver) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('his foals beat their dams by ' + sr.avgDelta + ' on average'); x.why.push('His foals beat their dams by ' + sr.avgDelta + ' on average'); }
-        else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { adj -= 0.4; x.why.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', below their dams'); }
+        else if (sr.scored >= 3 && sr.avgDelta < -3 && sr.better === 0) { A(-0.4, 'His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', below their dams'); x.why.push('His ' + sr.scored + ' scored foals average ' + sr.avgFoal + ', below their dams'); }
         var lf = learnedFailure(state, life);
-        if (lf && lf.rate >= 0.4) { adj -= 0.4; x.why.push('Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); }
+        if (lf && lf.rate >= 0.4) { A(-0.4, 'Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); x.why.push('Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); }
       }
       x.price = priceIdea(state, life, form.pace, comps);
       if (FX.keys.indexOf('profit') > -1) {
         var cost = x.price.floor;
-        if (cost && x.price.suggested && x.price.suggested >= cost * 1.25) { adj -= 0.25; x.why.push('Would sell about ' + Math.round((x.price.suggested / cost - 1) * 100) + '% above what you paid (your focus is profit)'); }
+        if (cost && x.price.suggested && x.price.suggested >= cost * 1.25) { A(-0.25, 'Would sell about ' + Math.round((x.price.suggested / cost - 1) * 100) + '% above what you paid (your focus is profit)'); x.why.push('Would sell about ' + Math.round((x.price.suggested / cost - 1) * 100) + '% above what you paid (your focus is profit)'); }
       }
       x.adj = adj;
       if (x.z != null) x.value = x.z + adj; else x.value = null;
@@ -1323,16 +1430,43 @@
       var level = null, rankLevel = null;
       if (x.pct != null) {
         rankLevel = x.pct >= 0.8 ? 5 : x.pct >= 0.5 ? 4 : x.pct >= 0.3 ? 3 : x.pct >= 0.12 ? 2 : 1;
-        if (x.flags.met && rankLevel < 3) rankLevel = 3;
-        if ((x.hard || 0) >= 2 && rankLevel > 2 && x.pct < 0.5) rankLevel = 2;
+        var byRank = rankLevel;
+        if (x.flags.met && rankLevel < 3) { rankLevel = 3; x.over.push('It meets all your goals, so it is never placed lower than Middle of the herd (its rank alone said ' + RANK_LEVELS[byRank] + ')'); }
+        if ((x.hard || 0) >= 2 && rankLevel > 2 && x.pct < 0.5) { rankLevel = 2; x.over.push('It misses 2 or more goals and is in the lower half, so it is capped at Consider selling'); }
       }
-      if (x.flags.sell) level = 1;
-      else if (x.flags.core) level = 5;
+      if (x.flags.sell) { level = 1; x.over.push('Your note says to sell, so it is Sell whatever its rank'); }
+      else if (x.flags.core) { level = 5; x.over.push('It is protected as a keeper (' + (x.coreWhy || []).join('; ') + '), so it is a Top keeper whatever its rank'); }
       else level = rankLevel;
       var prot = !!x.flags.core && !x.flags.sell;
-      out[x.life] = { level: level, rankLevel: rankLevel, protectedHorse: prot, protectedWhy: prot ? (x.coreWhy || []) : [], label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
+      out[x.life] = { parts: x.parts, adjParts: x.adjParts, over: x.over, z: x.z, adj: x.adj, value: x.value, level: level, rankLevel: rankLevel, protectedHorse: prot, protectedWhy: prot ? (x.coreWhy || []) : [], label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
     });
     return out;
+  }
+  // The hover text for a card: every step of how the horse got its level
+  function rankExplanation(r, a) {
+    var f2 = function (n) { return (n >= 0 ? '+' : '\u2212') + Math.abs(Math.round(n * 100) / 100).toFixed(2); };
+    var f1 = function (n) { return Math.round(n * 10) / 10; };
+    var L = [];
+    L.push('LEVEL: ' + r.label + (a.rank && a.of ? ' \u2014 ranks ' + a.rank + ' of ' + a.of + ' ' + a.group + ' (1 is the best)' : ''));
+    if (r.over.length) r.over.forEach(function (t) { L.push('\u2605 ' + t); });
+    if (r.value != null) {
+      L.push('');
+      L.push('HOW THE SCORE IS WORKED OUT (higher is better)');
+      L.push('1. Each measure compared with the average of its group, then blended (weights in brackets; your focus counts 1.6\u00d7):');
+      r.parts.forEach(function (p) { L.push('   ' + p.label + ' ' + (p.k === 'bt' || p.k === 'conf' || p.k === 'comp' || p.k === 'health' ? f1(p.value) : p.k === 'gp' ? Math.round(p.value) : p.value) + ' against a group average of ' + (p.k === 'gp' ? Math.round(p.mean) : f1(p.mean)) + '  \u2192 ' + f2(p.z) + '  (weight ' + f1(p.w) + (p.focus ? ', your focus' : '') + ')'); });
+      L.push('   Blended: ' + f2(r.z));
+      L.push('2. Adjustments:');
+      if (!r.adjParts.length) L.push('   none');
+      r.adjParts.forEach(function (p) { L.push('   ' + (p.amt ? f2(p.amt) : ' 0.00') + '  ' + p.text); });
+      L.push('3. Final score ' + f2(r.value) + (a.rank && a.of ? ', ranked against the other ' + (a.of - 1) + ' in the group' + (a.rank && a.of ? ': ' + (a.rank <= a.of / 2 ? 'top ' + Math.ceil(a.rank / a.of * 100) : 'bottom ' + Math.ceil((a.of - a.rank + 1) / a.of * 100)) + '%' : '') : ''));
+      L.push('');
+      L.push('LEVELS BY RANK: top 20% Top keeper \u00b7 next 30% Keep \u00b7 next 20% Middle \u00b7 next 18% Consider selling \u00b7 bottom 12% Sell');
+    } else {
+      L.push('');
+      L.push('Not enough saved data (Breed Total, conformation or genetic potential) or too few horses in its group to rank it.');
+    }
+    if (a.price) L.push('Suggested asking price about ' + fmtMoney(a.price) + ' HRC');
+    return L;
   }
   // The card for each horse: its level, where it ranks, the reasons, an asking price when selling is suggested, and for a
   // mare free to breed the stallion the ledger would pick. { action, level, label, rank, of, group, reasons, price, best, infoal }
@@ -1345,8 +1479,9 @@
       if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) return;
       if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased' || meta.status === 'Companion') return;
       var a = { action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, pips: r ? (r.rankLevel || r.level) : null, protectedHorse: !!(r && r.protectedHorse), label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
-      if (a.protectedHorse && r.protectedWhy.length) a.reasons.unshift('★ Protected as a keeper, whatever its rank: ' + r.protectedWhy.join('; '));
-      if (a.rank && a.of) a.reasons.unshift('Ranks ' + a.rank + ' of ' + a.of + ' ' + a.group + ' (1 is the best)');
+      if (r) a.reasons = rankExplanation(r, a);
+      var kl = keeperLines(state, l);
+      if (kl.length) { a.reasons.push(''); kl.forEach(function (t) { a.reasons.push(t); }); }
       if (r && r.level && r.level <= 2 && r.price && r.price.suggested) { a.price = r.price.suggested; a.reasons.push('Suggested asking price about ' + fmtMoney(a.price) + ' HRC'); }
       if (forSaleSet[l] || meta.status === 'For Sale') { a.action = 'forsale'; a.label = 'For sale'; a.reasons.unshift('Listed for sale'); }
       if (info.sex === 'mare') {
@@ -3333,6 +3468,8 @@
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
     herdAdvice: herdAdvice,
+    foalKeeperInfo: foalKeeperInfo,
+    keeperLines: keeperLines,
     herdRanking: herdRanking,
     focusOf: focusOf,
     FOCUS_TYPES: FOCUS_TYPES,

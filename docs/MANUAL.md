@@ -220,6 +220,18 @@ On your **ranch (estate) page** on Horse Reality, each horse card of yours that 
 
 Hover the badge for the rank and every reason. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.
 
+## Foals as keepers, and the full reasoning
+
+The hover on a ranch card, and a **Keep or sell** panel at the top of the horse's own page in the ledger (My Herd, My Mares, Stallions), show every step of how the level was worked out: the level and rank, each measure against the group average with its weight, each adjustment with its amount, the final score and where it falls in the level bands, and any rule that overrode the rank (a keep note, a proven producer, a sell note, the "meets every goal" floor).
+
+For a mare they also list **her foals as keepers**, for foals of hers that you own:
+
+- A **colt** is a keeper only if he would **make your herd of stallions better** (the same check used on a horse you are thinking of buying; it needs 3 stallions of the breed saved).
+- A **filly** is a keeper if she is **better than her dam**: Breed Total at least 0.5 higher and better in at least two of Breed Total, conformation and genetic potential, without making your mares worse. Better in only part of that shows as "maybe".
+- A **daughter whose own foals average at least 1 point above her dam's foals** (2 scored foals each) **out-produces her dam**. That lowers the dam's rank (\u22120.3 each, up to two), and her own producer record then no longer protects her as a Top keeper. A note, a gene you keep or a keep-all setting still does.
+
+A foal's own page and card show how she or he compares with the dam.
+
 ## Breeder focus
 
 Under **My notes** tick what you breed for: **Conformation**, **Genetic potential**, **Breed Total**, **Competition** (pick a discipline, or leave it as whichever suits each horse best), **Health & fertility**, **Colour & preferred genes**, **Proven producers**, and **Buying & selling for profit**. You can tick several. A focus rates horses that are strong in it a bit higher and weak ones a bit lower: Sell ideas are less likely to suggest selling a horse in the top quarter of your herd for that, a missed goal in that area counts for more, partners strong in it rank higher in the breeding suggestions, a horse to buy counts for more when it is strong in it, and the ranch card level weighs it 1.6 times as much. The profit focus raises the margin kept in the suggested top bid to at least 25%.

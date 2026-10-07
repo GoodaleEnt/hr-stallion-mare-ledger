@@ -205,24 +205,39 @@
     });
     return out;
   }
+  // Rows that look like a purchase but could not be read (the wording is reported once, so it can be fixed)
+  var unreadPurchases = [];
   function scrapePurchases() {
     var out = [];
+    unreadPurchases = [];
     document.querySelectorAll('tr.bank-table').forEach(function (row) {
       var cells = row.querySelectorAll('td');
       if (cells.length < 4 || cleanText(cells[0]) !== 'OUT') return;
       var text = cleanText(cells[2]);
-      if (text.indexOf('You have bought') === -1) return;
-      var horseA = cells[2].querySelector('a');
+      if (!/\b(bought|purchased)\b/i.test(text)) return;
+      // the horse is the first link that points at a horse (the seller's link may come before it)
+      var horseA = null;
+      cells[2].querySelectorAll('a').forEach(function (a) { if (!horseA && lifeNumberFromUrl(a.href || '')) horseA = a; });
       var life = horseA ? lifeNumberFromUrl(horseA.href) : '';
-      if (!life) return;
+      if (!life) { unreadPurchases.push(text); return; }
       var fallback = currencyFromCell(cells[1]);
-      var price = text.match(/ for ([\d\s ,.]+?)\s*([A-Za-z]{2,4})/);
-      if (!price) return;
-      var ship = text.match(/additional ([\d\s ,.]+?)\s*([A-Za-z]{2,4}) for transport/);
-      var p = parseAmountAndCurrency(price, fallback);
+      // take the horse's own name out first, so a name with "for" in it cannot be taken for the price
+      var clean = text.split(cleanText(horseA)).join(' ');
+      var money = '([0-9\\s\\u00a0.,]+?)\\s*([A-Za-z]{2,4})\\b';
+      var price = new RegExp('\\bfor\\s+' + money, 'i').exec(clean);
+      var ship = new RegExp('(?:additional|extra|plus|and|\\+)\\s+' + money + '\\s*(?:for\\s+)?(?:the\\s+)?(?:transport|shipping|delivery)', 'i').exec(clean)
+        || new RegExp('(?:transport|shipping|delivery)(?:\\s+fee)?(?:\\s+of)?\\s+' + money, 'i').exec(clean);
       var sh = ship ? parseAmountAndCurrency(ship, fallback) : { amount: 0, currency: fallback };
+      var p = price ? parseAmountAndCurrency(price, fallback) : { amount: 0, currency: fallback };
+      // the wording was not recognised: the amount column is what was paid in all
+      if (!p.amount) {
+        var total = toInt(cleanText(cells[1]));
+        if (total) p = { amount: Math.max(0, total - sh.amount), currency: fallback };
+      }
+      if (!p.amount && !sh.amount) { unreadPurchases.push(text); return; }
       out.push({ lifeNumber: life, name: parseHorseLabel(horseA), price: p.amount, currency: p.currency, shipping: sh.amount, shippingCurrency: sh.currency });
     });
+    if (unreadPurchases.length) console.warn('HR Ledger: bank rows that look like purchases but could not be read:', unreadPurchases);
     return out;
   }
 
@@ -660,6 +675,7 @@
           if (purchasesSaved) parts.push(purchasesSaved + ' purchase' + (purchasesSaved === 1 ? '' : 's') + ' recorded');
           if (salesSaved) parts.push(salesSaved + ' sale' + (salesSaved === 1 ? '' : 's') + ' recorded');
           if (feesPaid) parts.push(feesPaid + ' stud fee' + (feesPaid === 1 ? '' : 's') + ' paid recorded');
+          if (unreadPurchases.length) parts.push(unreadPurchases.length + ' purchase row' + (unreadPurchases.length === 1 ? '' : 's') + ' could not be read (see the console)');
           if (parts.length) showToast('HR Ledger: ' + parts.join(', '));
         });
       }

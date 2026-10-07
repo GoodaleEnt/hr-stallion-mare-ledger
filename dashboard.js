@@ -476,7 +476,7 @@
     html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
-    html += purchaseDetailsHtml(selectedPassportLife);
+    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
@@ -1151,7 +1151,7 @@
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
     html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
-    html += purchaseDetailsHtml(m.mareLifeNumber);
+    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
 
@@ -2789,6 +2789,31 @@
     }
     persist();
   }
+  // The highest conformation score by hand: the stats page only lists recent shows, so a horse with many shows (often one
+  // you bought) can have a higher score than the ledger has read. It counts in rankings, Breed Total and suggestions.
+  function setHorseBest(lifeNumber, field, value) {
+    if (!lifeNumber) return;
+    var meta = state.horseMeta[lifeNumber] = Object.assign({}, state.horseMeta[lifeNumber]);
+    if (field === 'confBest') {
+      var n = parseFloat(String(value).replace(',', '.'));
+      if (isFinite(n) && n > 0 && n <= 100) { meta.confBest = n; meta.confBestAt = Date.now(); if (!meta.confBestEvent || meta.confBestEvent === 'entered by hand') meta.confBestEvent = 'entered by hand'; }
+      else { delete meta.confBest; delete meta.confBestAt; delete meta.confBestDate; delete meta.confBestEvent; }
+    } else if (field === 'confBestDate') { meta.confBestDate = String(value || '').trim(); }
+    else if (field === 'confBestEvent') { meta.confBestEvent = String(value || '').trim().slice(0, 90); }
+    persist();
+  }
+  function scoreDetailsHtml(lifeNumber) {
+    if (!lifeNumber || !state.horseInfo[lifeNumber]) return '';
+    var meta = state.horseMeta[lifeNumber] || {}, b = L.bestConformation(meta), life = L.esc(lifeNumber);
+    var shows = Array.isArray(meta.showLog) ? meta.showLog.length : 0;
+    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Highest conformation score \u2014 ' + (b.best ? L.esc(Math.round(b.best * 1000) / 1000) : 'not recorded') + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' +
+        '<div class="field"><label for="hb-score-' + life + '">Highest score</label><input id="hb-score-' + life + '" type="number" min="0" max="100" step="any" data-action="horse-best" data-life="' + life + '" data-field="confBest" value="' + (meta.confBest ? L.esc(meta.confBest) : '') + '" placeholder="e.g. 87.425"></div>' +
+        '<div class="field"><label for="hb-date-' + life + '">Date earned (optional)</label><input id="hb-date-' + life + '" type="date" data-action="horse-best" data-life="' + life + '" data-field="confBestDate" value="' + L.esc(meta.confBestDate || '') + '"></div>' +
+        '<div class="field"><label for="hb-event-' + life + '">Show (optional)</label><input id="hb-event-' + life + '" type="text" data-action="horse-best" data-life="' + life + '" data-field="confBestEvent" value="' + L.esc(meta.confBestEvent || '') + '" placeholder="e.g. Dressage, Oct 2026"></div>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Horse Reality\'s stats page only lists recent shows, so a horse with many shows (often one you bought) can have a higher best score than the ledger has read. Enter it here and it is used for Breed Total, rankings and suggestions. A higher score read later from a page replaces it; clear the box to remove it.' + (shows ? ' ' + shows + ' show result' + (shows === 1 ? '' : 's') + ' saved from results pages.' : '') + '</p>' +
+      '</div></details>';
+  }
   function purchaseDetailsHtml(lifeNumber) {
     if (!lifeNumber) return '';
     var meta = (state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].purchase) || {};
@@ -3021,7 +3046,7 @@
 
     html += geneDetailsHtml(s.lifeNumber);
     html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
-    html += purchaseDetailsHtml(s.lifeNumber);
+    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
     html += removeHorsePanelHtml(s.lifeNumber, s.name);
@@ -3553,6 +3578,7 @@
         render();
       }
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'horse-best') { setHorseBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }
       else if (action === 'herd-status') { setLifeStatus(t.getAttribute('data-life'), t.value); }

@@ -2175,6 +2175,30 @@
   }
 
   // ---------- Studs & Semen market: a stallion's row compared with your mares ----------
+  // A mare's own profile in the same shape as an expected foal, for comparing a foal with her
+  function foalProfileOfMare(state, life) {
+    var info = state.horseInfo && state.horseInfo[life], p = { conf: bestConformation((state.horseMeta && state.horseMeta[life]) || {}).best || null, gp: Number(info && info.geneticPotential) || 0, traitAvg: null, weak: 0, strong: 0 };
+    if (info && info.confTraits) {
+      var ranks = Object.keys(info.confTraits).map(function (t) { return traitRankOf(info.confTraits[t]); }).filter(function (r) { return r != null; });
+      if (ranks.length) { p.traitAvg = ranks.reduce(function (a, b) { return a + b; }, 0) / ranks.length; p.weak = ranks.filter(function (r) { return r < 1; }).length; p.strong = ranks.filter(function (r) { return r >= 2; }).length; }
+    }
+    return p;
+  }
+  // one number to pick which of your stallions is the baseline (conformation score, genetic potential on the same scale, stats)
+  function foalScoreOf(e, FX) {
+    var w = function (k) { return FX.keys.indexOf(k) > -1 ? 1.6 : 1; };
+    return w('conf') * (e.conf || 0) + w('gp') * (e.gp || 0) / 10 + w('comp') * (e.traitAvg != null ? e.traitAvg * 5 : 0);
+  }
+  // Is foal a better, the same or worse than foal b? Judged on three things separately, not on Breed Total: the
+  // conformation score (a difference of 0.5 counts), genetic potential (3) and the conformation stats (the average rating
+  // of the traits, 0.1 of a rating step). Better = ahead on balance with nothing clearly worse; your breeder focus counts more.
+  function compareFoals(a, b, FX) {
+    var w = function (k) { return FX.keys.indexOf(k) > -1 ? 1.6 : 1; }, d = {}, score = 0, clearBad = 0;
+    if (a.conf != null && b.conf != null && a.conf > 0 && b.conf > 0) { d.conf = a.conf - b.conf; score += w('conf') * (d.conf >= 0.5 ? 1 : d.conf <= -0.5 ? -1 : 0); if (d.conf <= -1) clearBad++; }
+    if (a.gp > 0 && b.gp > 0) { d.gp = a.gp - b.gp; score += w('gp') * (d.gp >= 3 ? 1 : d.gp <= -3 ? -1 : 0); if (d.gp <= -6) clearBad++; }
+    if (a.traitAvg != null && b.traitAvg != null) { d.traits = a.traitAvg - b.traitAvg; d.weak = a.weak - b.weak; score += w('comp') * (d.traits >= 0.1 ? 1 : d.traits <= -0.1 ? -1 : 0); if (d.traits <= -0.2) clearBad++; }
+    return { verdict: score >= 1 && !clearBad ? 'better' : score <= -1 ? 'worse' : 'same', score: score, d: d, known: Object.keys(d).length };
+  }
   // The estimated foal for one mare and one stallion, the way the breeding suggestions work it out (average parents,
   // adjusted by what the ledger learned from your own foals): { estBT, gp, conf, coi, common, fixes, shared, note } or null
   function pairEstimate(state, mareLife, sireLife, LM) {
@@ -2195,7 +2219,20 @@
         if (a === 0 && b === 0) shared.push(t); else if (a === 0 && b >= 2) fixes.push(t);
       });
     }
-    return { estBT: conf ? breedTotal(gp, conf) : null, gp: gp, conf: conf, coi: coi, common: common, fixes: fixes, shared: shared, note: note };
+    // the foal's expected conformation traits: the average of the two parents' ratings (0 Below average ... 4 Very good)
+    var tr = { n: 0, sum: 0, weak: 0, strong: 0 };
+    if (mInfo.confTraits && sInfo.confTraits) {
+      Object.keys(mInfo.confTraits).forEach(function (t) {
+        var a = traitRankOf(mInfo.confTraits[t]), b = traitRankOf(sInfo.confTraits[t]);
+        if (a == null || b == null) return;
+        var e = (a + b) / 2;
+        tr.n++; tr.sum += e;
+        if (e < 1) tr.weak++;
+        if (e >= 2) tr.strong++;
+      });
+    }
+    return { estBT: conf ? breedTotal(gp, conf) : null, gp: gp, conf: conf, coi: coi, common: common, fixes: fixes, shared: shared, note: note,
+      traitAvg: tr.n ? tr.sum / tr.n : null, weak: tr.weak, strong: tr.strong, traitN: tr.n };
   }
   // Fees the other studs in the ledger ask, by Breed Total: what a stud of this Breed Total usually costs { est, n }
   function studFeeBenchmark(state, life) {
@@ -2238,22 +2275,22 @@
     // your free adult mares of this breed, and what a foal by him would be against a foal by your own best stallion
     var LM = learnedModel(state), me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var ownStuds = (state.stallions || []).filter(function (s) { return s.lifeNumber && s.owned !== false && stallionAvailable(state, String(s.lifeNumber)) && sameBreed(state.horseInfo[s.lifeNumber] || {}, info); });
-    var mares = [], busy = 0, skipped = 0;
+    var FXs = focusOf(state), mares = [], busy = 0, skipped = 0;
     ownedHorses(state).forEach(function (h) {
       if (h.info.sex !== 'mare' || isYoungInfo(h.info) || !sameBreed(h.info, info) || isSoldLife(state, h.lifeNumber) || isArchivedHorse(h) || h.meta.status === 'Companion') return;
       if (horseNoteRules(state, h.lifeNumber).noBreed) { skipped++; return; }
       if (mareBreedStatus(state, h.lifeNumber).status) { busy++; return; }
       var est = pairEstimate(state, h.lifeNumber, life, LM);
-      if (!est || est.estBT == null) return;
-      var own = null;
-      ownStuds.forEach(function (s) { var e = pairEstimate(state, h.lifeNumber, String(s.lifeNumber), LM); if (e && e.estBT != null && (!own || e.estBT > own.estBT)) own = { name: s.name, estBT: e.estBT }; });
-      var gain = own ? est.estBT - own.estBT : null;
-      mares.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), est: est, own: own, gain: gain, coiHigh: est.coi > 6.25, mareBT: horseBT(state, h.lifeNumber) });
+      if (!est || (est.conf == null && !(est.gp > 0))) return;
+      var mareProfile = foalProfileOfMare(state, h.lifeNumber), own = null;
+      ownStuds.forEach(function (s) { var e = pairEstimate(state, h.lifeNumber, String(s.lifeNumber), LM); if (e && (!own || foalScoreOf(e, FXs) > foalScoreOf(own.est, FXs))) own = { name: s.name, est: e }; });
+      var cmp = compareFoals(est, own ? own.est : mareProfile, FXs);
+      mares.push({ life: h.lifeNumber, name: h.info.name || ('#' + h.lifeNumber), est: est, own: own, cmp: cmp, coiHigh: est.coi > 6.25 });
     });
-    // best first: biggest gain over your own stallions, or the best foal when you have no stallion to compare
-    mares.sort(function (a, b) { return (b.gain != null ? b.gain : b.est.estBT - 100) - (a.gain != null ? a.gain : a.est.estBT - 100) || b.est.estBT - a.est.estBT; });
-    var better = mares.filter(function (m) { return (m.gain != null ? m.gain >= 0.5 : m.est.estBT > m.mareBT + 0.5) && !m.coiHigh; });
-    var worse = mares.filter(function (m) { return m.gain != null && m.gain <= -0.5; });
+    // best first: the biggest overall gain on conformation score, genetic potential and conformation stats
+    mares.sort(function (a, b) { return b.cmp.score - a.cmp.score || (b.est.conf || 0) - (a.est.conf || 0); });
+    var better = mares.filter(function (m) { return m.cmp.verdict === 'better' && !m.coiHigh; });
+    var worse = mares.filter(function (m) { return m.cmp.verdict === 'worse'; });
     var verdict = !mares.length ? 'unknown' : better.length ? 'better' : (worse.length >= mares.length / 2 ? 'worse' : 'same');
     // the fee
     var feeParts = Object.keys(fees).filter(function (c) { return fees[c] > 0; }).map(function (c) { return fmtMoney(fees[c]) + ' ' + c; });
@@ -2266,26 +2303,34 @@
     if (feeHRC && maxFee && feeHRC > maxFee) lines.push('✗ Above your maximum stud fee of ' + fmtMoney(maxFee) + ' HRC');
     lines.push(!judged.length ? '• No purchase criteria set for colts & stallions yet' : bad.length ? '✗ Misses your criteria for stallions: ' + bad.map(function (x) { return x.label; }).join(', ') : '✓ Meets your criteria for stallions');
     lines.push('');
-    if (!mares.length) lines.push('YOUR MARES: none of your free adult ' + (info.breed || 'mares') + ' mares could be compared' + (busy ? ' (' + busy + ' in foal or covered)' : '') + ' — their genetic potential must be saved');
+    if (!mares.length) lines.push('YOUR MARES: none of your free adult ' + (info.breed || 'mares') + ' mares could be compared' + (busy ? ' (' + busy + ' in foal or covered)' : '') + ' \u2014 their genetic potential must be saved');
     else {
-      lines.push('YOUR MARES: ' + (verdict === 'better' ? 'BETTER than your own stallions for ' + better.length + ' of ' + mares.length : verdict === 'worse' ? 'WORSE than your own stallions for most of your ' + mares.length + ' mares' : 'about the same as your own stallions') + (busy ? ' (' + busy + ' more are in foal or covered)' : ''));
+      lines.push('YOUR MARES (judged on the foal\u2019s conformation score, genetic potential and conformation stats, not on Breed Total): ' + (verdict === 'better' ? 'BETTER than your own stallions for ' + better.length + ' of ' + mares.length : verdict === 'worse' ? 'WORSE than your own stallions for most of your ' + mares.length + ' mares' : 'about the same as your own stallions') + (busy ? ' (' + busy + ' more are in foal or covered)' : ''));
+      var sgn = function (n, dec) { var v = Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec); return (v >= 0 ? '+' : '\u2212') + Math.abs(v); };
       mares.slice(0, 5).forEach(function (m) {
+        var e = m.est, d = m.cmp.d, against = m.own ? m.own.name : 'her', bits = [];
+        if (e.conf != null) bits.push('conformation score about ' + r1(e.conf) + (d.conf != null ? ' (' + sgn(d.conf, 1) + ')' : ''));
+        if (e.gp > 0) bits.push('genetic potential about ' + Math.round(e.gp) + (d.gp != null ? ' (' + sgn(d.gp, 0) + ')' : ''));
+        if (e.traitAvg != null) bits.push('stats: ' + e.strong + ' of ' + e.traitN + ' traits Good or better, ' + e.weak + ' weak' + (d.weak != null ? ' (' + (d.weak < 0 ? d.weak : d.weak > 0 ? '+' + d.weak : 'same') + ' weak against ' + against + ')' : ''));
         var why = [];
-        if (m.gain != null) why.push((m.gain >= 0 ? '+' : '−') + Math.abs(r1(m.gain)) + ' on ' + m.own.name + ' (' + r1(m.own.estBT) + ')');
-        else why.push('no stallion of yours to compare; her own Breed Total is ' + r1(m.mareBT));
-        if (m.est.fixes.length) why.push('he is strong where she is Below average: ' + m.est.fixes.join(', '));
-        if (m.est.shared.length) why.push('both Below average in ' + m.est.shared.join(', '));
-        why.push(m.est.common.length ? 'inbreeding about ' + (Math.round(m.est.coi * 100) / 100) + '%' : 'no shared ancestors');
-        lines.push((better.indexOf(m) > -1 ? '✓ ' : '• ') + m.name + ': foal Breed Total about ' + r1(m.est.estBT) + ' — ' + why.join('; '));
+        if (e.fixes.length) why.push('he is strong where she is Below average: ' + e.fixes.join(', '));
+        if (e.shared.length) why.push('both Below average in ' + e.shared.join(', '));
+        why.push(e.common.length ? 'inbreeding about ' + (Math.round(e.coi * 100) / 100) + '%' : 'no shared ancestors');
+        lines.push((better.indexOf(m) > -1 ? '\u2713 ' : m.cmp.verdict === 'worse' ? '\u2717 ' : '\u2022 ') + m.name + ' (compared with ' + against + '): ' + bits.join('; ') + ' \u2014 ' + why.join('; '));
       });
       if (mares.length > 5) lines.push('   and ' + (mares.length - 5) + ' more mare' + (mares.length - 5 === 1 ? '' : 's') + ' compared');
+      // would the best foal meet your goals?
+      var g = goalsOf(state, 'mare'), be = (better[0] || mares[0]).est, gl = [];
+      if (g.minConf != null && be.conf != null) gl.push('conformation ' + r1(be.conf) + (be.conf >= g.minConf ? ' meets' : ' is below') + ' your goal of ' + g.minConf);
+      if (g.minGP != null && be.gp > 0) gl.push('genetic potential ' + Math.round(be.gp) + (be.gp >= g.minGP ? ' meets' : ' is below') + ' your goal of ' + g.minGP);
+      if (gl.length) lines.push('Best foal against your goals: ' + gl.join('; '));
       var learnedNote = mares[0].est.note;
       if (learnedNote) lines.push('', learnedNote);
     }
     if (skipped) lines.push('(' + skipped + ' mare' + (skipped === 1 ? '' : 's') + ' left out because of your notes)');
     var top = better[0] || null, extra = [];
     if (feeParts.length) extra.push({ text: 'Fee ' + feeParts[0] + (feeParts.length > 1 ? ' +' : ''), bg: feeHRC && maxFee && feeHRC > maxFee ? '#C0281E' : '#46592C' });
-    if (verdict === 'better') extra.push({ text: 'Better for ' + better.length + ' mare' + (better.length === 1 ? '' : 's') + ' · best ' + top.name + (top.gain != null ? ' +' + r1(top.gain) : ''), bg: '#1E8449' });
+    if (verdict === 'better') extra.push({ text: 'Better for ' + better.length + ' mare' + (better.length === 1 ? '' : 's') + ' · best ' + top.name + '', bg: '#1E8449' });
     else if (verdict === 'worse') extra.push({ text: 'Worse for your mares', bg: '#C0281E' });
     else if (verdict === 'same') extra.push({ text: 'Same as your studs', bg: '#6E7260' });
     var frac = judged.length ? (judged.length - bad.length) / judged.length : 1;

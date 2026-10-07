@@ -974,9 +974,9 @@
   function watchForContent() {
     if (tryMergeOnce()) return;
 
-    var observer = new MutationObserver(function () {
+    var observer = new MutationObserver(observerDebounce(function () {
       if (tryMergeOnce()) observer.disconnect();
-    });
+    }));
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // Safety net so a page that will never show any of our trigger
@@ -1039,9 +1039,9 @@
       return true;
     }
     if (tryCapture()) return;
-    var observer = new MutationObserver(function () {
+    var observer = new MutationObserver(observerDebounce(function () {
       if (tryCapture()) observer.disconnect();
-    });
+    }));
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
@@ -1142,9 +1142,9 @@
       return true;
     }
     if (tryCapture()) return;
-    var observer = new MutationObserver(function () {
+    var observer = new MutationObserver(observerDebounce(function () {
       if (tryCapture()) observer.disconnect();
-    });
+    }));
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
@@ -1179,7 +1179,7 @@
     if (!force && !/\/market\//.test(location.pathname)) return;
     var outers = document.querySelectorAll('.market-office-table-row-outer');
     if (!outers.length) return;
-    HRStorage.getState(function (state) {
+    HRStorage.peekState(function (state) {
       var off = state.settings && state.settings.marketHighlight === false;
       var trades = state.marketTrades || {}, me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
       var index = null;
@@ -1543,11 +1543,20 @@
   // The ranch page lists horses as li.horse-item[data-horse="<life number>"]. Each of yours that is saved in the ledger
   // gets a small block under its name: a coloured Keep / Consider selling / Sell / For sale tag, and for a mare that is
   // free to breed the stallion the ledger would pick. Hover it for the reasons. A checkbox in My notes turns it off.
+  // Keep the site fast: heavy drawing waits for the browser to be idle, and page watchers run at most every 300 ms
+  function whenIdle(fn) {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(function () { try { fn(); } catch (e) { console.error('HR Ledger:', e); } }, { timeout: 4000 });
+    else setTimeout(fn, 50);
+  }
+  function observerDebounce(fn) {
+    var t = null;
+    return function () { if (t) return; t = setTimeout(function () { t = null; fn(); }, 300); };
+  }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
   function renderRanchAdvice() {
     var items = document.querySelectorAll('li.horse-item[data-horse]');
     if (!items.length) return;
-    HRStorage.getState(function (state) {
+    HRStorage.peekState(function (state) {
       if (state.settings && state.settings.ranchAdvice === false) { items.forEach(function (li) { li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); }); }); return; }
       var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
       var lives = [];
@@ -1556,9 +1565,10 @@
         if (info && (!me || String(info.ownerName || '').trim().toLowerCase() === me)) lives.push(l);
       });
       var advice;
-      try { advice = HRLib.herdAdvice(state, lives); } catch (e) { return; }
+      try { advice = HRLib.herdAdvice(state, lives, { noBreeding: true }); } catch (e) { return; }
       // one colour per level, from a dark green (top keeper) to red (sell)
       var COL = { top: '#146C3B', keep: '#1E8449', middle: '#7D8A2B', consider: '#B9770E', sell: '#C0281E', forsale: '#6E7260', nodata: '#8A8F85' };
+      var queue = [];
       items.forEach(function (li) {
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];
@@ -1590,29 +1600,38 @@
           box.appendChild(bar);
         }
         function stud(b) { return b.name + (b.estBT != null ? ' \u00b7 BT ' + b.estBT : ''); }
-        // your own best stallion, and when the ledger knows a better one (another player's) that as well, with its fee
-        if (a.best && a.bestOwn) {
-          pill('\u2192 Yours: ' + stud(a.bestOwn), '#2E3B1F');
-          pill('\u2191 Better: ' + stud(a.best) + (a.best.cost ? ' \u00b7 ' + a.best.cost : ''), '#5B3E8A');
-        } else if (a.best) pill('\u2192 ' + stud(a.best) + (a.best.yours ? ' (yours)' : (a.best.cost ? ' \u00b7 ' + a.best.cost : '')), a.best.yours ? '#2E3B1F' : '#5B3E8A');
+        // the best stallion for a free mare is worked out afterwards, a few at a time while the browser is idle
+        if (a.freeMare) queue.push({ life: li.getAttribute('data-horse'), show: function (pa) {
+          if (pa.best && pa.bestOwn) {
+            pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F');
+            pill('\u2191 Better: ' + stud(pa.best) + (pa.best.cost ? ' \u00b7 ' + pa.best.cost : ''), '#5B3E8A');
+          } else if (pa.best) pill('\u2192 ' + stud(pa.best) + (pa.best.yours ? ' (yours)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), pa.best.yours ? '#2E3B1F' : '#5B3E8A');
+          if (pa.reasons.length) box.title = box.title + '\n\n' + pa.reasons.join('\n');
+        } });
         // the very bottom of the card, so it sits in the same place on every card
         host.appendChild(box);
       });
+      function step() {
+        var t0 = Date.now();
+        while (queue.length && Date.now() - t0 < 12) { var q = queue.shift(); try { q.show(HRLib.partnerAdvice(state, q.life)); } catch (e) { /* skip this mare */ } }
+        if (queue.length) whenIdle(step);
+      }
+      if (queue.length) whenIdle(step);
     });
   }
   function scheduleRanch() {
     ranchTimers.forEach(clearTimeout);
-    ranchTimers = [1500, 4000].map(function (ms) { return setTimeout(renderRanchAdvice, ms); });
+    ranchTimers = [2000].map(function (ms) { return setTimeout(function () { whenIdle(renderRanchAdvice); }, ms); });
     var grid = document.querySelector('ul.horse-grid, ul.horses');
     if (grid && !ranchObserver) {
       // the list can be redrawn (filters, search): watch its direct children only, so adding our block never retriggers it
-      ranchObserver = new MutationObserver(function () { clearTimeout(ranchDebounce); ranchDebounce = setTimeout(renderRanchAdvice, 900); });
+      ranchObserver = new MutationObserver(function () { clearTimeout(ranchDebounce); ranchDebounce = setTimeout(function () { whenIdle(renderRanchAdvice); }, 900); });
       ranchObserver.observe(grid, { childList: true });
     }
   }
   function scheduleMarket() {
     marketTimers.forEach(clearTimeout);
-    marketTimers = [1500, 4000, 9000].map(function (ms) { return setTimeout(highlightMarket, ms); });
+    marketTimers = [2000, 6000].map(function (ms) { return setTimeout(function () { whenIdle(highlightMarket); }, ms); });
   }
   // (No storage-change listener here: Chrome would copy the whole ledger into every open Horse Reality tab on every
   // save. The rows are refreshed on load and when the tab is shown again.)
@@ -1627,7 +1646,7 @@
     var life = (window.__HR_TEST__ && window.__HR_TEST_LIFE__) || parseHorseIdFromUrl();
     if (!life) { removeFitBanner(); return; }
     if (fitDismissed === life) return;
-    HRStorage.getState(function (state) {
+    HRStorage.peekState(function (state) {
       if (state.settings && state.settings.fitBanner === false) { removeFitBanner(); return; }
       var f = HRLib.fitSummary(state, life);
       if (f.verdict === 'nogoals') { removeFitBanner(); return; }
@@ -1675,7 +1694,7 @@
   }
   function scheduleFit() {
     fitTimers.forEach(clearTimeout);
-    fitTimers = [1500, 4000, 9000, 16000].map(function (ms) { return setTimeout(renderFitBanner, ms); });
+    fitTimers = [2000, 6000, 14000].map(function (ms) { return setTimeout(function () { whenIdle(renderFitBanner); }, ms); });
   }
   // Refresh when you come back to this tab (for example after changing a setting in the dashboard)
   document.addEventListener('visibilitychange', function () {
@@ -1804,9 +1823,9 @@
       return true;
     }
     if (tryCapture()) return;
-    var observer = new MutationObserver(function () {
+    var observer = new MutationObserver(observerDebounce(function () {
       if (tryCapture()) observer.disconnect();
-    });
+    }));
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(function () { observer.disconnect(); }, 60000);
   }
@@ -2219,9 +2238,9 @@
       return true;
     }
     if (tryCapture()) return;
-    var observer = new MutationObserver(function () {
+    var observer = new MutationObserver(observerDebounce(function () {
       if (tryCapture()) observer.disconnect();
-    });
+    }));
     observer.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(function () { observer.disconnect(); }, 60000);
   }

@@ -50,6 +50,19 @@
     }).catch(function (e) { if (!isGone(e)) console.error('HR Ledger storage error:', e); });
   }
 
+  // Like getState, but hands over the shared copy instead of cloning the whole ledger. For code that only READS (drawing a
+  // badge, colouring rows): it must not change the object it is given.
+  function peekState(cb) {
+    if (!alive()) return;
+    gate = gate.then(function () {
+      if (!alive()) throw new Error('Extension context invalidated');
+      if (cache && Date.now() - cacheAt < CACHE_MS) { cacheAt = Date.now(); return cache; }
+      return readFromStorage().then(function (s) { cache = s; cacheAt = Date.now(); return s; });
+    }).then(function (s) {
+      try { if (global.HRLib && HRLib.markStable) HRLib.markStable(s); cb(s); } catch (e) { console.error('HR Ledger:', e); }
+    }).catch(function (e) { if (!isGone(e)) console.error('HR Ledger storage error:', e); });
+  }
+
   function setState(state, cb) {
     cache = clone(state);
     cacheAt = Date.now();
@@ -107,6 +120,7 @@
   global.HRStorage = {
     defaultState: defaultState,
     getState: getState,
+    peekState: peekState,
     setState: setState,
     alive: alive,
     allBreedingsFlat: allBreedingsFlat,

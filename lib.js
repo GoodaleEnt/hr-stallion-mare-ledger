@@ -106,6 +106,18 @@
   // Players can also pay Delta Points to age a horse up early, which this
   // formula can't see — that's what the manual aged-up override is for.
   var GAME_MS_PER_MONTH = 32 * 3600 * 1000;
+  // Results that are slow to work out and are asked for many times about the same ledger (the herd, what has been learned,
+  // price comparisons) are remembered for a state object marked stable. Only code that will not change the state marks it
+  // (the page scripts do, for the copy they only read), so the dashboard, which edits its state, never gets a stale answer.
+  var MEMO = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  function markStable(state) { try { Object.defineProperty(state, '__stable', { value: true, enumerable: false, configurable: true }); } catch (e) { /* frozen */ } return state; }
+  function memo(state, key, fn) {
+    if (!MEMO || !state || !state.__stable) return fn();
+    var m = MEMO.get(state);
+    if (!m) { m = {}; MEMO.set(state, m); }
+    if (!Object.prototype.hasOwnProperty.call(m, key)) m[key] = fn();
+    return m[key];
+  }
   function ageYears(dateOfBirth, birthAt) {
     if (birthAt) { var bm = Date.now() - birthAt; return bm < 0 ? null : (bm / GAME_MS_PER_MONTH) / 12; }
     if (!dateOfBirth) return null;
@@ -221,7 +233,8 @@
 
   // Cached horses whose API-reported owner matches the username in Settings
   // (same ownership rule the My Mares tab uses), with their herd tags attached.
-  function ownedHorses(state) {
+  function ownedHorses(state) { return memo(state, 'owned', function () { return ownedHorsesRaw(state); }); }
+  function ownedHorsesRaw(state) {
     var myName = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     if (!myName) return [];
     return Object.keys(state.horseInfo || {}).map(function (life) {
@@ -1004,7 +1017,8 @@
     });
     return rows;
   }
-  function learnedModel(state) {
+  function learnedModel(state) { return memo(state, 'learnedModel', function () { return learnedModelRaw(state); }); }
+  function learnedModelRaw(state) {
     var all = learnSamples(state);
     var rows = all.filter(function (r) { return r.score > 0 && r.sConf > 0 && r.mConf > 0; });
     var n = rows.length, out = { on: learningOn(state), n: n, conf: { off: 0, slope: 0, naiveErr: null, modelErr: null }, gp: { n: 0, off: 0 }, sire: {}, mare: {}, breed: {}, lines: [] };
@@ -1065,7 +1079,8 @@
   }
 
   // ---- buying ----
-  function learnedBuying(state) {
+  function learnedBuying(state) { return memo(state, 'learnedBuying', function () { return learnedBuyingRaw(state); }); }
+  function learnedBuyingRaw(state) {
     var out = { on: learningOn(state), bought: 0, sold: 0, avgPct: null, byBreed: [], proven: [], tips: [] };
     var pcts = [], by = {};
     Object.keys(state.horseMeta || {}).forEach(function (l) {
@@ -1327,7 +1342,8 @@
   // A keep note, a proven producer or a gene you keep makes a horse a top keeper; a sell note makes it Sell; a horse that
   // meets every goal is never lower than Middle.
   var RANK_LEVELS = { 5: 'Top keeper', 4: 'Keep', 3: 'Middle of the herd', 2: 'Consider selling', 1: 'Sell' };
-  function herdRanking(state) {
+  function herdRanking(state) { return memo(state, 'herdRanking', function () { return herdRankingRaw(state); }); }
+  function herdRankingRaw(state) {
     var FX = focusOf(state), goalsOn = anyGoals(state), me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
     var overall = overallNoteRules(state), comps = priceComps(state), form = sellFormOf(state);
     var herd = ownedHorses(state).filter(function (h) {
@@ -1470,7 +1486,23 @@
   }
   // The card for each horse: its level, where it ranks, the reasons, an asking price when selling is suggested, and for a
   // mare free to breed the stallion the ledger would pick. { action, level, label, rank, of, group, reasons, price, best, infoal }
-  function herdAdvice(state, lives) {
+  // The stallion the ledger would pick for a free adult mare, and your own best when a better one is in the ledger:
+  // { best, bestOwn, reasons }. Slow-ish (it looks at every stallion), so the ranch page asks for it a mare at a time.
+  function partnerAdvice(state, l) {
+    var out = { best: null, bestOwn: null, reasons: [] };
+    var sg = breedingSuggestions(state, l, 20), top = sg.suggestions && sg.suggestions[0];
+    var ownTop = (sg.suggestions || []).find(function (t) { return t.yours; });
+    var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, yours: t.yours, cost: t.terms && t.terms.summary ? t.terms.summary : '' }; };
+    if (ownTop && top && top !== ownTop) out.bestOwn = pack(ownTop);
+    if (top) {
+      out.best = pack(top);
+      if (out.bestOwn) out.reasons.push('Best of your own stallions: ' + out.bestOwn.name + (out.bestOwn.estBT != null ? ' (estimated foal Breed Total ' + out.bestOwn.estBT + ')' : ''));
+      out.reasons.push((out.bestOwn ? 'Better stallion in the ledger: ' : 'Best stallion to breed her to: ') + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
+      (top.reasons || []).slice(0, 3).forEach(function (t) { out.reasons.push('  ' + t); });
+    } else if (sg.error !== 'young') out.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')');
+    return out;
+  }
+  function herdAdvice(state, lives, opts) {
     var rk = herdRanking(state), forSaleSet = {}, out = {};
     ownedHorses(state).forEach(function (h) { if (h.meta.status === 'For Sale') forSaleSet[String(h.lifeNumber)] = true; });
     (lives || []).forEach(function (l) {
@@ -1488,17 +1520,8 @@
         var bs = mareBreedStatus(state, l);
         if (bs.status) { a.infoal = bs.status === 'pregnant' ? 'in foal' : 'covered'; a.reasons.unshift((bs.status === 'pregnant' ? 'In foal' : 'Covered') + (bs.due ? ', ' + bs.due : '') + (bs.stallion ? ' by ' + bs.stallion : '')); }
         else if (!isYoungInfo(info) && a.action !== 'sell' && a.action !== 'forsale') {
-          var sg = breedingSuggestions(state, l, 20), top = sg.suggestions && sg.suggestions[0];
-          // the best of your own stallions, and a better one from the ledger (another player's, with a stud fee saved) when there is one
-          var ownTop = (sg.suggestions || []).find(function (t) { return t.yours; });
-          var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, yours: t.yours, cost: t.terms && t.terms.summary ? t.terms.summary : '' }; };
-          if (ownTop && top && top !== ownTop) a.bestOwn = pack(ownTop);
-          if (top) {
-            a.best = pack(top);
-            if (a.bestOwn) a.reasons.push('Best of your own stallions: ' + a.bestOwn.name + (a.bestOwn.estBT != null ? ' (estimated foal Breed Total ' + a.bestOwn.estBT + ')' : ''));
-            a.reasons.push((a.bestOwn ? 'Better stallion in the ledger: ' : 'Best stallion to breed her to: ') + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
-            (top.reasons || []).slice(0, 3).forEach(function (t) { a.reasons.push('  ' + t); });
-          } else if (sg.error !== 'young') a.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')');
+          a.freeMare = true;
+          if (!(opts && opts.noBreeding)) { var pa = partnerAdvice(state, l); a.best = pa.best; a.bestOwn = pa.bestOwn; pa.reasons.forEach(function (t) { a.reasons.push(t); }); }
         }
       }
       out[l] = a;
@@ -2083,7 +2106,8 @@
     });
     return out;
   }
-  function priceComps(state) {
+  function priceComps(state) { return memo(state, 'priceComps', function () { return priceCompsRaw(state); }); }
+  function priceCompsRaw(state) {
     var comps = [];
     Object.keys(state.horseMeta || {}).forEach(function (l) {
       if (!isSoldLife(state, l)) return;
@@ -3468,6 +3492,8 @@
     foalAccuracy: foalAccuracy,
     foalsDue: foalsDue,
     herdAdvice: herdAdvice,
+    partnerAdvice: partnerAdvice,
+    markStable: markStable,
     foalKeeperInfo: foalKeeperInfo,
     keeperLines: keeperLines,
     herdRanking: herdRanking,

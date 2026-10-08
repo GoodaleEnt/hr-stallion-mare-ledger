@@ -233,7 +233,7 @@ Horse pictures are saved as data (the site's image server will not let other pag
 
 ## Ages
 
-The age Horse Reality shows is read for you: from the **ranch page** cards (every horse's real age, "9 years, 2 months", is saved when you open the page) and from a horse's own page. Owners can age horses up with Delta Points, so the birth date alone is not the age. When a horse's own age has not been read yet, the age control under its name lets you enter **how many months older than its birth date** it is, and the ledger adds that to the age by birth date from then on.
+The age Horse Reality shows is read for you: from the **ranch page** cards (every horse's real age, "9 years, 2 months", is saved when you open the page) and from a horse's own page (the age shown in its profile, which the page draws inside its own web components, is searched for until it appears). Owners can age horses up with Delta Points, so the birth date alone is not the age. When a horse's own age has not been read yet, the age control under its name lets you enter **how many months older than its birth date** it is, and the ledger adds that to the age by birth date from then on.
 
 ## Foals as keepers, and the full reasoning
 

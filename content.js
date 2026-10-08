@@ -1086,45 +1086,46 @@
   // see, and matches what the player sees in-game exactly. Scraped
   // straight from the DOM (like the bank/offspring tables) rather than the
   // API, since the API's passport data only exposes a raw birthdate.
+  // The age shown on a horse's own page (<p id="age">6 years 3 months</p>) is its real age: owners can age horses up with
+  // Delta Points, so it can be well above what the birth date says. The page draws inside shadow roots (web components),
+  // so the search goes through them, and it is repeated by the one-second tick until the age has appeared.
+  var ageDone = {};
+  function findAgeText() {
+    var el = deepQuery('#age') || deepQuery('.breed-and-age .age.desktop') || deepQuery('[data-age]');
+    var text = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    if (text) return text;
+    // a table row labelled "Age" (the horse information box)
+    var rows = deepQueryAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i].querySelectorAll('th, td');
+      if (cells.length >= 2 && /^age:?$/i.test((cells[0].textContent || '').trim())) { var t = (cells[1].textContent || '').replace(/\s+/g, ' ').trim(); if (t) return t; }
+    }
+    return '';
+  }
+  function scrapeAgeFromProfile() {
+    var id = parseHorseIdFromUrl();
+    if (!id || ageDone[id]) return;
+    var text = findAgeText();
+    if (!text) return;
+    var months = HRLib.parseAgeText(text);
+    if (months == null) return;
+    ageDone[id] = text;
+    HRStorage.getState(function (state) {
+      if (!state.horseInfo) state.horseInfo = {};
+      var info = state.horseInfo[id];
+      if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
+      if (info.ageMonths === months && info.ageText === text) return;
+      info.ageMonths = months;
+      info.ageText = text;
+      info.ageAt = Date.now();
+      info.capturedAt = Date.now();
+      HRStorage.setState(state);
+    });
+  }
   function scrapeAndMergeAgeText() {
     var id = parseHorseIdFromUrl();
-    if (!id) return;
-    function findAgeText() {
-      var el = document.querySelector('#age') || document.querySelector('.breed-and-age .age.desktop') || document.querySelector('[data-age]');
-      var text = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
-      if (text) return text;
-      // a table row labelled "Age" (the horse information box)
-      var rows = document.querySelectorAll('tr');
-      for (var i = 0; i < rows.length; i++) {
-        var cells = rows[i].querySelectorAll('th, td');
-        if (cells.length >= 2 && /^age:?$/i.test((cells[0].textContent || '').trim())) { var t = (cells[1].textContent || '').replace(/\s+/g, ' ').trim(); if (t) return t; }
-      }
-      return '';
-    }
-    function tryCapture() {
-      var text = findAgeText();
-      if (!text) return false;
-      var months = HRLib.parseAgeText(text);
-      if (months == null) return false;
-      HRStorage.getState(function (state) {
-        if (!state.horseInfo) state.horseInfo = {};
-        var info = state.horseInfo[id];
-        if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
-        if (info.ageMonths === months && info.ageText === text) return;
-        info.ageMonths = months;
-        info.ageText = text;
-        info.ageAt = Date.now();
-        info.capturedAt = Date.now();
-        HRStorage.setState(state);
-      });
-      return true;
-    }
-    if (tryCapture()) return;
-    var observer = new MutationObserver(observerDebounce(function () {
-      if (tryCapture()) observer.disconnect();
-    }));
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-    setTimeout(function () { observer.disconnect(); }, 60000);
+    if (id) delete ageDone[id]; // a fresh visit reads it again
+    scrapeAgeFromProfile();
   }
 
   // A horse's stats page lists only its latest 25 shows. The best conformation
@@ -2661,6 +2662,7 @@
     annotateBreedDropdown();
     addBreedParentLinks();
     scrapeShowResults();
+    scrapeAgeFromProfile();
     if (location.href !== lastHref) {
       lastHref = location.href;
       onPageReady();

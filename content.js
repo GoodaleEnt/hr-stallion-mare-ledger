@@ -1920,8 +1920,9 @@
   // pages, a message says how many scores were read; if none appears on a competition page, tell the developer.
   var lastCompSig = '';
   function readCompetitionPage() {
-    if (/conformation-shows/.test(location.pathname) || !/results/.test(location.pathname)) return null;
-    var h1 = document.querySelector('h1'), title = h1 ? (h1.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    // a competition's results page is /competitions/<id> (the entry page, ending /enter, is not read); older layouts had /results
+    if (/conformation-shows/.test(location.pathname) || /\/enter\/?$/.test(location.pathname) || !/\/competitions\/|results/.test(location.pathname)) return null;
+    var h1 = document.querySelector('.competition-title') || document.querySelector('h1'), title = h1 ? (h1.textContent || '').replace(/\s+/g, ' ').trim() : '';
     var discipline = HRLib.disciplineNameOf(title) || HRLib.disciplineNameOf(location.pathname);
     if (!discipline) return null;
     var rows = [];
@@ -1934,7 +1935,7 @@
       var owner = tr.querySelector('a[href*="/user/"]');
       rows.push({ life: m[1], score: parseFloat(sm[0]), owner: owner ? (owner.textContent || '').trim() : '', mine: tr.classList.contains('mine') });
     });
-    return rows.length ? { name: title, discipline: discipline, rows: rows, id: ((/\/([0-9a-f-]{8,})\/results/i.exec(location.pathname) || [])[1]) || title } : null;
+    return rows.length ? { name: title, discipline: discipline, rows: rows, id: ((/\/competitions\/([0-9a-f-]{8,})/i.exec(location.pathname) || /\/([0-9a-f-]{8,})\/results/i.exec(location.pathname) || [])[1]) || title } : null;
   }
   function scrapeCompetitionResults() {
     var res = readCompetitionPage();
@@ -1949,7 +1950,7 @@
         if (!(r.mine || (me && r.owner.toLowerCase() === me)) && !(state.horseInfo && state.horseInfo[r.life])) return;
         var meta = Object.assign({}, state.horseMeta[r.life]);
         var log = Array.isArray(meta.compLog) ? meta.compLog.slice() : [];
-        if (log.some(function (e) { return e.comp === res.id; })) return;
+        if (log.some(function (e) { return e.comp === res.id && e.score === r.score; })) return;
         log.push({ comp: res.id, name: res.name, discipline: res.discipline, score: r.score, seenAt: Date.now() });
         meta.compLog = log.slice(-40);
         HRLib.recordCompScore(meta, r.score, res.discipline);

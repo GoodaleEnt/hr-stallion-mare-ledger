@@ -322,6 +322,22 @@
     html += '<p class="notes-line" style="margin:14px 0 0;">HR Stallion &amp; Mare Ledger ' + (version ? 'v' + L.esc(version) : '') + ' \u00b7 <a href="manual.html" target="_blank" rel="noopener">User manual</a></p>';
     return html;
   }
+  // A change inside an open box (a gene, a price, a score) redraws the page; the boxes that were open stay open as long as it is
+  // the same page with the same boxes.
+  function detailsSig(n) { return [activeTab, herdSub, selectedId, selectedMareKey, selectedPassportLife, suggestLife, n].join('|'); }
+  function captureDetails() {
+    var app = document.getElementById('app');
+    if (!app) return null;
+    var ds = app.querySelectorAll('details');
+    return { sig: detailsSig(ds.length), opens: Array.prototype.map.call(ds, function (x) { return x.open; }) };
+  }
+  function restoreDetails(saved) {
+    var app = document.getElementById('app');
+    if (!saved || !app) return;
+    var ds = app.querySelectorAll('details');
+    if (detailsSig(ds.length) !== saved.sig) return;
+    Array.prototype.forEach.call(ds, function (x, i) { if (saved.opens[i] && !x.open) x.open = true; else if (!saved.opens[i] && x.open) x.open = false; });
+  }
   function render() {
     var app = document.getElementById('app');
     var html;
@@ -339,8 +355,10 @@
     else if (activeTab === 'calc') html = renderCalculator();
     else if (activeTab === 'settings') html = renderSettings();
     else html = renderStallionsList();
+    var keptOpen = captureDetails();
     app.removeAttribute('data-an');
     app.innerHTML = html;
+    restoreDetails(keptOpen);
     if (pendingConfirm) {
       var wrap = document.createElement('div');
       wrap.innerHTML = renderConfirm();

@@ -100,7 +100,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 // ---------- address-bar search: type "hrl", press Tab, then a horse's name or a tab ----------
 // "hrl Dark Knight" opens that horse in the ledger; "hrl mares", "hrl stallions", "hrl colts", "hrl fillies", "hrl herd",
 // "hrl analytics", "hrl calc" open that tab; "hrl panel" opens the ledger in Chrome's side panel.
-var OMNI_TABS = { stallions: 'stallions', mares: 'mares', colts: 'colts', fillies: 'fillies', herd: 'herd', retired: 'retired', others: 'others', analytics: 'analytics', calc: 'calc', calculator: 'calc' };
+var OMNI_TABS = { stallions: 'stallions', mares: 'mares', colts: 'colts', fillies: 'fillies', herd: 'herd', retired: 'retired', others: 'others', analytics: 'analytics', calc: 'calc', calculator: 'calc', settings: 'settings' };
 function omniEscape(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function omniNorm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9# ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
 chrome.omnibox.setDefaultSuggestion({ description: 'Open the ledger, or type a horse name, a life number, or mares, stallions, colts, fillies, herd, analytics, calc, panel' });

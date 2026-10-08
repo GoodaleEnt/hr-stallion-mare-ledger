@@ -82,7 +82,7 @@ Each stallion card shows his public/private stud fee, how many breedings are log
 
 Studs that show up here only because they were needed to track one of *your mares'* breedings with someone else's stallion are kept off this grid — they still show up wherever that mare's history is displayed.
 
-**Export Backup / Restore Backup** (top of this tab) save or reload your *entire* ledger as a single JSON file — every stallion, mare, breeding record, and cached horse passport. Use it before doing anything risky (switching computers, clearing browser data), or just periodically for peace of mind. Restoring a backup replaces everything currently stored, so you'll be asked to confirm first.
+**Export backup / Restore backup** (on the **Settings** tab) save or reload your *entire* ledger as a single JSON file — every stallion, mare, breeding record, and cached horse passport. Use it before doing anything risky (switching computers, clearing browser data), or just periodically for peace of mind. Restoring a backup replaces everything currently stored, so you'll be asked to confirm first.
 
 ## The Open in Ledger button
 
@@ -178,7 +178,7 @@ Set a horse's **Status** to **Retired** (on My Herd, on a mare's card or page, o
 
 **Colours:** a horse that meets every goal is outlined in **gold** (on its card or row, and across the top of its own page); a horse that misses **exactly one** goal box is outlined in **blue**. Anything else has no outline. Gold and blue are separate from the pink and amber outlines used for in-foal and covered mares.
 
-Fertility can only be tested from age 3, so for a horse younger than that the Fertility box is greyed ("tested from age 3") and is left out of your goals. Under the search box, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and, for conformation traits and for the five vet-check health traits, the **worst rating you will accept** and **how many** may be at that rating (for example, worst = Below average with 2 allows up to two BA traits; worst = Average with 3 allows up to three Average traits and no BA). Nothing may be rated worse than the one you pick. You can also set a **minimum fertility**. Leave a goal on "no limit" to ignore it.
+Fertility can only be tested from age 3, so for a horse younger than that the Fertility box is greyed ("tested from age 3") and is left out of your goals. On the **Settings** tab, open **Highlight goals** and fill in any of: a minimum top conformation score, a minimum Breed Total, and, for conformation traits and for the five vet-check health traits, the **worst rating you will accept** and **how many** may be at that rating (for example, worst = Below average with 2 allows up to two BA traits; worst = Average with 3 allows up to three Average traits and no BA). Nothing may be rated worse than the one you pick. You can also set a **minimum fertility**. Leave a goal on "no limit" to ignore it.
 
 Every horse card, herd row and horse page then shows five labelled boxes above its picture: **Conformation**, **Breed Total**, **Conformation traits**, **Health** and **Fertility**. A box is green if the horse meets that goal, red if it doesn't, and grey if there's no goal set or no data yet. A horse that meets every goal you set is outlined. A **Health** box turns **gold** when more than 3 of the 5 health traits are Excellent, and the **Fertility** box turns gold when fertility is Excellent, whatever your goals say. On a horse's page, each Excellent rating is gold too. Each horse's own page lists its health and fertility ratings once it has had a vet health check (and, for an adult, a fertility test); they are read from the horse's page on Horse Reality. Trait limits are "at or under": a maximum of 2 BA traits accepts horses with 0, 1 or 2.
 
@@ -213,7 +213,7 @@ The **×** hides it for that page, and a checkbox at the bottom of the **My note
 
 ## Purchase criteria
 
-The **Purchase criteria** panel (under My notes, near the top of the dashboard) is where you set what a horse should have for you to buy it. Two drop-downs choose whose criteria you are editing: **Applies to** (mares & fillies, colts & stallions, or both) and **Set for** (all breeds or one breed). So you can ask, for example, for genetic potential 600 and conformation 70 in mares and fillies and 650 and 75 in colts and stallions, for every breed. A field left empty uses the next wider setting: that breed for both sexes, then all breeds for that sex, then all breeds for both. The fields are the same as your goals (minimum genetic potential, top conformation and Breed Total, the **lowest conformation trait rating allowed** and how many traits may sit at it, the worst health rating you accept, minimum fertility) plus the **highest price you will pay** and a list of traits the horse **must be Good or better in**. Your preferred and unwanted genes (set per breed under Preferred genetics) count as well.
+The **Purchase criteria** panel (on the Settings tab, under My notes) is where you set what a horse should have for you to buy it. Two drop-downs choose whose criteria you are editing: **Applies to** (mares & fillies, colts & stallions, or both) and **Set for** (all breeds or one breed). So you can ask, for example, for genetic potential 600 and conformation 70 in mares and fillies and 650 and 75 in colts and stallions, for every breed. A field left empty uses the next wider setting: that breed for both sexes, then all breeds for that sex, then all breeds for both. The fields are the same as your goals (minimum genetic potential, top conformation and Breed Total, the **lowest conformation trait rating allowed** and how many traits may sit at it, the worst health rating you accept, minimum fertility) plus the **highest price you will pay** and a list of traits the horse **must be Good or better in**. Your preferred and unwanted genes (set per breed under Preferred genetics) count as well.
 
 **Suggestions from your herd:** once at least three of your horses of that breed are saved, the panel suggests values with an **Apply** button: the level that would put a new horse in the top 40% of your herd (of that sex, when you chose one) for genetic potential, top conformation and Breed Total, and the traits that at least half of your horses are Below average or Average in.
 
@@ -316,6 +316,10 @@ The ledger keeps a horse's status up to date as things happen on Horse Reality:
 - **Selling.** A horse you had listed that now shows another owner when you open its page is marked **Sold**, with who has it and when the ledger noticed. Reading your bank page (as before) fills in the sale price, date and buyer.
 
 A horse already Sold or Retired is never put back to For Sale by an old listing. Each of these shows in the **For sale / Retired / Sold** panel on the horse's page, and For Sale horses get the price check in Sell ideas.
+
+## The Settings tab
+
+Everything you set up is on one tab, **⚙ Settings**, at the end of the tab bar, instead of panels above every list: **You** (your Horse Reality username, and whether retired stallions are deleted automatically), **Backup** (export and restore, with the date of the last backup), **Highlight goals**, **My notes** (notes, breeder focus, breeding partners, preferred genes and the switches for the ranch cards, market colours, learning and saving market studs) and **Purchase criteria**. The side panel does not show Settings; its **Full view** button opens the ledger in a tab.
 
 ## Card colours at a glance
 

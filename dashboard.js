@@ -267,6 +267,36 @@
   }
 
   // ---------- render ----------
+  // ---------- settings ----------
+  // Everything you set up in one place, instead of panels above every list: who you are, backups, highlight goals, notes and
+  // preferences (breeder focus, partners, genes, switches), and purchase criteria.
+  var settingsSeen = false;
+  function renderSettings() {
+    // the panels start open the first time this page is shown
+    if (!settingsSeen) { settingsSeen = true; goalsOpen = true; notesOpen = true; buyOpen = true; }
+    var s = state.settings || {};
+    var html = topHeaderHtml();
+    html += '<div class="section-head"><h2>Settings</h2></div>';
+    html += '<div class="card" style="padding:14px 16px;margin-bottom:14px;"><strong>You</strong>' +
+      '<div class="settings-row" style="margin:10px 0 0;">' +
+        '<label class="username-setting">My Horse Reality username<input type="text" data-action="update-username" value="' + L.esc(s.myUsername) + '" placeholder="e.g. Nemoriamini"></label>' +
+        '<label class="settings-toggle"><input type="checkbox" data-action="toggle-auto-delete"' + (s.autoDeleteRetired ? ' checked' : '') + '> Automatically delete stallions marked Retired</label>' +
+      '</div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">The username is how the ledger knows which horses are yours rather than a customer\'s or another player\'s.</p></div>';
+    html += '<div class="card" style="padding:14px 16px;margin-bottom:14px;"><strong>Backup</strong>' +
+      '<p class="notes-line" style="margin:6px 0 10px;">Your ledger lives only in this browser. ' + (s.lastBackupAt ? 'Last backup: ' + L.esc(L.fmtDate(isoFromMs(s.lastBackupAt))) + '.' : 'No backup saved yet.') + ' A backup file holds everything, including the horse pictures, and restores it all.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+        '<button class="btn btn-sm btn-primary" data-action="export-backup" title="Save your entire ledger as a JSON file">Export backup</button>' +
+        '<button class="btn btn-sm" data-action="restore-backup" title="Replace your ledger with a previously exported backup">Restore backup</button>' +
+        '<input type="file" id="restore-file-input" accept="application/json" style="display:none;">' +
+      '</div></div>';
+    html += goalsPanelHtml();
+    html += notesPanelHtml();
+    html += purchasePanelHtml();
+    var version = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '';
+    html += '<p class="notes-line" style="margin:14px 0 0;">HR Stallion &amp; Mare Ledger ' + (version ? 'v' + L.esc(version) : '') + ' \u00b7 <a href="manual.html" target="_blank" rel="noopener">User manual</a></p>';
+    return html;
+  }
   function render() {
     var app = document.getElementById('app');
     var html;
@@ -282,6 +312,7 @@
     else if (activeTab === 'retired') html = renderRetiredList();
     else if (activeTab === 'analytics') html = renderAnalytics();
     else if (activeTab === 'calc') html = renderCalculator();
+    else if (activeTab === 'settings') html = renderSettings();
     else html = renderStallionsList();
     app.innerHTML = html;
     if (pendingConfirm) {
@@ -403,9 +434,6 @@
     }
 
     html += backupReminderHtml();
-    html += goalsPanelHtml();
-    html += notesPanelHtml();
-    html += purchasePanelHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
@@ -416,6 +444,7 @@
         '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
         '<button class="tab-btn' + (activeTab === 'analytics' ? ' active' : '') + '" data-action="show-tab" data-tab="analytics">Analytics</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
+        '<button class="tab-btn' + (activeTab === 'settings' ? ' active' : '') + '" data-action="show-tab" data-tab="settings" title="Username, goals, notes, purchase criteria, breeder focus, partners and backups">\u2699 Settings</button>' +
       '</div>';
     var breedsHere = {}, breedNames = [];
     Object.keys(state.horseInfo || {}).forEach(function (l) {
@@ -424,7 +453,7 @@
     });
     (state.stallions || []).forEach(function (s) { var k = L.breedKeyOf(s.breed); if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(s.breed); } });
     var isListTab = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others'].indexOf(activeTab) > -1;
-    if (breedNames.length > 1 || activeBreed || isListTab) {
+    if (activeTab !== 'settings' && (breedNames.length > 1 || activeBreed || isListTab)) {
       html += '<div style="margin:-6px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">';
       if (breedNames.length > 1 || activeBreed) {
         html += '<label for="global-breed" style="font-weight:600;font-size:13px;">Breed</label><select id="global-breed" data-action="global-breed"><option value="">All breeds</option>' +
@@ -679,19 +708,11 @@
 
     html += '<div class="section-head"><h2>Your Stallions</h2>' +
       '<div style="display:flex;gap:8px;">' +
-        '<button class="btn btn-sm" data-action="export-backup" title="Save your entire ledger as a JSON file">Export Backup</button>' +
-        '<button class="btn btn-sm" data-action="restore-backup" title="Replace your ledger with a previously exported backup">Restore Backup</button>' +
-        '<input type="file" id="restore-file-input" accept="application/json" style="display:none;">' +
         '<button class="btn btn-sm" data-action="toggle-import">' + (importingBreeding ? 'Close' : 'Import') + '</button>' +
         '<button class="btn btn-primary btn-sm" data-action="toggle-add-stallion">' + (addingStallion ? 'Close' : '+ Add Stallion') + '</button>' +
       '</div></div>';
 
-    html += '<div class="settings-row">' +
-      '<label class="settings-toggle"><input type="checkbox" data-action="toggle-auto-delete"' + (state.settings.autoDeleteRetired ? ' checked' : '') + '> Automatically delete stallions marked Retired</label>' +
-      '<label class="username-setting">My Horse Reality username' +
-        '<input type="text" data-action="update-username" value="' + L.esc(state.settings.myUsername) + '" placeholder="e.g. Nemoriamini">' +
-      '</label>' +
-      '</div>';
+    if (!(state.settings.myUsername || '').trim()) html += '<div class="card" style="padding:10px 14px;margin:0 0 14px;border-color:var(--accent-2);">Set your Horse Reality username under <button type="button" class="link-btn" data-action="show-tab" data-tab="settings">Settings</button> so the ledger knows which horses are yours.</div>';
 
     if (importingBreeding) html += renderImportForm(null);
     if (addingStallion) html += renderStallionForm();
@@ -903,7 +924,7 @@
 
     if (!myName) {
       html += '<div class="empty"><h3>Set your username first</h3>' +
-        '<p>Go to the Stallions tab and enter "My Horse Reality username" — that\'s how the ledger knows which mares are yours instead of a customer\'s.</p></div>';
+        '<p>Open the Settings tab and enter "My Horse Reality username" — that\'s how the ledger knows which mares are yours instead of a customer\'s.</p></div>';
       return html;
     }
 
@@ -955,7 +976,7 @@
 
     if (!myName) {
       html += '<div class="empty"><h3>Set your username first</h3>' +
-        '<p>Go to the Stallions tab and enter "My Horse Reality username" — that\'s how the ledger knows which young horses are yours.</p></div>';
+        '<p>Open the Settings tab and enter "My Horse Reality username" — that\'s how the ledger knows which young horses are yours.</p></div>';
       return html;
     }
 
@@ -1299,7 +1320,7 @@
     var myName = (state.settings.myUsername || '').trim();
     if (!myName) {
       html += '<div class="empty"><h3>Set your username first</h3>' +
-        '<p>Go to the Stallions tab and enter "My Horse Reality username" — that\'s how the ledger knows which cached horses are yours.</p></div>';
+        '<p>Open the Settings tab and enter "My Horse Reality username" — that\'s how the ledger knows which cached horses are yours.</p></div>';
       return html;
     }
 
@@ -1440,7 +1461,7 @@
     html += '<div class="an-card" style="margin-bottom:18px;"><h3>Goals</h3>';
     var anyGoal = L.anyGoals(state);
     if (!anyGoal) {
-      html += '<p class="notes-line" style="margin:0;">No goals set. Open <em>Highlight goals</em> at the top of the page to set some.</p>';
+      html += '<p class="notes-line" style="margin:0;">No goals set. Open <em>Highlight goals</em> in the Settings tab to set some.</p>';
     } else {
       html += '<p style="margin:0 0 8px;"><strong>' + a.goalHits + '</strong> horse' + (a.goalHits === 1 ? '' : 's') + ' meet all your goals; <strong>' + a.nearMiss + '</strong> miss by one box.</p>';
       html += '<div class="an-grid" style="margin:0;">';
@@ -3804,7 +3825,7 @@
     var m = /horse=([0-9]+)/.exec(location.hash || '');
     if (m) { window.HRLedgerOpenProfile(m[1]); return; }
     var t = /tab=(\w+)/.exec(location.hash || '');
-    var tabs = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others', 'analytics', 'calc'];
+    var tabs = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others', 'analytics', 'calc', 'settings'];
     if (t && tabs.indexOf(t[1]) > -1) {
       activeTab = t[1]; selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
       saveUi(); render();

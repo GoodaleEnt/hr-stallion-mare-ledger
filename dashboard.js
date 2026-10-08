@@ -10,6 +10,8 @@
   var uniqueMareCount = 0;
   var maresIndex = [];
   var activeTab = 'stallions';
+  var calcShowAll = false; // Foal Calculator suggestions: also list partners whose foal would not be better
+  var calcSuggOpen = {}; // which suggestion panels are open
   var herdSub = ''; // My Herd has a submenu: '' = the herd, 'retired' = retired horses
   var listSort = {}; // the sort order chosen for each list tab
   var selectedId = null;
@@ -2017,22 +2019,34 @@
     var feeBox = '<div class="field" style="max-width:260px;margin:0 0 12px;"><label for="calc-max-fee">Max stud fee for suggestions (HRC)</label><input id="calc-max-fee" type="number" min="0" step="1000" data-action="update-calc-fee" value="' + L.esc(fee) + '" placeholder="no limit"></div>';
     function panel(life) {
       if (!life || !state.horseInfo[life]) return '';
-      var r = L.pairIdeas(state, life, 10);
-      var head = '<h3 style="margin:0 0 4px;font-size:16px;">Suggested ' + r.kind + ' for ' + L.esc(r.name) + '</h3>';
-      if (r.error) return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head + '<p class="notes-line" style="margin:0;">' + (r.error === 'young' ? 'Horses under 3 can\'t be bred yet.' : r.error === 'no-breed' ? 'Your note on this horse says not to breed it.' : 'Pick a mare or a stallion.') + '</p></div>';
+      var r = L.pairIdeas(state, life, 40);
+      var head = '<strong>Suggested ' + r.kind + ' for ' + L.esc(r.name) + '</strong>';
+      var card = function (summary, inner, open) { return '<details class="calc-sugg card" data-life="' + L.esc(life) + '"' + (open ? ' open' : '') + ' style="padding:10px 16px;margin-bottom:12px;"><summary style="cursor:pointer;">' + summary + '</summary>' + inner + '</details>'; };
+      if (r.error) return card(head + ' <span class="sub">\u2014 ' + (r.error === 'young' ? 'under 3' : r.error === 'no-breed' ? 'not to be bred' : 'not available') + '</span>', '<p class="notes-line" style="margin:8px 0 0;">' + (r.error === 'young' ? 'Horses under 3 can\'t be bred yet.' : r.error === 'no-breed' ? 'Your note on this horse says not to breed it.' : 'Pick a mare or a stallion.') + '</p>', false);
       var pickAction = r.kind === 'stallions' ? 'calc-pick-stallion' : 'calc-pick-mare';
-      function col(title, list) {
+      var sgn = function (n, dec) { var v = Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec); return (v >= 0 ? '+' : '\u2212') + Math.abs(v); };
+      var betterMine = r.mine.filter(function (x) { return x.better === 'better'; }), betterOther = r.other.filter(function (x) { return x.better === 'better'; });
+      var nBetter = betterMine.length + betterOther.length, nAll = r.mine.length + r.other.length;
+      function col(title, list, allList) {
         var inner = list.length ? list.slice(0, 5).map(function (x) {
+          var tagColour = x.better === 'better' ? 'success' : x.better === 'worse' ? 'danger' : 'text-muted';
+          var tagText = x.better === 'better' ? 'better foal' : x.better === 'worse' ? 'foal falls short' : 'about the same';
+          var f = x.foal || {}, dd = x.d || {};
           return '<div style="border-top:1px solid var(--border);padding:7px 0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
-            '<strong>' + L.esc(x.name) + '</strong><button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(x.life) + '">Use</button></div>' +
-            (r.hasGoal ? '<span class="tag" style="font-size:11px;color:var(--' + (x.fits ? 'success' : 'warn') + ');">' + (x.fits ? 'might fit goals' : 'may fall short') + '</span> ' : '') +
-            '<span class="sub" style="font-size:12px;">' + x.reasons.map(function (t) { return L.esc(t); }).join(' \u00b7 ') + '</span></div>';
-        }).join('') : '<p class="notes-line" style="margin:6px 0 0;">None found yet. Open more ' + r.kind + '\' pages on Horse Reality so the ledger knows them.</p>';
+            '<strong>' + L.esc(x.name) + (x.partner ? ' <span class="tag">Partner</span>' : '') + '</strong><button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(x.life) + '">Use</button></div>' +
+            '<span class="tag" style="font-size:11px;color:var(--' + tagColour + ');">' + tagText + '</span> ' +
+            (r.hasGoal ? '<span class="tag" style="font-size:11px;color:var(--' + (x.fits ? 'success' : 'warn') + ');">' + (x.fits ? 'might fit goals' : 'may miss goals') + '</span> ' : '') +
+            '<div class="mono" style="font-size:12px;margin:3px 0;">' + (f.conf != null ? 'conformation ' + f.conf + (dd.conf != null ? ' (' + sgn(dd.conf, 1) + ')' : '') + ' \u00b7 ' : '') + 'GP ' + (f.gp || '?') + (dd.gp != null ? ' (' + sgn(dd.gp, 0) + ')' : '') + (f.n ? ' \u00b7 ' + f.strong + '/' + f.n + ' traits good+, ' + f.weak + ' weak' : '') + '</div>' +
+            '<span class="sub" style="font-size:12px;">' + x.reasons.slice(0, 5).map(function (t) { return L.esc(t); }).join(' \u00b7 ') + '</span></div>';
+        }).join('') : '<p class="notes-line" style="margin:6px 0 0;">' + (allList.length ? 'None would give a better foal than ' + L.esc(r.name) + '.' : 'None found yet. Open more ' + r.kind + '\' pages on Horse Reality so the ledger knows them.') + '</p>';
         return '<div><div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">' + title + '</div>' + inner + '</div>';
       }
-      return '<div class="card" style="padding:14px 16px;margin-bottom:14px;">' + head +
-        '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px;">' +
-        col('Your ' + r.kind, r.mine) + col('Other players\' ' + r.kind, r.other) + '</div></div>';
+      var minePick = calcShowAll ? r.mine : betterMine, otherPick = calcShowAll ? r.other : betterOther;
+      var summary = head + ' <span class="sub" style="font-size:12.5px;">\u2014 ' + (nAll ? nBetter + ' would give a better foal' + (calcShowAll ? ', showing all ' + nAll : ' (of ' + nAll + ' considered)') : 'none found yet') + '</span>';
+      var inner = '<p class="notes-line" style="margin:8px 0;">A foal counts as <em>better</em> when its expected conformation score, genetic potential and conformation stats are ahead of ' + L.esc(r.name) + '\'s on balance with nothing clearly worse. The numbers in brackets are how far ahead (+) or behind (\u2212) it is.</p>' +
+        '<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" data-action="calc-show-all"' + (calcShowAll ? ' checked' : '') + '> Also show partners whose foal would only match or fall short</label>' +
+        '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px;">' + col('Your ' + r.kind, minePick, r.mine) + col('Other players\' ' + r.kind, otherPick, r.other) + '</div>';
+      return card(summary, inner, !!calcSuggOpen[life]);
     }
     var h = panel(calcMare) + panel(calcStallion);
     if (h) h = feeBox + h;
@@ -3692,6 +3706,7 @@
         }
       });
       app.addEventListener('toggle', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('calc-sugg')) calcSuggOpen[e.target.getAttribute('data-life')] = e.target.open;
         if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
         if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
         if (e.target && e.target.classList && e.target.classList.contains('buy-panel')) buyOpen = e.target.open;
@@ -3723,6 +3738,7 @@
           if (selectedId === sid3) selectedId = null;
         }
       }
+      else if (action === 'calc-show-all') { calcShowAll = !!t.checked; render(); }
       else if (action === 'list-sort') { listSort[activeTab] = t.value; saveUi(); render(); }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }

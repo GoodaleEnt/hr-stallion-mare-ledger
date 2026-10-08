@@ -3181,7 +3181,9 @@
       var geneFx2 = preferredGeneBonus(state, life, cl);
       geneFx2.reasons.forEach(function (r) { reasons.push(r); });
       var score = (conf != null ? foalScoreOf(foalQ, FXq) / 2 : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus + geneFx2.bonus;
-      list.push({ unlisted: usableQ === 'unlisted', life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
+      // is the foal better than the horse that was picked? (conformation score, genetic potential and conformation stats)
+      var cmpQ = compareFoals(foalQ, foalProfileOfMare(state, life), FXq);
+      list.push({ partner: partnerOwnerOf(state, ci), better: cmpQ.verdict, d: cmpQ.d, foal: { conf: conf != null ? Math.round(conf * 10) / 10 : null, gp: Math.round(gp), weak: trq.weak, strong: trq.strong, n: trq.n }, unlisted: usableQ === 'unlisted', life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
     });
     list.sort(function (a, b) { return b.score - a.score; });
     out.mine = list.filter(function (x) { return x.mine; }).slice(0, limit || 10);

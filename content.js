@@ -1962,31 +1962,68 @@
       HRStorage.setState(state, function () { showToast('HR Ledger: ' + saved + ' ' + res.discipline + ' score' + (saved === 1 ? '' : 's') + ' saved'); });
     });
   }
-  // the "competition results" block on a horse's stats page (rows laid out like the show results block)
+  // the "Latest 25 competition results" block on a horse's stats page: rows of date, level ("BRE - Training Level"), score and
+  // position; the HRToolkit summary table above it (All-time high / low) is read too. The discipline is the one named in the
+  // row or the block; a short code like "BRE" is matched to the discipline the horse is in training for (and remembered).
   var lastCompStatsSig = '';
+  function isoFromDmy(t) { var m = /(\d{1,2})-(\d{1,2})-(\d{4})/.exec(t || ''); return m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : ''; }
   function scrapeCompetitionStats() {
     var id = parseHorseIdFromUrl();
     if (!id) return;
-    var found = [];
+    var rows = [], sum = null, blockDisc = '';
     document.querySelectorAll('.half_block').forEach(function (block) {
       var top = block.querySelector('.top');
       if (!top || !/competition/i.test(top.textContent || '') || /show results/i.test(top.textContent || '')) return;
+      blockDisc = HRLib.disciplineNameOf(top.textContent || '') || blockDisc;
+      var all = block.querySelector('.hrtoolkit-summary-alltime');
+      if (all) {
+        var tds = all.querySelectorAll('td'), hi = parseFloat((tds[1] && tds[1].textContent) || ''), lo = parseFloat((tds[2] && tds[2].textContent) || '');
+        if (hi > 0) sum = { high: hi, low: lo > 0 ? lo : 0 };
+      }
       block.querySelectorAll('.row_460').forEach(function (row) {
         var cols = row.querySelectorAll(':scope > div');
         if (cols.length < 3) return;
-        var cat = (cols[1].textContent || '').replace(/\s+/g, ' ').trim(), vm = /\d+(?:\.\d+)?/.exec((cols[2].textContent || '').replace(/,/g, ''));
-        var disc = HRLib.disciplineNameOf(cat) || HRLib.disciplineNameOf(top.textContent || '');
-        if (vm && disc) found.push({ discipline: disc, score: parseFloat(vm[0]) });
+        var dateText = (cols[0].textContent || '').trim(), level = (cols[1].textContent || '').replace(/\s+/g, ' ').trim();
+        var vm = /\d+(?:\.\d+)?/.exec((cols[2].textContent || '').replace(/,/g, ''));
+        // older layout: category, score; current layout: date, level, score, position
+        if (!/\d{1,2}-\d{1,2}-\d{4}/.test(dateText)) { level = dateText; dateText = ''; vm = /\d+(?:\.\d+)?/.exec((cols[2].textContent || '').replace(/,/g, '')) || vm; }
+        if (!vm) return;
+        var cm = /^\s*([A-Za-z]{2,5})\s*-/.exec(level);
+        rows.push({ level: level, date: isoFromDmy(dateText), score: parseFloat(vm[0]), code: cm ? cm[1].toUpperCase() : '', named: HRLib.disciplineNameOf(level) });
       });
     });
-    if (!found.length) return;
-    var sig = id + '|' + found.map(function (f) { return f.discipline + f.score; }).join(',');
+    if (!rows.length && !sum) return;
+    var sig = id + '|' + rows.map(function (r) { return r.date + r.score; }).join(',') + '|' + (sum ? sum.high + '/' + sum.low : '');
     if (sig === lastCompStatsSig) return;
     lastCompStatsSig = sig;
     HRStorage.getState(function (state) {
       if (!state.horseMeta) state.horseMeta = {};
-      var meta = Object.assign({}, state.horseMeta[id]), changed = false;
-      found.forEach(function (f) { if (HRLib.recordCompScore(meta, f.score, f.discipline)) changed = true; });
+      var info = (state.horseInfo && state.horseInfo[id]) || {};
+      var trainedAll = String(info.training || '').split(',').map(function (t) { return HRLib.disciplineNameOf(t); }).filter(Boolean);
+      var trained = trainedAll.length === 1 ? trainedAll[0] : '';
+      var codes = Object.assign({}, state.settings && state.settings.compCodes), codesChanged = false;
+      function discOf(r) {
+        if (r.named) return r.named;
+        if (blockDisc) return blockDisc;
+        if (r.code && codes[r.code]) return codes[r.code];
+        if (trained) { if (r.code) { codes[r.code] = trained; codesChanged = true; } return trained; }
+        return r.code ? 'Other (' + r.code + ')' : '';
+      }
+      var meta = Object.assign({}, state.horseMeta[id]), changed = false, fallback = '';
+      rows.forEach(function (r) {
+        var disc = discOf(r);
+        if (!disc) return;
+        fallback = fallback || disc;
+        if (HRLib.recordCompScore(meta, r.score, disc, { event: r.level, date: r.date })) changed = true;
+      });
+      if (sum) {
+        var sd = fallback || trained || blockDisc;
+        if (sd) {
+          if (HRLib.recordCompScore(meta, sum.high, sd, { event: 'HRToolkit all-time high' })) changed = true;
+          if (sum.low && HRLib.recordCompScore(meta, sum.low, sd, { event: 'HRToolkit all-time low' })) changed = true;
+        }
+      }
+      if (codesChanged) { state.settings = Object.assign({}, state.settings, { compCodes: codes }); changed = true; }
       if (!changed) return;
       state.horseMeta[id] = meta;
       HRStorage.setState(state, function () { showToast('HR Ledger: competition scores saved for this horse'); });

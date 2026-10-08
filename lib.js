@@ -2669,8 +2669,8 @@
       rec = Object.assign({ n: 0 }, rec);
       var ch = false;
       var ev = detail && detail.event ? String(detail.event).slice(0, 90) : '';
-      if (!(rec.high >= score)) { rec.high = score; rec.highAt = Date.now(); rec.highEvent = ev; delete rec.highDate; ch = true; }
-      if (!(rec.low > 0) || (score < rec.low && (rec.high - score) <= MAX_COMP_RANGE)) { if (rec.low !== score) { rec.low = score; rec.lowAt = Date.now(); rec.lowEvent = ev; delete rec.lowDate; ch = true; } }
+      if (!(rec.high >= score)) { rec.high = score; rec.highAt = Date.now(); rec.highEvent = ev; rec.highDate = (detail && detail.date) || ''; ch = true; }
+      if (!(rec.low > 0) || (score < rec.low && (rec.high - score) <= MAX_COMP_RANGE)) { if (rec.low !== score) { rec.low = score; rec.lowAt = Date.now(); rec.lowEvent = ev; rec.lowDate = (detail && detail.date) || ''; ch = true; } }
       return { rec: rec, changed: ch };
     }
     var all = bump(c); c.high = all.rec.high; c.low = all.rec.low; changed = all.changed;

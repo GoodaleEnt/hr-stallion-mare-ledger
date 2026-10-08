@@ -1916,7 +1916,36 @@
     var name = chosen || (oi && oi.breed) || key;
     return '<p class="notes-line" style="margin:0 0 12px;">Showing only <strong>' + L.esc(name) + '</strong> horses. There is no crossbreeding in Horse Reality, so only the same breed can be paired.</p>';
   }
+  // The pickers are typeahead boxes: type part of a name or a life number and choose from the list (a browser datalist),
+  // instead of scrolling a long drop-down. The text of an entry is "Name (#life)".
+  function calcTypeLabel(r) { return r.name + ' (#' + r.life + ')'; }
+  function calcTypeaheadHtml(sex, selected) {
+    var rows = calcRows(sex, selected), id = 'calc-' + (sex === 'mare' ? 'mare' : 'stallion');
+    var cur = rows.find(function (r) { return r.life === selected; });
+    return '<input id="' + id + '" type="text" list="' + id + '-list" autocomplete="off" data-action="' + id + '-text" placeholder="Type a name or life number\u2026" value="' + L.esc(cur ? calcTypeLabel(cur) : '') + '" style="width:100%;">' +
+      '<datalist id="' + id + '-list">' + rows.map(function (r) {
+        var tag = r.breed.status === 'pregnant' ? ' \u2665 in foal' : r.breed.status === 'covered' ? ' \u2714 covered' + (r.breed.stallion ? ' by ' + r.breed.stallion : '') : '';
+        return '<option value="' + L.esc(calcTypeLabel(r)) + '" label="' + L.esc((r.mine ? 'Your horse' : 'Other horse') + (r.young ? ' \u00b7 under 3' : '') + tag) + '"></option>';
+      }).join('') + '</datalist>' + (selected ? '<button type="button" class="link-btn" style="font-size:12px;" data-action="calc-clear-' + (sex === 'mare' ? 'mare' : 'stallion') + '">clear</button>' : '');
+  }
+  // What was typed or chosen: a "(#life)" ending, a bare life number, or a name that only one horse has
+  function calcResolveText(sex, text) {
+    var t = String(text || '').trim();
+    if (!t) return '';
+    // any saved horse of that sex counts, whatever the filter boxes show
+    var all = Object.keys(state.horseInfo || {}).filter(function (l) { return state.horseInfo[l].sex === sex; });
+    var m = /#(\d{6,})\)?\s*$/.exec(t) || /^(\d{6,})$/.exec(t);
+    if (m && all.indexOf(m[1]) > -1) return m[1];
+    var low = t.toLowerCase();
+    var hits = all.filter(function (l) { return String(state.horseInfo[l].name || '').toLowerCase() === low; });
+    if (hits.length === 1) return hits[0];
+    hits = all.filter(function (l) { return String(state.horseInfo[l].name || '').toLowerCase().indexOf(low) > -1; });
+    return hits.length === 1 ? hits[0] : null;
+  }
   function calcOptionsHtml(sex, selected) {
+    return '';
+  }
+  function calcRows(sex, selected) {
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
     var f = calcFilter[sex], sugg = f.sugg ? calcSuggestedSet(sex) : null;
@@ -1932,19 +1961,7 @@
     }).map(function (life) {
       return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' } };
     }).sort(function (a, b) { return a.name.localeCompare(b.name); });
-    function group(label, list) {
-      if (!list.length) return '';
-      return '<optgroup label="' + L.esc(label) + '">' + list.map(function (r) {
-        var tag = r.breed.status === 'pregnant' ? '  \u2014  \u2665 IN FOAL' : r.breed.status === 'covered' ? '  \u2014  \u2714 COVERED' + (r.breed.stallion ? ' by ' + r.breed.stallion : '') : '';
-        var colour = r.breed.status === 'pregnant' ? ' style="color:#b0407a;font-weight:700;"' : r.breed.status === 'covered' ? ' style="color:#a06a00;font-weight:700;"' : '';
-        return '<option value="' + L.esc(r.life) + '"' + colour + (r.life === selected ? ' selected' : '') + '>' + L.esc(r.name) + ' (#' + L.esc(r.life) + ')' + L.esc(tag) + '</option>';
-      }).join('') + '</optgroup>';
-    }
-    return '<option value="">Choose…</option>' +
-      group('Your horses · 3 and older', rows.filter(function (r) { return r.mine && !r.young; })) +
-      group('Other horses · 3 and older', rows.filter(function (r) { return !r.mine && !r.young; })) +
-      group('Your horses · Under 3', rows.filter(function (r) { return r.mine && r.young; })) +
-      group('Other horses · Under 3', rows.filter(function (r) { return !r.mine && r.young; }));
+    return rows;
   }
   function ancestorLabel(life) {
     var name = L.ancestorName(state, life);
@@ -2161,8 +2178,8 @@
     html += '<div class="card" style="padding:12px 16px;margin-bottom:12px;max-width:380px;"><label for="calc-breed" style="font-weight:600;">Breed</label>' + breedSelectHtml('calc-breed', 'calc-breed', calcBreed) + '</div>';
     html += breedNoteHtml(breedInForce(calcBreed, calcMare || calcStallion), calcBreed, calcMare || calcStallion);
     html += '<div class="card" style="padding:16px;margin-bottom:16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">' +
-      '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + '<select id="calc-mare" data-action="calc-mare">' + calcOptionsHtml('mare', calcMare) + '</select></div>' +
-      '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + '<select id="calc-stallion" data-action="calc-stallion">' + calcOptionsHtml('stallion', calcStallion) + '</select></div>' +
+      '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + calcTypeaheadHtml('mare', calcMare) + '</div>' +
+      '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + calcTypeaheadHtml('stallion', calcStallion) + '</div>' +
       '</div>';
     html += calcPlanHtml();
     html += calcSuggestionsHtml();
@@ -3202,6 +3219,8 @@
         selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
         render();
       }
+      else if (action === 'calc-clear-mare') { calcMare = ''; saveUi(); render(); }
+      else if (action === 'calc-clear-stallion') { calcStallion = ''; saveUi(); render(); }
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
@@ -3460,6 +3479,12 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'calc-mare-text' || action === 'calc-stallion-text') {
+        var isM = action === 'calc-mare-text', picked = calcResolveText(isM ? 'mare' : 'stallion', t.value);
+        if (picked === null) { render(); return; } // not a horse in the list: put the box back as it was
+        if (isM) calcMare = picked; else calcStallion = picked;
+        saveUi(); render();
+      }
       else if (action === 'goals-split') {
         if (t.checked) {
           // start both sets from the goals you already have

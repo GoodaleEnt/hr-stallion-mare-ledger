@@ -312,6 +312,8 @@ A foal's own page and card show how she or he compares with the dam.
 
 Under **My notes** tick what you breed for: **Conformation**, **Genetic potential**, **Breed Total**, **Competition** (pick a discipline, or leave it as whichever suits each horse best), **Health & fertility**, **Colour & preferred genes**, **Proven producers**, and **Buying & selling for profit**. You can tick several. A focus rates horses that are strong in it a bit higher and weak ones a bit lower: Sell ideas are less likely to suggest selling a horse in the top quarter of your herd for that, a missed goal in that area counts for more, partners strong in it rank higher in the breeding suggestions, a horse to buy counts for more when it is strong in it, and the ranch card level weighs it 1.6 times as much. The profit focus raises the margin kept in the suggested top bid to at least 25%.
 
+**Competition scores in the decisions.** Scores earned in competitions (read from results pages and a horse's stats page) show on the horse's card (*Top competition*, with the discipline) and in its page header (*Top comp*). They count in keep/sell ranking, partner suggestions and buying advice. How much depends on your focus: with **Conformation** ticked, the conformation score leads; with **Competition** ticked (and not Conformation), the score earned in your chosen discipline leads, is listed first on cards and tags, and counts more than conformation. With neither ticked, competition scores count a little. The reasons in the card hover list it as *Competition score*.
+
 ## What the ledger learns
 
 Nothing is stored and nothing comes from outside: each time it is needed the ledger looks again at your own records, and the **Analytics** tab shows **What the ledger has learned**.

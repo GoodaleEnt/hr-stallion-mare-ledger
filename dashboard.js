@@ -2545,7 +2545,13 @@
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var info = (state.horseInfo && state.horseInfo[life]) || {};
     var conf = L.bestConformation(meta).best;
-    var out = { conf: null, bt: null, low: null };
+    var out = { conf: null, bt: null, low: null, comp: null };
+    // competition: the best score in the discipline you breed for (or in any when none is chosen), with the discipline and when
+    var cs = L.compSummary(state, life);
+    if (cs) {
+      var fd = state.settings && state.settings.focusDiscipline, row = fd ? cs.by.find(function (r) { return r.discipline === fd; }) : cs.by[0];
+      if (row) out.comp = { value: round3(row.high), discipline: row.discipline, n: row.n, low: row.low ? round3(row.low) : null };
+    }
     if (conf) {
       out.conf = { value: round3(conf), when: highDateText(meta.confBestDate, meta.confBestAt), event: meta.confBestEvent || '' };
     }
@@ -2568,11 +2574,16 @@
     var h = highScoreInfo(life);
     var sub = 'font-size:11.5px;color:var(--text-muted);text-align:right;padding:0 0 3px;';
     var out = '';
+    // a competition breeder sees the competition score first, everyone else the conformation score
+    var fx = (state.settings && state.settings.breederFocus) || {}, compFirst = !!fx.comp && !fx.conf;
+    var compRow = h.comp ? '<div class="row"><span>Top competition</span><span class="v mono">' + L.esc(h.comp.value) + ' <span class="sub">(' + L.esc(h.comp.discipline) + (h.comp.n > 1 ? ', ' + h.comp.n + ' results' : '') + ')</span></span></div>' : '';
+    if (compFirst) out += compRow;
     if (h.conf) {
       out += '<div class="row"><span>Top conformation</span><span class="v mono">' + L.esc(h.conf.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.conf.when, h.conf.event].filter(Boolean).join(' · ')) + '</div>';
       if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + (h.low.full ? ' of ' + L.esc(h.low.full) : '') + ')</span></span></div>' + '<div style="' + sub + '">' + L.esc([h.low.when, h.low.event].filter(Boolean).join(' · ')) + '</div>' + (h.low.ranged ? '<div style="' + sub + 'color:var(--near);font-weight:600;">\u25C6 Ranged: high and low span the full range</div>' : '');
     }
+    if (!compFirst) out += compRow;
     if (h.bt) {
       out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.bt.when, h.bt.formula].filter(Boolean).join(' · ')) + '</div>';
@@ -2583,9 +2594,12 @@
   function highScoreTagsHtml(life) {
     var h = highScoreInfo(life);
     var out = '';
+    var fxt = (state.settings && state.settings.breederFocus) || {}, compTag = h.comp ? '<span class="tag mono" title="Highest competition score in ' + L.esc(h.comp.discipline) + (h.comp.low ? ' (lowest ' + L.esc(h.comp.low) + ')' : '') + '">Top comp ' + L.esc(h.comp.value) + ' \u00b7 ' + L.esc(h.comp.discipline) + '</span>' : '';
+    if (fxt.comp && !fxt.conf) out += compTag;
     if (h.conf) out += '<span class="tag mono" title="' + L.esc(['Highest conformation show score', h.conf.event].filter(Boolean).join(' — ')) + '">Top confo ' + L.esc(h.conf.value) + (h.conf.when ? ' · ' + L.esc(h.conf.when) : '') + '</span>';
     if (h.low) out += '<span class="tag mono" title="' + L.esc(['Lowest conformation show score', h.low.event].filter(Boolean).join(' — ')) + '">Low confo ' + L.esc(h.low.value) + (h.low.when ? ' · ' + L.esc(h.low.when) : '') + '</span>';
     if (h.low && h.low.ranged) out += '<span class="tag mono" style="color:var(--near);border-color:var(--near);" title="Highest minus lowest conformation score has reached the full range of ' + L.esc(h.low.full) + ' for this breed, so no later show can widen it">\u25C6 Ranged</span>';
+    if (!(fxt.comp && !fxt.conf)) out += compTag;
     if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
     return out;
   }

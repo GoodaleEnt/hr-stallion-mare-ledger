@@ -1233,7 +1233,7 @@
     { key: 'conf', label: 'Conformation', hint: 'top conformation score (show quality)' },
     { key: 'gp', label: 'Genetic potential', hint: 'the genetic potential total' },
     { key: 'bt', label: 'Breed Total', hint: 'genetic potential and conformation together' },
-    { key: 'comp', label: 'Competition', hint: 'conformation traits that count in a discipline' },
+    { key: 'comp', label: 'Competition', hint: 'competition scores in a discipline, and the conformation traits that count there (for you, competition scores come before conformation)' },
     { key: 'health', label: 'Health & fertility', hint: 'health ratings and fertility' },
     { key: 'genes', label: 'Colour & preferred genes', hint: 'genes you prefer or keep (and avoid)' },
     { key: 'producer', label: 'Proven producers', hint: 'mares that out-produce themselves, stallions whose foals beat their dams' },
@@ -1243,11 +1243,21 @@
     var f = (state && state.settings && state.settings.breederFocus) || {};
     return { keys: FOCUS_TYPES.filter(function (t) { return f[t.key]; }).map(function (t) { return t.key; }), discipline: (state && state.settings && state.settings.focusDiscipline) || '' };
   }
-  function focusLabel(key) { var t = FOCUS_TYPES.find(function (x) { return x.key === key; }); return t ? t.label.toLowerCase() : key; }
+  // the competition focus also looks at the scores the horses have actually earned ('compscore' / 'cscore' are not a choice of their own)
+  function focusKeysAll(FX) { return FX.keys.indexOf('comp') > -1 ? FX.keys.concat(['compscore']) : FX.keys; }
+  // the highest competition score a horse has had: in the discipline you breed for, or in any when none is chosen; null when none
+  function compScoreOf(state, life, discipline) {
+    var c = state && state.horseMeta && state.horseMeta[life] && state.horseMeta[life].comp;
+    if (!c) return null;
+    var v = discipline ? (c.by && c.by[discipline] && c.by[discipline].high) : c.high;
+    return v > 0 ? Number(v) : null;
+  }
+  function focusLabel(key) { if (key === 'compscore' || key === 'cscore') return 'competition score'; var t = FOCUS_TYPES.find(function (x) { return x.key === key; }); return t ? t.label.toLowerCase() : key; }
   var RATING_SCORE = { excellent: 90, good: 70, average: 50, fair: 30, poor: 10 };
   // A number for one focus (higher is better) or null when it is not known
   function focusMetric(state, life, key, discipline) {
     var info = state.horseInfo && state.horseInfo[life], meta = (state.horseMeta && state.horseMeta[life]) || {};
+    if (key === 'compscore') return compScoreOf(state, life, discipline);
     if (!info) return null;
     if (key === 'conf') { var c = bestConformation(meta).best; return c > 0 ? c : null; }
     if (key === 'gp') { var g = Number(info.geneticPotential); return g > 0 ? g : null; }
@@ -1416,6 +1426,7 @@
     }).map(function (h) {
       var life = String(h.lifeNumber), m = {};
       ['bt', 'conf', 'gp', 'comp', 'health', 'genes', 'producer'].forEach(function (k) { m[k] = focusMetric(state, life, k, FX.discipline); });
+      m.cscore = focusMetric(state, life, 'compscore', FX.discipline);
       return { life: life, h: h, sex: h.info.sex, young: isYoungInfo(h.info), breed: breedKeyOf(h.info.breed), m: m, z: 0, adj: 0, why: [], flags: {}, parts: [], adjParts: [], over: [] };
     });
     var GROUP = { mare: 'mares & fillies', stallion: 'colts & stallions' };
@@ -1423,7 +1434,8 @@
     var bySex = { mare: [], stallion: [] }, byBreedSex = {};
     herd.forEach(function (x) { bySex[x.sex].push(x); (byBreedSex[x.breed + '|' + x.sex] = byBreedSex[x.breed + '|' + x.sex] || []).push(x); });
     herd.forEach(function (x) { var g = byBreedSex[x.breed + '|' + x.sex]; x.group = x.breed && g.length >= 6 ? g : bySex[x.sex]; x.groupName = (x.group === bySex[x.sex] ? '' : (x.h.info.breed || '') + ' ') + GROUP[x.sex]; });
-    var BASE = { bt: 1, conf: 0.5, gp: 0.5, comp: 0, health: 0, genes: 0.6, producer: 0.6 };
+    // conformation counts most for a conformation breeder; for a competition breeder the scores horses earned in the discipline (cscore) come first
+    var BASE = { bt: 1, conf: 0.5, gp: 0.5, comp: 0, cscore: 0.3, health: 0, genes: 0.6, producer: 0.6 };
     var stats = {};
     function statOf(group, k) {
       var key = group.length + '|' + group[0].life + '|' + k;
@@ -1437,15 +1449,18 @@
     herd.forEach(function (x) {
       var num = 0, den = 0, life = x.life, nr = horseNoteRules(state, life);
       Object.keys(BASE).forEach(function (k) {
-        var w = (BASE[k] || 0) * (FX.keys.indexOf(k) > -1 ? 1.6 : 1);
-        if (FX.keys.indexOf(k) > -1 && !BASE[k]) w = 1.4;
+        var inF = FX.keys.indexOf(k === 'cscore' ? 'comp' : k) > -1;
+        var w = (BASE[k] || 0) * (inF ? 1.6 : 1);
+        if (inF && !BASE[k]) w = 1.4;
+        if (k === 'cscore' && inF) w = 1.2;
+        if (k === 'conf' && !inF && FX.keys.indexOf('comp') > -1) w *= 0.6;
         if (!w || x.m[k] == null) return;
         var st = statOf(x.group, k);
         if (st.n < 3) return;
         var z = Math.max(-2, Math.min(2, (x.m[k] - st.mean) / st.sd));
         num += w * z; den += w;
-        x.parts.push({ k: k, label: { bt: 'Breed Total', conf: 'Top conformation', gp: 'Genetic potential', comp: 'Competition fit', health: 'Health & fertility', genes: 'Genes', producer: 'Producer record' }[k] || k, value: x.m[k], mean: st.mean, z: z, w: w, focus: FX.keys.indexOf(k) > -1 });
-        if (FX.keys.indexOf(k) > -1 && Math.abs(z) >= 0.6) x.why.push((z > 0 ? 'Strong' : 'Weak') + ' in your focus, ' + focusLabel(k) + (k === 'conf' || k === 'gp' || k === 'bt' ? ' (' + r1(x.m[k]) + ' against a group average of ' + r1(st.mean) + ')' : ''));
+        x.parts.push({ k: k, label: { bt: 'Breed Total', conf: 'Top conformation', gp: 'Genetic potential', comp: 'Competition fit', cscore: 'Competition score' + (FX.discipline ? ' (' + FX.discipline + ')' : ''), health: 'Health & fertility', genes: 'Genes', producer: 'Producer record' }[k] || k, value: x.m[k], mean: st.mean, z: z, w: w, focus: inF });
+        if (inF && Math.abs(z) >= 0.6) x.why.push((z > 0 ? 'Strong' : 'Weak') + ' in your focus, ' + focusLabel(k) + (k === 'conf' || k === 'gp' || k === 'bt' || k === 'cscore' ? ' (' + r1(x.m[k]) + ' against a group average of ' + r1(st.mean) + ')' : ''));
       });
       x.z = den ? num / den : null;
       var adj = 0;
@@ -1537,7 +1552,7 @@
       L.push('');
       L.push('HOW THE SCORE IS WORKED OUT (higher is better)');
       L.push('1. Each measure compared with the average of its group, then blended (weights in brackets; your focus counts 1.6\u00d7):');
-      r.parts.forEach(function (p) { L.push('   ' + p.label + ' ' + (p.k === 'bt' || p.k === 'conf' || p.k === 'comp' || p.k === 'health' ? f1(p.value) : p.k === 'gp' ? Math.round(p.value) : p.value) + ' against a group average of ' + (p.k === 'gp' ? Math.round(p.mean) : f1(p.mean)) + '  \u2192 ' + f2(p.z) + '  (weight ' + f1(p.w) + (p.focus ? ', your focus' : '') + ')'); });
+      r.parts.forEach(function (p) { L.push('   ' + p.label + ' ' + (p.k === 'bt' || p.k === 'conf' || p.k === 'comp' || p.k === 'cscore' || p.k === 'health' ? f1(p.value) : p.k === 'gp' ? Math.round(p.value) : p.value) + ' against a group average of ' + (p.k === 'gp' ? Math.round(p.mean) : f1(p.mean)) + '  \u2192 ' + f2(p.z) + '  (weight ' + f1(p.w) + (p.focus ? ', your focus' : '') + ')'); });
       L.push('   Blended: ' + f2(r.z));
       L.push('2. Adjustments:');
       if (!r.adjParts.length) L.push('   none');
@@ -1727,7 +1742,7 @@
     // a breeder focus lifts partners that are strong in it (by how far above the others they stand)
     var FXp = focusOf(state);
     if (FXp.keys.length && list.length > 1) {
-      FXp.keys.forEach(function (k) {
+      focusKeysAll(FXp).forEach(function (k) {
         if (k === 'profit') return;
         var vals = list.map(function (it) { return focusMetric(state, it.life, k, FXp.discipline); }), known = vals.filter(function (v) { return v != null; });
         if (known.length < 2) return;
@@ -2147,7 +2162,7 @@
     else if (weak.length && info.confTraits) out.lines.push({ ok: null, text: 'Your herd is weakest in ' + weak.join(', ') + '; this horse is not strong there' });
     // your breeder focus counts for more
     var FXh = focusOf(state);
-    FXh.keys.forEach(function (k) {
+    focusKeysAll(FXh).forEach(function (k) {
       if (k === 'profit') return;
       var mv = focusMetric(state, life, k, FXh.discipline);
       if (mv == null) return;
@@ -4011,6 +4026,7 @@
     marketRowInfo: marketRowInfo,
     recordCompScore: recordCompScore,
     compSummary: compSummary,
+    compScoreOf: compScoreOf,
     disciplineNameOf: disciplineNameOf,
     COMP_DISCIPLINES: COMP_DISCIPLINES,
     partnerList: partnerList,

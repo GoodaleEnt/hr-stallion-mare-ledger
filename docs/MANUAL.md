@@ -240,6 +240,18 @@ The ledger records each horse's **lowest** conformation score just like the high
 
 A horse with **12 conformation stats** can vary by at most **6.928** between its lowest and its highest score. When highest minus lowest reaches 6.928 the horse is marked **◆ Ranged**: both ends are found, so no later show can widen it. Until then the card shows how far it has got ("range 6.846 of 6.928"). A low found automatically that is further under the high than 6.928 is ignored as a misread (for breeds whose full range is not known the limit is 12 points); one you type is always kept. **Ranged** shows on the card, in the horse's header, as a blue pill on the ranch cards, in the keep/sell reasons, and as **Ranged first** in the Sort box; `#ranged` in a list filter finds them.
 
+Where to see it. On a horse's card, the lowest score, its range and how far it is from the full range (a horse part-way, "range 6.846 of 6.928", next to a ranged one, which gets the blue **◆ Ranged** line):
+
+![A card part-way to the full range, and a ranged card](images/11-ranged-cards.png)
+
+In the horse's own page header, **Top confo**, **Low confo** and, once the range is full, the blue **◆ Ranged** tag:
+
+![The tags in a horse's page header: Top confo, Low confo and Ranged](images/12-ranged-profile.png)
+
+On your ranch page, a blue **◆ Ranged** pill under the keep/sell badge (an illustration of the card; your own horses' pictures show as usual):
+
+![The Ranged pill on a ranch page card](images/13-ranged-ranch-card.png)
+
 ### Competition scores
 
 The highest and lowest **competition** score of each horse, overall and per discipline (Dressage, Driving, Endurance, Eventing, Flat Racing, Show Jumping, Western Reining, Basic Training), is read from a competition's **results page** (a list of horses with a score; the discipline comes from the page title or address) and from the competition results block on a horse's **stats page**. A message says how many scores were read. They show in a **Competition scores** box on the horse's page. Conformation shows are kept separate.

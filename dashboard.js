@@ -1931,7 +1931,7 @@
   // ---------- Retired / Sold: horses that leave the working lists ----------
   // A horse's status can be set on its herd row/page (horseMeta.status) or, for
   // a stallion, on the Stallions tab (record status). Either one counts. Retired
-  // horses move to the Retired tab; Sold horses move to Other Horses. Nothing is
+  // horses move to My Herd → Retired; Sold horses move to Other Horses. Nothing is
   // deleted - setting the status back to Active returns the horse.
   function lifeStatus(life) {
     var m = state.horseMeta && state.horseMeta[life];
@@ -1968,7 +1968,7 @@
     if (!life) return '';
     return '<div class="card" style="padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">' +
       '<label for="mare-status" style="color:var(--text-muted);font-size:13px;">Status</label>' + statusSelectHtml(life, 'mare-status') +
-      '<span class="notes-line" style="margin:0;">Sold mares move to Other Horses; retired mares move to the Retired tab.</span></div>';
+      '<span class="notes-line" style="margin:0;">Sold mares move to Other Horses; retired mares move to My Herd → Retired.</span></div>';
   }
 
   // every horse the ledger knows with this status, as { lifeNumber, info, meta }

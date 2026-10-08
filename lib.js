@@ -1497,14 +1497,14 @@
   function partnerAdvice(state, l) {
     var out = { best: null, bestOwn: null, reasons: [] };
     var sg = breedingSuggestions(state, l, 40);
-    var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, conf: t.conf, yours: t.yours, unlisted: !!t.unlisted, cost: t.yours ? '' : (t.terms && t.terms.summary ? t.terms.summary : 'no fee saved') }; };
+    var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, conf: t.conf, yours: t.yours, partner: t.partner || '', unlisted: !!t.unlisted, cost: t.yours ? '' : (t.terms && t.terms.summary ? t.terms.summary : 'no fee saved') }; };
     var mine = sg.mine || [], others = sg.others || [];
     if (!mine.length && !others.length) { if (sg.error !== 'young') out.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')'); return out; }
     out.bestOwn = mine[0] ? pack(mine[0]) : null;
     // the best-crossing stallion of another player that is saved in the ledger (marked when no fee is known)
     var bestOther = others[0] || null;
     out.best = bestOther ? pack(bestOther) : (mine[0] ? pack(mine[0]) : null);
-    var line = function (t, i) { return '  ' + (i + 1) + '. ' + t.name + ' \u2014 expected foal conformation ' + (t.conf != null ? t.conf : '?') + ', GP ' + Math.round(t.gp) + (t.traitAvg != null ? ', ' + (t.weakTraits || 0) + ' weak traits' : '') + (t.yours ? '' : (t.terms && t.terms.summary ? ' \u00b7 ' + t.terms.summary : ' \u00b7 no stud fee saved')); };
+    var line = function (t, i) { return '  ' + (i + 1) + '. ' + t.name + (t.partner ? ' (partner)' : '') + ' \u2014 expected foal conformation ' + (t.conf != null ? t.conf : '?') + ', GP ' + Math.round(t.gp) + (t.traitAvg != null ? ', ' + (t.weakTraits || 0) + ' weak traits' : '') + (t.yours ? '' : (t.terms && t.terms.summary ? ' \u00b7 ' + t.terms.summary : ' \u00b7 no stud fee saved')); };
     if (mine.length) { out.reasons.push('YOUR STALLIONS (top ' + mine.length + ')'); mine.forEach(function (t, i) { out.reasons.push(line(t, i)); }); }
     if (others.length) { out.reasons.push('OTHER PLAYERS\u2019 STALLIONS SAVED IN THE LEDGER (top ' + others.length + ')'); others.forEach(function (t, i) { out.reasons.push(line(t, i)); }); }
     var top = bestOther || mine[0];
@@ -1625,6 +1625,7 @@
       var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
       var yours = !!(rec && rec.owned !== false);
       var terms = yours ? null : studTermsOf(state, life);
+      var partnerName = yours ? '' : partnerOwnerOf(state, sInfo);
       var isMineHorse = yours || usable === 'yes' && !terms && String((sInfo.ownerName || '')).trim().toLowerCase() === String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
       // what she and he have produced together already
       var hist = { foals: 0, failed: 0, bestScore: 0 };
@@ -1648,6 +1649,7 @@
       else reasons.push('His fertility is not recorded' + (isYoungInfo(sInfo) ? '' : ' (open his page after a fertility test)'));
       var lf = LM.on ? learnedFailure(state, life) : null;
       if (lf && lf.expected != null && Math.abs(lf.rate - lf.expected) >= 0.1) { learnedFail = (lf.expected - lf.rate) * 5; reasons.push('Learned: ' + lf.failed + ' of his ' + lf.n + ' coverings failed (' + Math.round(lf.rate * 100) + '%), against ' + Math.round(lf.expected * 100) + '% expected for his fertility'); }
+      if (partnerName) reasons.push('Stallion of your breeding partner ' + partnerName);
       if (usable === 'unlisted') reasons.push('No stud fee or semen saved for him, so he may not be at stud (open his page or the Studs & Semen market to check)');
       if (yours) reasons.push('Your own stallion: no stud fee');
       else if (terms) reasons.push('Cost: ' + terms.summary);
@@ -1657,8 +1659,8 @@
       if (noteFx.reason) reasons.push(noteFx.reason);
       var geneFx = preferredGeneBonus(state, mareLife, life);
       geneFx.reasons.forEach(function (r) { reasons.push(r); });
-      var score = baseScore + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
-      list.push({ unlisted: usable === 'unlisted', life: life, conf: conf != null ? Math.round(conf * 10) / 10 : null, traitAvg: foalExp.traitAvg, weakTraits: tr.weak, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
+      var score = baseScore + (partnerName ? 0.4 : 0) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
+      list.push({ partner: partnerName, unlisted: usable === 'unlisted', life: life, conf: conf != null ? Math.round(conf * 10) / 10 : null, traitAvg: foalExp.traitAvg, weakTraits: tr.weak, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     // a breeder focus lifts partners that are strong in it (by how far above the others they stand)
     var FXp = focusOf(state);
@@ -2494,7 +2496,40 @@
   // Does a horse match every #tag term of a search (a part of a tag matches)? terms are tags without the #.
   function tagQueryMatch(state, life, terms) {
     var tags = tagsOf(state, life);
+    // horses of your breeding partners also answer to #partner and #bp
+    if (partnerOwnerOf(state, state.horseInfo && state.horseInfo[life])) tags = tags.concat(['partner', 'bp']);
     return terms.every(function (q) { return tags.some(function (t) { return t.indexOf(q) > -1; }); });
+  }
+
+  // ---------- breeding partners ----------
+  // Other players whose stallions you breed to (state.settings.partners, up to 20 user names). Their stallions that are saved in
+  // the ledger are marked as partner studs: ranked a little higher in the suggestions, shown with a "partner" label, and found
+  // with #partner (or #bp) in a list filter.
+  var MAX_PARTNERS = 20;
+  function partnerList(state) { return (state && state.settings && Array.isArray(state.settings.partners)) ? state.settings.partners : []; }
+  function partnerOwnerOf(state, info) {
+    var owner = String((info && info.ownerName) || '').trim().toLowerCase();
+    if (!owner) return '';
+    var hit = partnerList(state).find(function (p) { return String(p).trim().toLowerCase() === owner; });
+    return hit ? String(info.ownerName).trim() : '';
+  }
+  // 'added', 'exists', 'full' or 'invalid'
+  function addPartner(state, name) {
+    name = String(name || '').trim();
+    if (name.length < 2 || name.length > 40) return 'invalid';
+    state.settings = state.settings || {};
+    var list = partnerList(state).slice();
+    if (list.some(function (p) { return String(p).toLowerCase() === name.toLowerCase(); })) return 'exists';
+    if (list.length >= MAX_PARTNERS) return 'full';
+    list.push(name);
+    state.settings.partners = list;
+    return 'added';
+  }
+  function removePartner(state, name) {
+    var list = partnerList(state), next = list.filter(function (p) { return String(p).toLowerCase() !== String(name).toLowerCase(); });
+    if (next.length === list.length) return false;
+    state.settings.partners = next;
+    return true;
   }
 
   // ---------- listing a horse for sale and retiring it ----------
@@ -3809,6 +3844,11 @@
     askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
     marketRowInfo: marketRowInfo,
+    partnerList: partnerList,
+    partnerOwnerOf: partnerOwnerOf,
+    addPartner: addPartner,
+    removePartner: removePartner,
+    MAX_PARTNERS: MAX_PARTNERS,
     normalizeTag: normalizeTag,
     tagsOf: tagsOf,
     addTagTo: addTagTo,

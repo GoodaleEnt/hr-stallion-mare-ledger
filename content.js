@@ -1814,7 +1814,7 @@
         // the best stallion for a free mare is worked out afterwards, a few at a time while the browser is idle
         if (a.freeMare) queue.push({ life: li.getAttribute('data-horse'), show: function (pa) {
           if (pa.bestOwn) pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F');
-          if (pa.best && !pa.best.yours) pill('\u2192 Other: ' + stud(pa.best) + (pa.best.unlisted ? ' (no fee saved)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), '#5B3E8A');
+          if (pa.best && !pa.best.yours) pill('\u2192 Other: ' + stud(pa.best) + (pa.best.partner ? ' (partner)' : '') + (pa.best.unlisted ? ' (no fee saved)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), '#5B3E8A');
           if (pa.reasons.length) box.title = box.title + '\n\n' + pa.reasons.join('\n');
         } });
         // the very bottom of the card, so it sits in the same place on every card

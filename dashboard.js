@@ -1121,7 +1121,7 @@
       h2 += '<div class="card" style="padding:14px 16px;margin-bottom:10px;">' +
         '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;justify-content:space-between;">' +
           '<div><span class="tag mono">#' + (i + 1) + '</span> <button type="button" class="link-btn" style="font-size:17px;font-weight:600;" data-action="open-passport" data-life="' + L.esc(s.life) + '">' + L.esc(s.name) + '</button>' +
-            (s.yours ? ' <span class="tag">Your stallion</span>' : s.unlisted ? ' <span class="tag" title="No stud fee or semen is saved for him">No fee saved</span>' : '') + '</div>' +
+            (s.yours ? ' <span class="tag">Your stallion</span>' : s.partner ? ' <span class="tag" title="A stallion of your breeding partner ' + L.esc(s.partner) + '">Partner</span>' + (s.unlisted ? ' <span class="tag" title="No stud fee or semen is saved for him">No fee saved</span>' : '') : s.unlisted ? ' <span class="tag" title="No stud fee or semen is saved for him">No fee saved</span>' : '') + '</div>' +
           '<div class="mono" style="font-size:15px;">' + (s.estBT != null ? 'Foal BT ~<strong>' + s.estBT + '</strong>' : 'Avg GP <strong>' + s.gp + '</strong>') + ' <button type="button" class="btn btn-sm" data-action="calc-open" data-mare="' + L.esc(life) + '" data-stallion="' + L.esc(s.life) + '">Foal Calculator</button></div>' +
         '</div>' +
         '<ul style="margin:8px 0 0 18px;padding:0;font-size:13.5px;line-height:1.55;">' + s.reasons.map(function (x) { return '<li>' + L.esc(x) + '</li>'; }).join('') + '</ul>' +
@@ -2516,6 +2516,7 @@
       }).join('') + (horses.length > 15 ? '<p class="notes-line" style="margin:4px 0 0;">and ' + (horses.length - 15) + ' more.</p>' : '') + '</div>';
     }
     html += breederFocusHtml();
+    html += partnersHtml();
     html += preferredGenesHtml();
     html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-ranch-advice"' + (state.settings.ranchAdvice === false ? '' : ' checked') + '> Show Keep / Sell and the best stallion for each mare on the cards of my Horse Reality ranch page</label>' +
@@ -2523,6 +2524,14 @@
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-learn"' + (state.settings.learn === false ? '' : ' checked') + '> Let the ledger learn from my foals, sales and bids to improve its breeding and purchase suggestions</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-market-highlight"' + (state.settings.marketHighlight === false ? '' : ' checked') + '> Colour market rows green or red for horses I have looked at (would lift my herd or not)</label>';
     return html + '</details>';
+  }
+  // Other players whose stallions you breed to
+  function partnersHtml() {
+    var list = L.partnerList(state);
+    return '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><strong style="font-size:13px;">Breeding partners' + (list.length ? ' (' + list.length + ' of ' + L.MAX_PARTNERS + ')' : '') + '</strong>' +
+      '<p class="notes-line" style="margin:4px 0 8px;">Add the Horse Reality user names of players whose stallions you breed to. Their stallions saved in the ledger are marked <em>Partner</em>, ranked a little higher in the suggestions, and found with <em>#partner</em> in a list filter. Horses of theirs you open are saved like any other horse.</p>' +
+      '<div style="margin-bottom:6px;">' + (list.map(function (p) { return '<span class="tag" style="margin:0 6px 4px 0;">' + L.esc(p) + ' <button type="button" class="link-btn" data-action="partner-remove" data-name="' + L.esc(p) + '" aria-label="Remove ' + L.esc(p) + '">\u00d7</button></span>'; }).join('') || '<span class="sub">No partners yet.</span>') + '</div>' +
+      (list.length < L.MAX_PARTNERS ? '<form data-action="partner-add" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input name="partner" type="text" maxlength="40" placeholder="User name" autocomplete="off" style="max-width:220px;"><button type="submit" class="btn btn-sm">Add partner</button></form>' : '') + '</div>';
   }
   // What kind of breeder you are: horses strong in it are rated a bit higher, weak ones a bit lower
   function breederFocusHtml() {
@@ -3276,6 +3285,7 @@
       }
       else if (action === 'calc-clear-mare') { calcMare = ''; saveUi(); render(); }
       else if (action === 'calc-clear-stallion') { calcStallion = ''; saveUi(); render(); }
+      else if (action === 'partner-remove') { if (L.removePartner(state, t.getAttribute('data-name'))) { notesOpen = true; persist(); } }
       else if (action === 'tag-remove') { if (L.removeTagFrom(state, t.getAttribute('data-life'), t.getAttribute('data-tag'))) persist(); }
       else if (action === 'filter-tag') {
         listFilterText = '#' + t.getAttribute('data-tag');
@@ -3408,6 +3418,12 @@
       if (action === 'submit-search') {
         horseSearchQuery = (fd.get('query') || '').trim();
         render();
+      }
+      else if (action === 'partner-add') {
+        var pr = L.addPartner(state, fd.get('partner'));
+        if (pr === 'invalid') { alert('Type a Horse Reality user name.'); return; }
+        notesOpen = true;
+        if (pr === 'added') persist(); else render();
       }
       else if (action === 'tag-add') {
         var tl = t.getAttribute('data-life'), tr = L.addTagTo(state, tl, fd.get('tag'));

@@ -2447,6 +2447,7 @@
     html += preferredGenesHtml();
     html += '<label style="display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-fit-banner"' + (state.settings.fitBanner === false ? '' : ' checked') + '> Show a "fits / doesn\'t fit my criteria" summary on Horse Reality horse pages</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-ranch-advice"' + (state.settings.ranchAdvice === false ? '' : ' checked') + '> Show Keep / Sell and the best stallion for each mare on the cards of my Horse Reality ranch page</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-save-studs"' + (state.settings.saveMarketStuds === false ? '' : ' checked') + '> Save the stallions listed on the Studs &amp; Semen market (a few at a time) so they show up in the Foal Calculator and suggestions</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-learn"' + (state.settings.learn === false ? '' : ' checked') + '> Let the ledger learn from my foals, sales and bids to improve its breeding and purchase suggestions</label>' +
       '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="update-market-highlight"' + (state.settings.marketHighlight === false ? '' : ' checked') + '> Colour market rows green or red for horses I have looked at (would lift my herd or not)</label>';
     return html + '</details>';
@@ -3487,6 +3488,7 @@
       }
       else if (action === 'update-focus') { var bf = Object.assign({}, state.settings.breederFocus); if (t.checked) bf[t.getAttribute('data-focus')] = true; else delete bf[t.getAttribute('data-focus')]; state.settings.breederFocus = bf; notesOpen = true; persist(); }
       else if (action === 'update-focus-discipline') { state.settings.focusDiscipline = t.value; notesOpen = true; persist(); }
+      else if (action === 'update-save-studs') { state.settings.saveMarketStuds = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-ranch-advice') { state.settings.ranchAdvice = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-learn') { state.settings.learn = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-market-highlight') { state.settings.marketHighlight = !!t.checked; notesOpen = true; persist(); }

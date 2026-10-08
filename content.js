@@ -1623,6 +1623,69 @@
     var t = null;
     return function () { if (t) return; t = setTimeout(function () { t = null; fn(); }, 300); };
   }
+  // ---- stallions on the Studs & Semen market are saved for you ----
+  // Opening the market lists many studs the ledger has never seen. A few at a time (5 per pass, a pause between each, only
+  // while the browser is idle) the stallions listed on the page are looked up the way a visit to their page would, and
+  // their fee is kept with them, so they show up in the Foal Calculator, the mare cards' suggestions and the market rows.
+  // A checkbox in My notes turns it off.
+  var studCacheTimers = [], studCacheBusy = false;
+  function cacheMarketStuds() {
+    if (studCacheBusy || !/\/market\/studs-and-semen/.test(location.pathname) || /\/(edit|create)/.test(location.pathname)) return;
+    var rows = document.querySelectorAll('.market-office-table-row-outer');
+    if (!rows.length || !getAuthData().hr_csrf) return;
+    var wanted = [];
+    rows.forEach(function (outer) {
+      var a = outer.querySelector('a[href*="/market/studs-and-semen/"]'), m = a && /studs-and-semen\/(\d+)/.exec(a.getAttribute('href') || '');
+      if (!m) return;
+      var fees = {};
+      [['hrc', 'HRC'], ['dp', 'DP'], ['ft', 'FT'], ['wt', 'WT']].forEach(function (p) {
+        var td = outer.querySelector('tr.market-item-price td.item-price-' + p[0]);
+        if (td && !td.classList.contains('disabled')) { var n = parseInt(String(td.textContent || '').replace(/[^0-9]/g, ''), 10); if (n) fees[p[1]] = n; }
+      });
+      if (!wanted.some(function (w) { return w.life === m[1]; })) wanted.push({ life: m[1], fees: fees });
+    });
+    if (!wanted.length) return;
+    studCacheBusy = true;
+    HRStorage.peekState(function (state) {
+      if (state.settings && state.settings.saveMarketStuds === false) { studCacheBusy = false; return; }
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase(), week = Date.now() - 7 * 86400000;
+      // new ones first, then ones last saved over a week ago (fee and details change)
+      var todo = wanted.filter(function (w) { var i = state.horseInfo && state.horseInfo[w.life]; return !i; })
+        .concat(wanted.filter(function (w) { var i = state.horseInfo && state.horseInfo[w.life]; return i && (!i.capturedAt || i.capturedAt < week) && String(i.ownerName || '').trim().toLowerCase() !== me; })).slice(0, 5);
+      if (!todo.length) { studCacheBusy = false; return; }
+      var got = [];
+      (function next(i) {
+        if (i >= todo.length) { finish(); return; }
+        var id = todo[i].life;
+        Promise.all([
+          fetchHorseJson('/api/player/horse/' + id).catch(function () { return null; }),
+          fetchHorseJson('/api/player/horse/' + id + '/passport').catch(function () { return null; })
+        ]).then(function (res) {
+          var info = safeExtract(function () { return buildHorseInfoFromApi(id, res[0], res[1]); }, null);
+          if (info) got.push({ info: info, fees: todo[i].fees });
+          setTimeout(function () { next(i + 1); }, 800);
+        });
+      })(0);
+      function finish() {
+        if (!got.length) { studCacheBusy = false; return; }
+        HRStorage.getState(function (st) {
+          got.forEach(function (g) {
+            HRStorage.upsertHorseInfo(st, g.info.lifeNumber, g.info);
+            if (g.info.sex === 'stallion' && Object.keys(g.fees).length) {
+              var meta = st.horseMeta[g.info.lifeNumber] = Object.assign({}, st.horseMeta[g.info.lifeNumber]);
+              meta.studTerms = Object.assign({}, meta.studTerms, { cheapest: g.fees, seenAt: toIsoDate(Date.now()) });
+            }
+          });
+          HRStorage.setState(st, function () { studCacheBusy = false; showToast('HR Ledger: ' + got.length + ' stud' + (got.length === 1 ? '' : 's') + ' from the market saved'); });
+        });
+      }
+    });
+  }
+  function scheduleStudCache() {
+    studCacheTimers.forEach(clearTimeout);
+    if (!/\/market\/studs-and-semen/.test(location.pathname)) return;
+    studCacheTimers = [4000, 16000, 30000].map(function (ms) { return setTimeout(function () { whenIdle(cacheMarketStuds); }, ms); });
+  }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
   function renderRanchAdvice() {
     var items = document.querySelectorAll('li.horse-item[data-horse]');
@@ -2506,6 +2569,7 @@
     scheduleFit();
     scheduleMarket();
     scheduleRanch();
+    scheduleStudCache();
     scheduleBidScan();
     scheduleSales();
     checkPendingRetire();

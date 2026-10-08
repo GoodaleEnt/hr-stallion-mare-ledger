@@ -253,6 +253,8 @@ A checkbox in **My notes** turns learning off.
 
 ## Studs & Semen market
 
+**Studs are saved for you.** Opening the market saves the stallions listed on the page, 5 per pass with a pause between each and only while the browser is idle, the way a visit to their page would, together with the fee shown. They then appear in the Foal Calculator's Other horses, the mare cards' suggestions and the market rows. A checkbox in **My notes** turns it off.
+
 On the market's **Studs & Semen** pages, a stallion the ledger has saved (open his page once) gets the same treatment as a horse for sale:
 
 - **Badges** under his name: **GP**, **Conf**, **BT**, **Traits** and **Fert** (green with a tick when he meets your purchase criteria for colts & stallions, red with a cross when not), the **stud fee**, and a verdict: **Better for N mares** (with the best mare and how much better), **Worse for your mares** or **Same as your studs**.

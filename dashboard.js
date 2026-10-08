@@ -3646,7 +3646,13 @@
   };
   function openFromHash() {
     var m = /horse=([0-9]+)/.exec(location.hash || '');
-    if (m) window.HRLedgerOpenProfile(m[1]);
+    if (m) { window.HRLedgerOpenProfile(m[1]); return; }
+    var t = /tab=(\w+)/.exec(location.hash || '');
+    var tabs = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others', 'analytics', 'calc'];
+    if (t && tabs.indexOf(t[1]) > -1) {
+      activeTab = t[1]; selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+      saveUi(); render();
+    }
   }
   window.addEventListener('hashchange', openFromHash);
 

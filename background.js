@@ -96,3 +96,66 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
   return true; // keep the message channel open for the async response
 });
+
+// ---------- address-bar search: type "hrl", press Tab, then a horse's name or a tab ----------
+// "hrl Dark Knight" opens that horse in the ledger; "hrl mares", "hrl stallions", "hrl colts", "hrl fillies", "hrl herd",
+// "hrl analytics", "hrl calc" open that tab; "hrl panel" opens the ledger in Chrome's side panel.
+var OMNI_TABS = { stallions: 'stallions', mares: 'mares', colts: 'colts', fillies: 'fillies', herd: 'herd', retired: 'retired', others: 'others', analytics: 'analytics', calc: 'calc', calculator: 'calc' };
+function omniEscape(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function omniNorm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9# ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+chrome.omnibox.setDefaultSuggestion({ description: 'Open the ledger, or type a horse name, a life number, or mares, stallions, colts, fillies, herd, analytics, calc, panel' });
+chrome.omnibox.onInputChanged.addListener(function (text, suggest) {
+  var q = omniNorm(text), out = [];
+  Object.keys(OMNI_TABS).concat(['panel']).forEach(function (c) {
+    if (!q || c.indexOf(q) === 0) out.push({ content: 'tab:' + c, description: 'Open <match>' + omniEscape(c) + '</match> in the ledger' });
+  });
+  if (!q) { suggest(out.slice(0, 8)); return; }
+  HRStorage.getState(function (state) {
+    var hits = [];
+    Object.keys(state.horseInfo || {}).forEach(function (life) {
+      var i = state.horseInfo[life], n = omniNorm(i.name);
+      var at = n.indexOf(q);
+      if (life.indexOf(q.replace('#', '')) === 0 || at > -1) hits.push({ life: life, rank: at === 0 || life.indexOf(q.replace('#', '')) === 0 ? 0 : 1, info: i });
+    });
+    hits.sort(function (a, b) { return a.rank - b.rank || String(a.info.name || '').localeCompare(String(b.info.name || '')); });
+    hits.slice(0, 6).forEach(function (h) {
+      var mine = String(h.info.ownerName || '').trim().toLowerCase() === String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+      out.unshift({ content: 'horse:' + h.life, description: omniEscape(h.info.name || ('#' + h.life)) + ' <dim>' + omniEscape([h.info.breed, h.info.sex, mine ? 'yours' : h.info.ownerName].filter(Boolean).join(' \u00b7 ')) + ' #' + h.life + '</dim>' });
+    });
+    suggest(out.slice(0, 8));
+  });
+});
+chrome.omnibox.onInputEntered.addListener(function (text) {
+  var t = String(text || '').trim(), m;
+  if ((m = /^horse:(\d+)$/.exec(t))) { openDashboard(m[1]); return; }
+  if ((m = /^tab:(\w+)$/.exec(t))) { openCommand(m[1]); return; }
+  if (!t) { openDashboard(''); return; }
+  var low = omniNorm(t);
+  if (OMNI_TABS[low] || low === 'panel') { openCommand(low); return; }
+  if ((m = /^#?(\d{6,})$/.exec(t))) { openDashboard(m[1]); return; }
+  // a name: the first saved horse that matches
+  HRStorage.getState(function (state) {
+    var found = Object.keys(state.horseInfo || {}).find(function (life) { return omniNorm(state.horseInfo[life].name).indexOf(low) > -1; });
+    if (found) openDashboard(found); else openDashboard('');
+  });
+});
+function openCommand(cmd) {
+  if (cmd === 'panel') {
+    chrome.windows.getLastFocused(function (w) { try { chrome.sidePanel.open({ windowId: w.id }); } catch (e) { openDashboard(''); } });
+    return;
+  }
+  openDashboardTab(OMNI_TABS[cmd] || '');
+}
+// the dashboard opens on a tab when the address ends in #tab=<name>
+async function openDashboardTab(tab) {
+  var url = chrome.runtime.getURL('dashboard.html');
+  var target = tab ? url + '#tab=' + encodeURIComponent(tab) + '&t=' + Date.now() : url;
+  try {
+    var contexts = await chrome.runtime.getContexts({ contextTypes: ['TAB'] });
+    var open = contexts.find(function (c) { return c.documentUrl && c.documentUrl.split('#')[0] === url && c.tabId >= 0; });
+    if (open) { await chrome.tabs.update(open.tabId, { active: true, url: target }); await chrome.windows.update(open.windowId, { focused: true }); return; }
+  } catch (e) { /* open a new tab */ }
+  chrome.tabs.create({ url: target });
+}
+// the toolbar icon keeps opening the dashboard in a tab; the side panel is opened from the address bar ("hrl panel")
+try { chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }); } catch (e) { /* older Chrome */ }

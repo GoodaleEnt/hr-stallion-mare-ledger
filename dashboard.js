@@ -12,6 +12,7 @@
   var activeTab = 'stallions';
   var calcShowAll = false; // Foal Calculator suggestions: also list partners whose foal would not be better
   var calcSuggOpen = {}; // which suggestion panels are open
+  var anOpen = {}; // Analytics: which sections are open (by title)
   var herdSub = ''; // My Herd has a submenu: '' = the herd, 'retired' = retired horses
   var listSort = {}; // the sort order chosen for each list tab
   var selectedId = null;
@@ -59,7 +60,7 @@
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
   function saveUi() {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed, activeBreed: activeBreed, sort: listSort })); } catch (e) {}
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed, activeBreed: activeBreed, sort: listSort, an: anOpen })); } catch (e) {}
   }
   try {
     var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
@@ -71,6 +72,7 @@
     if (savedUi.tab === 'calc') activeTab = 'calc';
     if (savedUi.tab === 'young') activeTab = 'colts';
     if (savedUi.sort && typeof savedUi.sort === 'object') listSort = savedUi.sort;
+    if (savedUi.an && typeof savedUi.an === 'object') anOpen = savedUi.an;
   } catch (e) {}
 
   // ---------- derived data ----------
@@ -337,6 +339,7 @@
     else if (activeTab === 'calc') html = renderCalculator();
     else if (activeTab === 'settings') html = renderSettings();
     else html = renderStallionsList();
+    app.removeAttribute('data-an');
     app.innerHTML = html;
     if (pendingConfirm) {
       var wrap = document.createElement('div');
@@ -346,6 +349,7 @@
     wireEvents();
     applyListSort();
     applyListFilter();
+    if (activeTab === 'analytics' && !suggestLife && !selectedPassportLife && !selectedId && !selectedMareKey) enhanceAnalytics();
   }
 
   function renderConfirm() {
@@ -1484,6 +1488,45 @@
     return '<div class="an-card" style="margin-bottom:18px;"><h3>What the ledger has learned' + (ls.on ? '' : ' (off)') + '</h3>' +
       (ls.on ? '<strong style="font-size:13px;">Breeding</strong>' + ls.breeding.map(li).join('') + '<div style="margin-top:10px;"><strong style="font-size:13px;">Buying and prices</strong></div>' + ls.buying.map(li).join('') +
         '<p class="notes-line" style="margin:8px 0 0;">Worked out again from your records each time, so it improves as foals are born, horses are sold and bids are won or lost. Turn it off under My notes.</p>' : '<p class="notes-line" style="margin:6px 0 0;">Learning is turned off under My notes.</p>') + '</div>';
+  }
+  // ---------- analytics: sections you can open and close, and a bar to jump between them ----------
+  // The analytics page is built as a long run of cards; after it is drawn each card becomes a section with its title as a
+  // heading (click to open or close), the few small overview cards start open, and a bar at the top jumps to a section.
+  var AN_OPEN = ['Suggestions', 'Goals', 'Breedings per month', 'Top Breed Total', 'Top conformation'];
+  function anSlug(t) { return 'an-' + String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+  function enhanceAnalytics() {
+    var app = document.getElementById('app');
+    if (!app || app.getAttribute('data-an')) return;
+    var nav = [];
+    Array.prototype.slice.call(app.querySelectorAll('.an-card')).forEach(function (card) {
+      var h3 = card.querySelector(':scope > h3');
+      if (!h3) return;
+      var title = (h3.firstChild && h3.firstChild.nodeType === 3 ? h3.firstChild.textContent : h3.textContent).replace(/\s+/g, ' ').trim();
+      if (!title) return;
+      var det = document.createElement('details');
+      det.className = 'an-card an-sec';
+      det.id = anSlug(title);
+      det.setAttribute('data-sec', title);
+      if (anOpen[title] != null ? anOpen[title] : AN_OPEN.indexOf(title) > -1) det.open = true;
+      var sum = document.createElement('summary');
+      sum.innerHTML = h3.innerHTML;
+      h3.remove();
+      var body = document.createElement('div');
+      body.className = 'an-body';
+      while (card.firstChild) body.appendChild(card.firstChild);
+      det.appendChild(sum); det.appendChild(body);
+      card.parentNode.replaceChild(det, card);
+      nav.push({ id: det.id, title: title });
+    });
+    if (nav.length) {
+      var bar = document.createElement('div');
+      bar.className = 'an-nav';
+      bar.innerHTML = nav.map(function (n) { return '<button type="button" class="btn btn-sm" data-action="an-jump" data-id="' + L.esc(n.id) + '">' + L.esc(n.title.replace(/ \(.*\)$/, '')) + '</button>'; }).join('') +
+        '<span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-action="an-all" data-open="1">Open all</button><button type="button" class="btn btn-sm btn-ghost" data-action="an-all" data-open="0">Close all</button>';
+      var first = app.querySelector('.stats-bar');
+      if (first && first.nextSibling) first.parentNode.insertBefore(bar, first.nextSibling); else app.insertBefore(bar, app.firstChild);
+    }
+    app.setAttribute('data-an', '1');
   }
   function renderAnalytics() {
     var html = topHeaderHtml();
@@ -3706,6 +3749,7 @@
         }
       });
       app.addEventListener('toggle', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('an-sec')) { anOpen[e.target.getAttribute('data-sec')] = e.target.open; saveUi(); }
         if (e.target && e.target.classList && e.target.classList.contains('calc-sugg')) calcSuggOpen[e.target.getAttribute('data-life')] = e.target.open;
         if (e.target && e.target.classList && e.target.classList.contains('goals-panel')) goalsOpen = e.target.open;
         if (e.target && e.target.classList && e.target.classList.contains('notes-panel')) notesOpen = e.target.open;
@@ -3737,6 +3781,15 @@
           deleteStallionRec(sid3);
           if (selectedId === sid3) selectedId = null;
         }
+      }
+      else if (action === 'an-jump') {
+        var sec = document.getElementById(t.getAttribute('data-id'));
+        if (sec) { sec.open = true; anOpen[sec.getAttribute('data-sec')] = true; saveUi(); sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+      else if (action === 'an-all') {
+        var openAll = t.getAttribute('data-open') === '1';
+        document.querySelectorAll('details.an-sec').forEach(function (s) { s.open = openAll; anOpen[s.getAttribute('data-sec')] = openAll; });
+        saveUi();
       }
       else if (action === 'calc-show-all') { calcShowAll = !!t.checked; render(); }
       else if (action === 'list-sort') { listSort[activeTab] = t.value; saveUi(); render(); }

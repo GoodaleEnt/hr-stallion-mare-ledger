@@ -166,6 +166,22 @@
   .an-table th.sortable:hover{ color:var(--text); }
   .an-table td{ padding:6px; border-top:1px solid var(--border); }
   .an-table td.num, .an-table th.num{ text-align:right; }
+
+  /* ---- analytics: sections ---- */
+  .an-sec{ padding:0 !important; overflow:hidden; margin-bottom:12px; }
+  .an-sec > summary{ list-style:none; cursor:pointer; display:flex; align-items:baseline; gap:10px; padding:12px 16px; font-family:"Fraunces", Georgia, serif; font-size:16px; font-weight:600; }
+  .an-sec > summary::-webkit-details-marker{ display:none; }
+  .an-sec > summary::before{ content:"\25B8"; color:var(--text-muted); font-size:13px; transition:transform .15s; }
+  .an-sec[open] > summary::before{ transform:rotate(90deg); }
+  .an-sec > summary:hover{ background:var(--surface-2); }
+  .an-sec > summary .sub{ font-family:"IBM Plex Sans", system-ui, sans-serif; }
+  .an-sec > .an-body{ padding:6px 16px 16px; border-top:1px solid var(--border); }
+  .an-grid > .an-sec{ margin-bottom:0; }
+  .an-nav{ position:sticky; top:0; z-index:6; display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 0; margin:0 0 14px; background:var(--bg); border-bottom:1px solid var(--border); }
+  .an-nav .btn{ border-radius:999px; font-size:12.5px; padding:4px 11px; min-height:0; }
+  .an-table tbody tr:hover td{ background:var(--surface-2); }
+  .an-table td{ padding:7px 8px; }
+  .an-body > p, .an-body > .an-tip{ max-width:80ch; }
   .an-bars{ display:flex; align-items:flex-end; gap:6px; height:120px; margin-top:6px; }
   .an-bar{ flex:1; background:var(--accent); border-radius:4px 4px 0 0; min-height:2px; position:relative; }
   .an-barlabels{ display:flex; gap:6px; font-size:10px; color:var(--text-muted); }

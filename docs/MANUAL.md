@@ -319,7 +319,7 @@ A horse already Sold or Retired is never put back to For Sale by an old listing.
 
 ## The Settings tab
 
-Everything you set up is on one tab, **⚙ Settings**, at the end of the tab bar, instead of panels above every list: **You** (your Horse Reality username, and whether retired stallions are deleted automatically), **Backup** (export and restore, with the date of the last backup), **Highlight goals**, **My notes** (notes, breeder focus, breeding partners, preferred genes and the switches for the ranch cards, market colours, learning and saving market studs) and **Purchase criteria**. The side panel does not show Settings; its **Full view** button opens the ledger in a tab.
+Everything you set up is on one tab, **⚙ Settings**, at the end of the tab bar, instead of panels above every list: **You** (your Horse Reality username, and whether retired stallions are deleted automatically), **Backup** (export and restore, with the date of the last backup), **Highlight goals**, **My notes** (notes, breeder focus, breeding partners, preferred genes and the switches for the ranch cards, market colours, learning and saving market studs) and **Purchase criteria**. **Breeds in your ledger** lists every breed that has horses saved, with how many are yours and how many belong to other players; **Remove** next to a breed deletes the other players' horses of that breed (yours are never touched; they stay in Recently deleted for 30 days and are not saved again), which is how to clear out a breed you do not keep. The side panel does not show Settings; its **Full view** button opens the ledger in a tab.
 
 ## Card colours at a glance
 

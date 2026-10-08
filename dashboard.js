@@ -267,6 +267,23 @@
   }
 
   // ---------- render ----------
+  // Breeds saved in the ledger, with a way to clear out other players' horses of a breed you do not keep
+  function breedCleanupHtml() {
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase(), by = {};
+    Object.keys(state.horseInfo || {}).forEach(function (l) {
+      var i = state.horseInfo[l], k = L.breedKeyOf(i.breed) || '(none)';
+      var g = by[k] = by[k] || { key: k, name: i.breed || 'No breed saved', mine: 0, others: 0 };
+      if (me && String(i.ownerName || '').trim().toLowerCase() === me) g.mine++; else g.others++;
+    });
+    var rows = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return (b.mine + b.others) - (a.mine + a.others); });
+    if (!rows.length) return '';
+    return '<div class="card" style="padding:14px 16px;margin-bottom:14px;"><strong>Breeds in your ledger</strong>' +
+      '<p class="notes-line" style="margin:6px 0 10px;">Every horse whose page you have opened is saved, whoever owns it. To clear out a breed you do not keep, remove the other players\u2019 horses of it. Your own horses are never touched here. Removed horses stay in <em>Recently deleted</em> for 30 days and the ledger will not save them again.</p>' +
+      '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Breed</th><th class="num">Yours</th><th class="num">Other players\u2019</th><th></th></tr></thead><tbody>' + rows.map(function (g) {
+        return '<tr><td>' + L.esc(g.name) + '</td><td class="num mono">' + g.mine + '</td><td class="num mono">' + g.others + '</td><td class="num">' +
+          (g.others ? '<button type="button" class="btn btn-sm" style="border-color:var(--danger);color:var(--danger);" data-action="remove-breed-others" data-breed="' + L.esc(g.key) + '" data-name="' + L.esc(g.name) + '" data-count="' + g.others + '">Remove ' + g.others + '</button>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
   // ---------- settings ----------
   // Everything you set up in one place, instead of panels above every list: who you are, backups, highlight goals, notes and
   // preferences (breeder focus, partners, genes, switches), and purchase criteria.
@@ -290,6 +307,7 @@
         '<button class="btn btn-sm" data-action="restore-backup" title="Replace your ledger with a previously exported backup">Restore backup</button>' +
         '<input type="file" id="restore-file-input" accept="application/json" style="display:none;">' +
       '</div></div>';
+    html += breedCleanupHtml();
     html += goalsPanelHtml();
     html += notesPanelHtml();
     html += purchasePanelHtml();
@@ -3384,6 +3402,19 @@
         if (anSort[anTable] && anSort[anTable].key === anKey) anSort[anTable].dir = -anSort[anTable].dir;
         else anSort[anTable] = { key: anKey, dir: AN_TEXT_KEYS[anKey] ? 1 : -1 };
         render();
+      }
+      else if (action === 'remove-breed-others') {
+        var rbKey = t.getAttribute('data-breed'), rbName = t.getAttribute('data-name'), rbMe = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+        var rbLives = Object.keys(state.horseInfo || {}).filter(function (l) {
+          var i = state.horseInfo[l];
+          return (L.breedKeyOf(i.breed) || '(none)') === rbKey && !(rbMe && String(i.ownerName || '').trim().toLowerCase() === rbMe);
+        });
+        if (!rbLives.length) return;
+        askConfirm('Remove the ' + rbLives.length + ' saved ' + rbName + ' horse' + (rbLives.length === 1 ? '' : 's') + ' that belong to other players from your ledger? Your own horses are not touched. They stay in Recently deleted for 30 days and the ledger will not save them again.', function () {
+          rbLives.forEach(function (l) { L.removeHorse(state, l, (state.horseInfo[l] && state.horseInfo[l].name) || ('#' + l)); });
+          selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+          persist();
+        });
       }
       else if (action === 'remove-horse') {
         var rmLife = t.getAttribute('data-life'), rmName = t.getAttribute('data-name') || ('#' + rmLife);

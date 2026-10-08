@@ -2812,7 +2812,9 @@
     var meta = state.horseMeta[life] || {}, cs = L.compSummary(state, life), by = (meta.comp && meta.comp.by) || {}, id = L.esc(life);
     var discs = L.COMP_DISCIPLINES.slice();
     Object.keys(by).forEach(function (k) { if (discs.indexOf(k) < 0) discs.push(k); });
-    var disc = compEditDisc[life] || (state.settings && state.settings.focusDiscipline) || Object.keys(by)[0] || discs[0];
+    // the discipline the horse is in training for is read from its page (Training: "Western Reining - Level 1/10 - 100%")
+    var trained = (String(state.horseInfo[life].training || '').split(',').map(function (t) { return L.disciplineNameOf(t); }).filter(Boolean))[0] || '';
+    var disc = compEditDisc[life] || trained || (state.settings && state.settings.focusDiscipline) || Object.keys(by)[0] || discs[0];
     if (discs.indexOf(disc) < 0) disc = discs[0];
     var rec = by[disc] || {};
     var att = function (field) { return ' data-action="comp-best" data-life="' + id + '" data-field="' + field + '"'; };
@@ -2821,7 +2823,7 @@
       return '<tr><td>' + L.esc(r.discipline) + '</td><td class="num mono">' + L.esc(r.high) + '</td><td class="num mono">' + (r.low ? L.esc(r.low) : '\u2014') + '</td><td class="num mono">' + (r.low ? L.esc(round3(r.high - r.low)) : '\u2014') + '</td><td class="num mono">' + (r.n || '\u2014') + '</td><td>' + L.esc([highDateText(r.highDate, r.highAt), r.highEvent].filter(Boolean).join(' \u00b7 ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>' : '';
     return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">' + head + '</summary>' +
-      '<div class="card" style="padding:14px;margin-top:8px;">' + table +
+      '<div class="card" style="padding:14px;margin-top:8px;">' + (state.horseInfo[life].training ? '<div class="sub" style="margin-bottom:10px;">In training: <strong>' + L.esc(state.horseInfo[life].training) + '</strong> (read from Horse Reality; that discipline is chosen below first)</div>' : '') + table +
       '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:' + (table ? '12' : '0') + 'px;">' +
         '<div class="field"><label for="cb-disc-' + id + '">Discipline</label><select id="cb-disc-' + id + '" data-action="comp-disc" data-life="' + id + '">' + discs.map(function (n) { return '<option' + (n === disc ? ' selected' : '') + '>' + L.esc(n) + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label for="cb-high-' + id + '">Highest score</label><input id="cb-high-' + id + '" type="number" min="0" max="1000" step="any"' + att('high') + ' value="' + (rec.high ? L.esc(rec.high) : '') + '" placeholder="e.g. 83.774"></div>' +

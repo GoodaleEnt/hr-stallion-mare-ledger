@@ -2555,6 +2555,49 @@
     return true;
   }
 
+  // ---------- competition scores ----------
+  // horseMeta[life].comp = { high, low, n, at, by: { <discipline>: { high, low, n } } }: the highest and lowest competition score
+  // seen for a horse, overall and per discipline (conformation shows are kept apart, in confBest / confLow). The high only
+  // goes up and the low only goes down; a low more than MAX_COMP_RANGE under the high is ignored (a misread row).
+  var COMP_DISCIPLINES = ['Dressage', 'Driving', 'Endurance', 'Eventing', 'Flat Racing', 'Show Jumping', 'Western Reining', 'Basic Training'];
+  var MAX_COMP_RANGE = 40;
+  function disciplineNameOf(text) {
+    var t = String(text || '').toLowerCase();
+    if (/dressage/.test(t)) return 'Dressage';
+    if (/driving/.test(t)) return 'Driving';
+    if (/endurance/.test(t)) return 'Endurance';
+    if (/eventing/.test(t)) return 'Eventing';
+    if (/racing|gallop/.test(t)) return 'Flat Racing';
+    if (/jumping/.test(t)) return 'Show Jumping';
+    if (/reining|western/.test(t)) return 'Western Reining';
+    if (/basic/.test(t)) return 'Basic Training';
+    return '';
+  }
+  // Returns true when something changed. A score of 0 or over 1000 is ignored.
+  function recordCompScore(meta, score, discipline) {
+    score = Number(score);
+    if (!(score > 0 && score <= 1000)) return false;
+    var c = Object.assign({}, meta.comp), by = Object.assign({}, c.by), changed = false;
+    function bump(rec) {
+      rec = Object.assign({ n: 0 }, rec);
+      var ch = false;
+      if (!(rec.high >= score)) { rec.high = score; ch = true; }
+      if (!(rec.low > 0) || (score < rec.low && (rec.high - score) <= MAX_COMP_RANGE)) { if (rec.low !== score) { rec.low = score; ch = true; } }
+      return { rec: rec, changed: ch };
+    }
+    var all = bump(c); c.high = all.rec.high; c.low = all.rec.low; changed = all.changed;
+    if (discipline) { var d = bump(by[discipline]); by[discipline] = d.rec; if (d.changed) changed = true; }
+    c.by = by;
+    if (changed) { c.at = Date.now(); meta.comp = c; }
+    return changed;
+  }
+  function compSummary(state, life) {
+    var m = state && state.horseMeta && state.horseMeta[life], c = m && m.comp;
+    if (!c || !(c.high > 0)) return null;
+    var rows = Object.keys(c.by || {}).map(function (k) { return { discipline: k, high: c.by[k].high, low: c.by[k].low, n: c.by[k].n || 0 }; }).sort(function (a, b) { return b.high - a.high; });
+    return { high: c.high, low: c.low || null, range: c.low ? Math.round((c.high - c.low) * 1000) / 1000 : null, by: rows, log: Array.isArray(m.compLog) ? m.compLog.length : 0 };
+  }
+
   // ---------- listing a horse for sale and retiring it ----------
   // A horse you list gets the status For Sale and a log of the prices you ask (horseMeta[life].askLog); a price change
   // adds a line. A horse you retire gets the status Retired and the date. A horse already Sold or Retired is not
@@ -3893,6 +3936,10 @@
     askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
     marketRowInfo: marketRowInfo,
+    recordCompScore: recordCompScore,
+    compSummary: compSummary,
+    disciplineNameOf: disciplineNameOf,
+    COMP_DISCIPLINES: COMP_DISCIPLINES,
     partnerList: partnerList,
     partnerOwnerOf: partnerOwnerOf,
     addPartner: addPartner,

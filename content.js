@@ -1912,6 +1912,85 @@
     fitDebounce = setTimeout(function () { renderFitBanner(); highlightMarket(); }, 2300);
   });
 
+  // ---- competition results: scores of your horses in the disciplines ----
+  // Two places are read: a competition's results page (a list of horses with a score, like the conformation show results; the
+  // discipline is taken from the page title or address), and the "competition results" block of a horse's stats page. Only
+  // horses that are yours (or already saved) are recorded. Because these pages can be laid out differently from the show
+  // pages, a message says how many scores were read; if none appears on a competition page, tell the developer.
+  var lastCompSig = '';
+  function readCompetitionPage() {
+    if (/conformation-shows/.test(location.pathname) || !/results/.test(location.pathname)) return null;
+    var h1 = document.querySelector('h1'), title = h1 ? (h1.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    var discipline = HRLib.disciplineNameOf(title) || HRLib.disciplineNameOf(location.pathname);
+    if (!discipline) return null;
+    var rows = [];
+    document.querySelectorAll('.responsive-tr, tr').forEach(function (tr) {
+      var link = tr.querySelector('a[href*="/horses/"]'), m = link && /\/horses\/(\d+)\//.exec(link.getAttribute('href') || '');
+      if (!m) return;
+      var scoreEl = tr.querySelector('.text-right strong.fontbigger') || tr.querySelector('strong.fontbigger') || tr.querySelector('.text-right strong');
+      var sm = scoreEl && /\d+(?:\.\d+)?/.exec((scoreEl.textContent || '').replace(/,/g, ''));
+      if (!sm) return;
+      var owner = tr.querySelector('a[href*="/user/"]');
+      rows.push({ life: m[1], score: parseFloat(sm[0]), owner: owner ? (owner.textContent || '').trim() : '', mine: tr.classList.contains('mine') });
+    });
+    return rows.length ? { name: title, discipline: discipline, rows: rows, id: ((/\/([0-9a-f-]{8,})\/results/i.exec(location.pathname) || [])[1]) || title } : null;
+  }
+  function scrapeCompetitionResults() {
+    var res = readCompetitionPage();
+    if (!res) return;
+    var sig = res.id + '|' + res.rows.map(function (r) { return r.life + ':' + r.score; }).join(',');
+    if (sig === lastCompSig) return;
+    lastCompSig = sig;
+    HRStorage.getState(function (state) {
+      if (!state.horseMeta) state.horseMeta = {};
+      var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase(), saved = 0;
+      res.rows.forEach(function (r) {
+        if (!(r.mine || (me && r.owner.toLowerCase() === me)) && !(state.horseInfo && state.horseInfo[r.life])) return;
+        var meta = Object.assign({}, state.horseMeta[r.life]);
+        var log = Array.isArray(meta.compLog) ? meta.compLog.slice() : [];
+        if (log.some(function (e) { return e.comp === res.id; })) return;
+        log.push({ comp: res.id, name: res.name, discipline: res.discipline, score: r.score, seenAt: Date.now() });
+        meta.compLog = log.slice(-40);
+        HRLib.recordCompScore(meta, r.score, res.discipline);
+        var by = Object.assign({}, meta.comp && meta.comp.by), rec = Object.assign({}, by[res.discipline]);
+        rec.n = (rec.n || 0) + 1; by[res.discipline] = rec; meta.comp = Object.assign({}, meta.comp, { by: by });
+        state.horseMeta[r.life] = meta; saved++;
+      });
+      if (!saved) return;
+      HRStorage.setState(state, function () { showToast('HR Ledger: ' + saved + ' ' + res.discipline + ' score' + (saved === 1 ? '' : 's') + ' saved'); });
+    });
+  }
+  // the "competition results" block on a horse's stats page (rows laid out like the show results block)
+  var lastCompStatsSig = '';
+  function scrapeCompetitionStats() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    var found = [];
+    document.querySelectorAll('.half_block').forEach(function (block) {
+      var top = block.querySelector('.top');
+      if (!top || !/competition/i.test(top.textContent || '') || /show results/i.test(top.textContent || '')) return;
+      block.querySelectorAll('.row_460').forEach(function (row) {
+        var cols = row.querySelectorAll(':scope > div');
+        if (cols.length < 3) return;
+        var cat = (cols[1].textContent || '').replace(/\s+/g, ' ').trim(), vm = /\d+(?:\.\d+)?/.exec((cols[2].textContent || '').replace(/,/g, ''));
+        var disc = HRLib.disciplineNameOf(cat) || HRLib.disciplineNameOf(top.textContent || '');
+        if (vm && disc) found.push({ discipline: disc, score: parseFloat(vm[0]) });
+      });
+    });
+    if (!found.length) return;
+    var sig = id + '|' + found.map(function (f) { return f.discipline + f.score; }).join(',');
+    if (sig === lastCompStatsSig) return;
+    lastCompStatsSig = sig;
+    HRStorage.getState(function (state) {
+      if (!state.horseMeta) state.horseMeta = {};
+      var meta = Object.assign({}, state.horseMeta[id]), changed = false;
+      found.forEach(function (f) { if (HRLib.recordCompScore(meta, f.score, f.discipline)) changed = true; });
+      if (!changed) return;
+      state.horseMeta[id] = meta;
+      HRStorage.setState(state, function () { showToast('HR Ledger: competition scores saved for this horse'); });
+    });
+  }
+
   // ---- conformation show results page ----
   // A show's results page lists every horse in each category (Foals / Mares / Stallions / Geldings) with its rank and
   // score. The score of each horse that is in the ledger (or is yours) raises its top conformation score, and the
@@ -2678,6 +2757,8 @@
     annotateBreedDropdown();
     addBreedParentLinks();
     scrapeShowResults();
+    scrapeCompetitionResults();
+    scrapeCompetitionStats();
     scrapeAgeFromProfile();
     if (location.href !== lastHref) {
       lastHref = location.href;

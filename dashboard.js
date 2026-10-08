@@ -494,7 +494,7 @@
     html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
-    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
+    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + compPanelHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
@@ -1167,7 +1167,7 @@
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
     html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
-    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
+    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + compPanelHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
 
@@ -2583,6 +2583,16 @@
         '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.round(c.p * 100) + '%;background:var(--' + (c.level === 'avoid' ? 'danger' : 'accent') + ');"></span></span><span class="mono">' + Math.round(c.p * 100) + '%</span></div>';
     }).join('') + '<p class="notes-line" style="margin:6px 0 0;">The chance the foal has at least one copy. A gene neither parent is tested for counts as not there.</p></div>';
   }
+  // Competition scores (high, low and per discipline) read from results pages and the horse's stats page
+  function compPanelHtml(life) {
+    var cs = L.compSummary(state, life);
+    if (!cs) return '';
+    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Competition scores</strong> <span class="tag mono">high ' + L.esc(cs.high) + '</span>' + (cs.low ? ' <span class="tag mono">low ' + L.esc(cs.low) + ' \u00b7 range ' + L.esc(cs.range) + '</span>' : '') +
+      (cs.by.length ? '<div style="overflow-x:auto;margin-top:8px;"><table class="an-table"><thead><tr><th>Discipline</th><th class="num">High</th><th class="num">Low</th><th class="num">Seen</th></tr></thead><tbody>' + cs.by.map(function (r) {
+        return '<tr><td>' + L.esc(r.discipline) + '</td><td class="num mono">' + L.esc(r.high) + '</td><td class="num mono">' + (r.low ? L.esc(r.low) : '\u2014') + '</td><td class="num mono">' + (r.n || '\u2014') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' : '') +
+      '<p class="notes-line" style="margin:8px 0 0;">Read when you open a competition\'s results page or a horse\'s stats page; the high only goes up and the low only goes down. Conformation shows are kept apart (Highest conformation score).</p></div>';
+  }
   // Keep or sell: the level, how it was worked out, and (for a mare or a foal of a mare of yours) the foals as keepers
   function keeperPanelHtml(life) {
     var info = state.horseInfo[life], me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
@@ -3158,7 +3168,7 @@
 
     html += geneDetailsHtml(s.lifeNumber);
     html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
-    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
+    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + compPanelHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
     html += removeHorsePanelHtml(s.lifeNumber, s.name);

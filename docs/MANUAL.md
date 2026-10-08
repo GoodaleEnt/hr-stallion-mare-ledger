@@ -45,6 +45,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 37. [Market board colours](#market-board-colours)
 38. [Listing, retiring and selling a horse](#listing-retiring-and-selling-a-horse)
 39. [Card colours at a glance](#card-colours-at-a-glance)
+40. [Tags, partners and other tools](#tags-partners-and-other-tools)
 
 ## Installing
 
@@ -226,6 +227,40 @@ On your **ranch (estate) page** on Horse Reality, each horse card of yours that 
 - For an adult mare free to breed, an arrow and **the stallion the ledger would pick**, with the foal's estimated Breed Total. Stallions are ranked on the foal's **expected conformation score, genetic potential and conformation stats** (not on Breed Total, which depends on how the foal does in conformation shows); the same ranking is used in the Foal Calculator's partner suggestions and the **Pairing ideas** list on the Analytics tab. A breeder focus counts the matching measure more. The card shows **Yours** (your best stallion) and **Other** (the best-crossing stallion of another player that is saved in the ledger, with his fee, or "no fee saved" when you have not seen one). Hover for your top 5 and the other players' top 5 and why. The **Breeding suggestions** page shows the same two lists. A stallion of another player with no stud fee saved is still offered but marked, because he may not be at stud.
 
 Hover the badge for the rank and every reason. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.
+
+## Tags, partners and other tools
+
+### Taglines from HRToolkit on the ranch page
+
+If you use the **HRToolkit** extension, each horse's tagline on your **ranch page** holds numbers the ledger would otherwise need a visit to the horse's page for: for example `3G|6A|3BA|580|64|69.176` (3 Good, 6 Average, 3 Below average traits, genetic potential 580, Breed Total 64, conformation 69.176) and its private stable tag `69.18-62.69|GGGGG` (all-time high and low conformation, then the five health ratings). When you open the ranch page the ledger reads these for every horse on it: it fills in a missing genetic potential, raises the top conformation score, keeps the **all-time low**, uses the trait counts for the goal check when the individual traits have not been read, and fills in health ratings that are missing. A tag is only used when its numbers agree with each other (the Breed Total must match the genetic potential and conformation), so a differently laid-out tagline is simply ignored. Ratings read from a tag are replaced by the real ones the next time you open the horse's page.
+
+### Lowest conformation score and range
+
+Besides the highest score, the ledger keeps each horse's **lowest** conformation score, so you can see its range. It only ever goes down. It is read from the show scores listed on a horse's stats page, from show results pages, from HRToolkit's all-time low, and from the ranch tag above. A low more than 12 points under the high is ignored when it is read automatically (a wrongly entered show would otherwise stretch the range); one you type yourself under **Highest conformation score** on the horse's page is always kept. The range shows on the horse's card and page.
+
+### Competition scores
+
+The highest and lowest **competition** score of each horse, overall and per discipline (Dressage, Driving, Endurance, Eventing, Flat Racing, Show Jumping, Western Reining, Basic Training), is read from a competition's **results page** (a list of horses with a score; the discipline comes from the page title or address) and from the competition results block on a horse's **stats page**. A message says how many scores were read. They show in a **Competition scores** box on the horse's page. Conformation shows are kept separate.
+
+### Horse tags
+
+Give a horse up to **10 tags** in the **Tags** box on its page: 2 to 24 characters, lower case, spaces joined by hyphens (for example `comp-team`). Tags show as chips on **My Herd**; click one to filter the list. In the filter box above a list, type `#tag` (a part of a tag matches, and several `#tag` terms narrow it further) to see the horses with that tag. On **My Herd**, **Select horses to tag** lets you tick several horses and **Add tag** or **Remove tag** on all of them at once. The tags **keep**, **sell** and **no-breed** work like the same words in a horse's notes, so they change the keep/sell ranking, Sell ideas and the breeding suggestions.
+
+### Typeahead pickers
+
+The **Mare** and **Stallion** boxes in the Foal Calculator are typeahead boxes: type part of a name or a life number and pick from the list that appears (each entry says whether it is your horse, under 3, in foal or covered), instead of scrolling a long drop-down. **clear** empties the box.
+
+### Breeding partners
+
+Under **My notes → Breeding partners**, add the Horse Reality user names of up to 20 players whose stallions you breed to. Their stallions saved in the ledger are marked **Partner** on the suggestion cards and ranked a little higher, and `#partner` (or `#bp`) in a list filter finds their horses. Horses of theirs you open are saved like any other horse.
+
+### Suspected genes and Peacock
+
+In **Extra genes** on a horse's page, each hidden gene has a **Suspected (not confirmed)** group of choices such as `? / sty` (one copy of sty, the other not known). A suspected copy does not change the colour odds, but it counts as a possible gene: it shows as an italic chip, appears in the preferred and unwanted gene lists with a **?** (a suspected unwanted gene counts against the horse; a suspected preferred one does not protect it), and the Foal Calculator's chance of a gene counts a suspected copy as a coin toss. **Peacock** has its own tick box and a line-strength estimate (0 to 100%); `#peacock` in a list filter finds those horses.
+
+### Address-bar search and the side panel
+
+In Chrome's address bar type **hrl**, press **Tab**, then a horse's name or life number to open it in the ledger, or one of **mares**, **stallions**, **colts**, **fillies**, **herd**, **retired**, **others**, **analytics**, **calc** to open that tab. **hrl panel** opens the ledger in Chrome's **side panel**, beside the Horse Reality page you are on.
 
 ## Pictures are stored apart from the ledger
 

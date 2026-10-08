@@ -61,6 +61,8 @@ Screenshots 1–2 predate the extra tabs (My Herd, Other Horses, Foal Calculator
 |------------|------|---------------|
 | `storage` | permissions | Saves the user's ledger (stallions, breeding records, cached horse details, herd tags, settings) in `chrome.storage.local` on their device. |
 | `unlimitedStorage` | permissions | The ledger stores cached horse portraits and years of breeding history, which can exceed the default storage quota. |
+| `sidePanel` | permissions | Lets the user open the ledger in Chrome's side panel, beside the Horse Reality page they are on (address bar: `hrl panel`). Nothing is read from other sites. |
+| `omnibox` (keyword `hrl`) | manifest key | Address-bar search of the ledger: type `hrl`, press Tab, then a horse's name or a tab name to open it in the ledger. It searches only the user's own saved ledger on their device. |
 | `alarms` | permissions | An hourly alarm refreshes the toolbar badge that counts coverings ready to review, since a pending covering can age past the review threshold with no page activity. |
 | `*://*.horsereality.com/*` | host_permissions | The ledger reads the bank, offspring, notification and horse pages on horsereality.com to record fees and breedings, requests the viewed horse's details from Horse Reality's own API (`v2.horsereality.com`), and downloads horse portraits from Horse Reality's image server to store them locally. No other site is accessed. |
 

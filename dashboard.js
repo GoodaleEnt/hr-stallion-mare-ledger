@@ -10,6 +10,8 @@
   var uniqueMareCount = 0;
   var maresIndex = [];
   var activeTab = 'stallions';
+  var herdSub = ''; // My Herd has a submenu: '' = the herd, 'retired' = retired horses
+  var listSort = {}; // the sort order chosen for each list tab
   var selectedId = null;
   var selectedMareKey = null;
   var selectedPassportLife = null;
@@ -55,7 +57,7 @@
   function defaultCalcFilter() { return { adult: true, young: true, mine: true, other: true, sugg: false }; }
   var calcFilter = { mare: defaultCalcFilter(), stallion: defaultCalcFilter() };
   function saveUi() {
-    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed, activeBreed: activeBreed })); } catch (e) {}
+    try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: activeTab === 'calc' ? 'calc' : '', calcMare: calcMare, calcStallion: calcStallion, calcFilter: calcFilter, calcBreed: calcBreed, activeBreed: activeBreed, sort: listSort })); } catch (e) {}
   }
   try {
     var savedUi = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
@@ -66,6 +68,7 @@
     if (savedUi.calcFilter) ['mare', 'stallion'].forEach(function (k) { if (savedUi.calcFilter[k]) calcFilter[k] = Object.assign(defaultCalcFilter(), savedUi.calcFilter[k]); });
     if (savedUi.tab === 'calc') activeTab = 'calc';
     if (savedUi.tab === 'young') activeTab = 'colts';
+    if (savedUi.sort && typeof savedUi.sort === 'object') listSort = savedUi.sort;
   } catch (e) {}
 
   // ---------- derived data ----------
@@ -325,9 +328,9 @@
     else if (activeTab === 'mares') html = renderMaresList();
     else if (activeTab === 'colts') html = renderYoungList('stallion');
     else if (activeTab === 'fillies') html = renderYoungList('mare');
-    else if (activeTab === 'herd') html = renderHerdList();
+    else if (activeTab === 'herd') html = herdSub === 'retired' ? renderRetiredList() : renderHerdList();
     else if (activeTab === 'others') html = renderOthersList();
-    else if (activeTab === 'retired') html = renderRetiredList();
+    else if (activeTab === 'retired') { activeTab = 'herd'; herdSub = 'retired'; html = renderRetiredList(); }
     else if (activeTab === 'analytics') html = renderAnalytics();
     else if (activeTab === 'calc') html = renderCalculator();
     else if (activeTab === 'settings') html = renderSettings();
@@ -339,6 +342,7 @@
       app.appendChild(wrap.firstElementChild);
     }
     wireEvents();
+    applyListSort();
     applyListFilter();
   }
 
@@ -454,11 +458,10 @@
     html += backupReminderHtml();
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
-        '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
+        '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">Mares</button>' +
         '<button class="tab-btn' + (activeTab === 'colts' ? ' active' : '') + '" data-action="show-tab" data-tab="colts">Colts</button>' +
         '<button class="tab-btn' + (activeTab === 'fillies' ? ' active' : '') + '" data-action="show-tab" data-tab="fillies">Fillies</button>' +
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
-        '<button class="tab-btn' + (activeTab === 'retired' ? ' active' : '') + '" data-action="show-tab" data-tab="retired">Retired</button>' +
         '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
         '<button class="tab-btn' + (activeTab === 'analytics' ? ' active' : '') + '" data-action="show-tab" data-tab="analytics">Analytics</button>' +
         '<button class="tab-btn' + (activeTab === 'calc' ? ' active' : '') + '" data-action="show-tab" data-tab="calc">Foal Calculator</button>' +
@@ -470,13 +473,14 @@
       if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(b); }
     });
     (state.stallions || []).forEach(function (s) { var k = L.breedKeyOf(s.breed); if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(s.breed); } });
-    var isListTab = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others'].indexOf(activeTab) > -1;
+    var isListTab = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'others'].indexOf(activeTab) > -1;
     if (activeTab !== 'settings' && (breedNames.length > 1 || activeBreed || isListTab)) {
       html += '<div style="margin:-6px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">';
       if (breedNames.length > 1 || activeBreed) {
         html += '<label for="global-breed" style="font-weight:600;font-size:13px;">Breed</label><select id="global-breed" data-action="global-breed"><option value="">All breeds</option>' +
           breedNames.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === L.breedKeyOf(activeBreed) ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>';
       }
+      if (isListTab && activeTab !== 'others') html += sortSelectHtml();
       if (isListTab) html += '<input id="list-filter" type="search" data-action="list-filter" placeholder="Filter by name, breed, status or #tag\u2026" value="' + L.esc(listFilterText) + '" style="flex:1 1 240px;max-width:380px;">';
       html += '</div>';
     }
@@ -497,6 +501,62 @@
       '<button type="button" class="btn btn-sm" data-action="backup-snooze">Remind me in a week</button></div>';
   }
   // Hide the cards / rows that don't match the filter box (the list itself is not re-drawn).
+  // ---------- sort order for the list tabs ----------
+  var SORT_MODES = [
+    ['', 'Order as listed'], ['name', 'Name A\u2013Z'], ['name-desc', 'Name Z\u2013A'], ['age', 'Age: oldest first'], ['age-young', 'Age: youngest first'],
+    ['bt', 'Breed Total: high to low'], ['gp', 'Genetic potential: high to low'], ['conf', 'Conformation: high to low'],
+    ['goals', 'Goals: met first'], ['rank', 'Keep / sell rank: best first']
+  ];
+  function lifeOfEl(el) {
+    var life = el.getAttribute('data-life') || (el.querySelector('[data-life]') && el.querySelector('[data-life]').getAttribute('data-life')) || '';
+    if (!life && el.getAttribute('data-key')) { var mrec = maresIndex.find(function (x) { return x.key === el.getAttribute('data-key'); }); life = mrec && mrec.mareLifeNumber || ''; }
+    if (!life && el.getAttribute('data-id')) { var srec = state.stallions.find(function (x) { return x.id === el.getAttribute('data-id'); }); life = srec && srec.lifeNumber || ''; }
+    return life;
+  }
+  function sortValueOf(el, mode, ranking) {
+    var life = lifeOfEl(el), info = (life && state.horseInfo[life]) || {}, meta = (life && state.horseMeta[life]) || {};
+    if (mode === 'name' || mode === 'name-desc') {
+      var rec = el.getAttribute('data-id') && state.stallions.find(function (x) { return x.id === el.getAttribute('data-id'); });
+      return String(info.name || (rec && rec.name) || el.textContent || '').toLowerCase();
+    }
+    if (mode === 'age' || mode === 'age-young') { var m = L.effectiveAgeMonths(info); return m == null ? -1 : m; }
+    if (mode === 'bt') { var b = highScoreInfo(life).bt; return b ? Number(b.value) : -1; }
+    if (mode === 'gp') return Number(info.geneticPotential) || -1;
+    if (mode === 'conf') return L.bestConformation(meta).best || -1;
+    if (mode === 'goals') { if (!life) return -1; var c = L.goalCheck(state, life); return c.met ? 2 : (c.active && L.goalMisses(state, life).length === 1 ? 1 : 0); }
+    if (mode === 'rank') { var r = ranking && ranking[life]; return r && r.pct != null ? r.pct : (r && r.level ? r.level / 10 : -1); }
+    return 0;
+  }
+  // Reorders the cards or rows already drawn (a list's own order is kept for "Order as listed")
+  function applyListSort() {
+    var mode = listSort[activeTab] || '';
+    if (!mode) return;
+    var app = document.getElementById('app');
+    if (!app) return;
+    var els = Array.prototype.slice.call(app.querySelectorAll('.stallion-card[data-action], .herd-row'));
+    if (!els.length) return;
+    var ranking = mode === 'rank' ? L.herdRanking(state) : null, parents = [];
+    els.forEach(function (el) { if (parents.indexOf(el.parentElement) === -1) parents.push(el.parentElement); });
+    parents.forEach(function (p) {
+      var kids = els.filter(function (el) { return el.parentElement === p; });
+      var keyed = kids.map(function (el, i) { return { el: el, v: sortValueOf(el, mode, ranking), i: i }; });
+      keyed.sort(function (a, b) {
+        var c;
+        if (mode === 'name') c = a.v < b.v ? -1 : a.v > b.v ? 1 : 0;
+        else if (mode === 'name-desc') c = a.v < b.v ? 1 : a.v > b.v ? -1 : 0;
+        else if (mode === 'age-young') c = a.v - b.v;
+        else c = b.v - a.v;
+        return c || a.i - b.i;
+      });
+      keyed.forEach(function (k) { p.appendChild(k.el); });
+    });
+  }
+  function sortSelectHtml() {
+    var cur = listSort[activeTab] || '';
+    return '<label for="list-sort" style="font-weight:600;font-size:13px;">Sort</label><select id="list-sort" data-action="list-sort">' + SORT_MODES.map(function (m) {
+      return '<option value="' + m[0] + '"' + (m[0] === cur ? ' selected' : '') + '>' + L.esc(m[1]) + '</option>';
+    }).join('') + '</select>';
+  }
   function applyListFilter() {
     var q0 = listFilterText.trim().toLowerCase();
     // #tag terms narrow by tag (a part of a tag matches); the rest is text
@@ -520,7 +580,7 @@
     var info = state.horseInfo[selectedPassportLife];
     if (!info) { selectedPassportLife = null; return renderStallionsList(); }
     var href = L.safeUrl('https://www.horsereality.com/horses/' + selectedPassportLife + '/');
-    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? '← Back to herd' : activeTab === 'others' ? '← Back to other horses' : activeTab === 'retired' ? '← Back to retired' : '← Back to search') + '</button>';
+    var html = '<button class="back-link" data-action="close-passport">' + (activeTab === 'herd' ? (herdSub === 'retired' ? '← Back to retired' : '← Back to herd') : activeTab === 'others' ? '← Back to other horses' : '← Back to search') + '</button>';
     html += suggestionsLinkHtml(selectedPassportLife);
     html += goalStripHtml(selectedPassportLife);
     html += '<div class="detail-head profile-goal' + goalClass(selectedPassportLife) + '"><div class="name-row">' +
@@ -558,7 +618,7 @@
     } else {
       html += '<div class="empty"><h3>Not yet tied to a breeding record</h3>' +
         '<p>This horse is cached from a page you visited, but isn\'t linked to a tracked stallion or a logged breeding yet. Once one of those exists, ' +
-        'she or he will also show up on the Stallions or My Mares tab.</p></div>';
+        'she or he will also show up on the Stallions or Mares tab.</p></div>';
     }
     return html;
   }
@@ -592,7 +652,7 @@
   }
 
   // Cached passports (state.horseInfo) belonging to you, under 3 years old —
-  // shown separately from the Stallions/My Mares tabs, which are scoped to
+  // shown separately from the Stallions/Mares tabs, which are scoped to
   // breeding-age (3yo+) horses. "Under 3" here is the effective age: a real
   // cached birthdate, or a manually tracked age for a horse HR never gave us
   // a passport birthdate for (see ageUpHorse).
@@ -957,7 +1017,7 @@
       '</div>';
 
     html += breedingCalendarHtml();
-    html += '<div class="section-head"><h2>My Mares</h2></div>';
+    html += '<div class="section-head"><h2>Mares</h2></div>';
 
     if (!maresIndex.length) {
       html += '<div class="empty"><h3>No mares of yours recorded yet</h3>' +
@@ -1183,7 +1243,7 @@
 
     var mareIdx = maresIndex.findIndex(function (x) { return x.key === selectedMareKey; });
     var html = '<div class="detail-nav">' +
-      '<button class="back-link" data-action="back-to-mares">← My mares</button>' +
+      '<button class="back-link" data-action="back-to-mares">← Mares</button>' +
       (maresIndex.length > 1 ? '<div class="detail-nav-btns">' +
         '<button class="btn btn-sm" data-action="nav-mare" data-dir="prev">‹ Previous</button>' +
         '<button class="btn btn-sm" data-action="nav-mare" data-dir="next">Next ›</button>' +
@@ -1333,8 +1393,15 @@
     '</div>';
   }
 
+  // My Herd's submenu: the herd, and the retired horses
+  function herdSubTabsHtml() {
+    var n = horsesWithStatus('Retired').length;
+    return '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
+      '<button type="button" class="btn btn-sm' + (herdSub !== 'retired' ? ' btn-primary' : '') + '" data-action="herd-sub" data-sub="">Herd</button>' +
+      '<button type="button" class="btn btn-sm' + (herdSub === 'retired' ? ' btn-primary' : '') + '" data-action="herd-sub" data-sub="retired">Retired' + (n ? ' (' + n + ')' : '') + '</button></div>';
+  }
   function renderHerdList() {
-    var html = topHeaderHtml();
+    var html = topHeaderHtml() + herdSubTabsHtml();
     var myName = (state.settings.myUsername || '').trim();
     if (!myName) {
       html += '<div class="empty"><h3>Set your username first</h3>' +
@@ -1621,7 +1688,7 @@
     return rows;
   }
 
-  // ---------- breeding calendar (My Mares tab): foals due and mares ready ----------
+  // ---------- breeding calendar (Mares tab): foals due and mares ready ----------
   function breedingCalendarHtml() {
     var due = L.foalsDue(viewState()), ready = L.readyMares(viewState());
     if (!due.length && !ready.length) return '';
@@ -1854,7 +1921,7 @@
     }).sort(function (a, b) { return String(a.info.name || '').localeCompare(String(b.info.name || '')); });
   }
   function renderRetiredList() {
-    var html = topHeaderHtml();
+    var html = topHeaderHtml() + herdSubTabsHtml();
     var horses = horsesWithStatus('Retired');
     html += '<div class="section-head"><h2>Retired</h2></div>';
     if (!horses.length) {
@@ -3346,8 +3413,10 @@
           render();
         });
       }
+      else if (action === 'herd-sub') { activeTab = 'herd'; herdSub = t.getAttribute('data-sub') === 'retired' ? 'retired' : ''; listFilterText = ''; selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null; saveUi(); render(); }
       else if (action === 'show-tab') {
         activeTab = t.getAttribute('data-tab');
+        if (activeTab === 'retired') { activeTab = 'herd'; herdSub = 'retired'; } else if (activeTab === 'herd') herdSub = '';
         listFilterText = '';
         saveUi();
         selectedMareKey = null; selectedId = null; selectedPassportLife = null; suggestLife = null;
@@ -3654,6 +3723,7 @@
           if (selectedId === sid3) selectedId = null;
         }
       }
+      else if (action === 'list-sort') { listSort[activeTab] = t.value; saveUi(); render(); }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
       else if (action === 'bulk-pick') {
@@ -3858,7 +3928,8 @@
     var t = /tab=(\w+)/.exec(location.hash || '');
     var tabs = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others', 'analytics', 'calc', 'settings'];
     if (t && tabs.indexOf(t[1]) > -1) {
-      activeTab = t[1]; selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
+      activeTab = t[1]; herdSub = '';
+      if (activeTab === 'retired') { activeTab = 'herd'; herdSub = 'retired'; } selectedId = null; selectedMareKey = null; selectedPassportLife = null; suggestLife = null;
       saveUi(); render();
     }
   }

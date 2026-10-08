@@ -70,7 +70,7 @@
 <h2 id="start">Getting started</h2>
 <ol>
   <li><strong>Pin the icon.</strong> Click the puzzle-piece in Chrome's toolbar and pin <em>HR Stallion &amp; Mare Ledger</em>. Clicking it opens this dashboard.</li>
-  <li><strong>Enter your username.</strong> On the Stallions tab, type your Horse Reality username in <em>My Horse Reality username</em>. This is how the ledger tells your horses from everyone else's. Until you do, My Mares stays empty and nothing is counted as yours.</li>
+  <li><strong>Enter your username.</strong> On the Stallions tab, type your Horse Reality username in <em>My Horse Reality username</em>. This is how the ledger tells your horses from everyone else's. Until you do, Mares stays empty and nothing is counted as yours.</li>
   <li><strong>Just play.</strong> Browse Horse Reality as usual. Open your horses, your bank page, your breeding pages. The ledger reads what you open and fills in the rest.</li>
 </ol>
 <div class="note">The ledger only learns from pages you actually open, in your own browser. If something is missing, open that page on Horse Reality once.</div>
@@ -96,7 +96,7 @@
 <table>
   <tr><th>Tab</th><th>What it holds</th></tr>
   <tr><td>Stallions</td><td>Your stud roster: fees, breedings, earnings. The tiles at the top count your Active stallions, mares, colts and fillies, each with how many fit your goals, are off by one, or off by more.</td></tr>
-  <tr><td>My Mares</td><td>Your mares (age 3 and over) with their breeding status.</td></tr>
+  <tr><td>Mares</td><td>Your mares (age 3 and over) with their breeding status.</td></tr>
   <tr><td>Colts</td><td>Your stallions under 3. Click a heading to sort.</td></tr>
   <tr><td>Fillies</td><td>Your mares under 3. Click a heading to sort.</td></tr>
   <tr><td>My Herd</td><td>Every horse you own, with role, status and project.</td></tr>
@@ -220,6 +220,12 @@
 </ul>
 <p>A horse already Sold or Retired is never put back to For Sale by an old listing.</p>
 
+<h2 id="sorting">Sorting, My Herd's submenu and Analytics sections</h2>
+<p><strong>Sort.</strong> The Stallions, Mares, Colts, Fillies and My Herd tabs each have a Sort box beside the filter box: order as listed, name, age (oldest or youngest first), Breed Total, genetic potential or conformation (high to low), goals met first, or keep/sell rank. Each tab remembers its own order.</p>
+<p><strong>Retired</strong> is no longer a tab: My Herd has a small menu at the top, Herd and Retired.</p>
+<p><strong>Analytics</strong> is built from sections you open and close: click a heading, use the bar of names under the tiles to jump to a section, or Open all / Close all. The small overview sections start open; the page remembers what you left open.</p>
+<p><strong>Foal Calculator suggestions</strong> start collapsed with a count, and list only partners whose expected foal would be better than the horse you picked (conformation score, genetic potential and conformation stats); a tick box shows the rest.</p>
+
 <h2 id="settingstab">The Settings tab</h2>
 <p>Everything you set up is on one tab, <strong>&#9881; Settings</strong>, at the end of the tab bar, instead of panels above every list: <em>You</em> (your username, automatic deletion of retired stallions), <em>Backup</em> (export and restore, with the date of the last backup), <em>Highlight goals</em>, <em>My notes</em> (notes, breeder focus, breeding partners, preferred genes and the switches), and <em>Purchase criteria</em>. <em>Breeds in your ledger</em> lists each breed with how many horses are yours and how many belong to other players; <em>Remove</em> deletes the other players' horses of that breed (yours are never touched; they stay in Recently deleted for 30 days), which clears out a breed you do not keep. The side panel does not show Settings; its Full view button opens the ledger in a tab.</p>
 
@@ -293,7 +299,7 @@
 <h2 id="goalsug">Goal suggestions, calendar and more</h2>
 <ul>
   <li><strong>Goal suggestions:</strong> set a minimum Genetic Potential as well as conformation and Breed Total. Under the goal boxes the ledger suggests when to change a goal and to what, from your herd and recent foals, with an Apply button.</li>
-  <li><strong>My Mares</strong> shows Foals due and Mares ready to breed. The toolbar badge counts coverings to review plus foals due this week.</li>
+  <li><strong>Mares</strong> shows Foals due and Mares ready to breed. The toolbar badge counts coverings to review plus foals due this week.</li>
   <li><strong>Analytics</strong> adds Money, Stud fee changes, Compare two horses and CSV export.</li>
   <li>Every horse page has <strong>Notes</strong> and <strong>Copy sales ad</strong>. Goal sets save named goals for quick switching.</li>
   <li><strong>Recently deleted</strong> (Other Horses) keeps removed items for 30 days with a Restore button.</li>
@@ -353,7 +359,7 @@
 
 <h2 id="faq">Questions &amp; fixes</h2>
 <details><summary>"Extension context invalidated" shows in the extension's Errors list.</summary>It appears when the extension is reloaded or updated while a Horse Reality tab is still open, because that tab keeps running the old copy of the script. It is harmless, and the old script now stops quietly. Reload the Horse Reality tab to get the new one.</details>
-<details><summary>My Mares is empty / my horses aren't counted as mine.</summary>Enter your Horse Reality username on the Stallions tab, then open your horses' pages once.</details>
+<details><summary>Mares is empty / my horses aren't counted as mine.</summary>Enter your Horse Reality username on the Stallions tab, then open your horses' pages once.</details>
 <details><summary>A horse is missing or out of date.</summary>Open its page on Horse Reality. The ledger saves what it sees when you load a page.</details>
 <details><summary>The Open in Ledger button isn't on a horse's page.</summary>Reload the Horse Reality tab. If it still isn't there, reload the extension on <code>chrome://extensions</code> and try again.</details>
 <details><summary>A breeding wasn't recorded.</summary>Coverings are saved when you click Breed on the Breed page. Older ones can be added by hand on the stallion's page, or picked up from your bank page and the mare's Foals tab.</details>

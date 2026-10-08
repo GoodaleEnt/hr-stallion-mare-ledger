@@ -15,7 +15,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 7. [A stallion's detail page](#a-stallions-detail-page)
 8. [Adding a stallion by hand](#adding-a-stallion-by-hand)
 9. [Bulk-importing breeding records](#bulk-importing-breeding-records)
-10. [My Mares](#my-mares)
+10. [Mares](#my-mares)
 11. [A mare's detail page & pregnancy tracking](#a-mares-detail-page--pregnancy-tracking)
 12. [My Herd](#my-herd) (high scores, sales, retired horses, highlight goals)
 13. [Handy extras](#handy-extras)
@@ -64,7 +64,7 @@ Chrome hides new extension icons behind the puzzle-piece menu by default. Pin it
 
 ## First-time setup
 
-Open the dashboard (click the toolbar icon) and enter your Horse Reality username under **"My Horse Reality username"** on the Stallions tab. This is how the extension tells *your* horses apart from everyone else's — without it, "My Mares" stays empty and owned horses won't auto-track.
+Open the dashboard (click the toolbar icon) and enter your Horse Reality username under **"My Horse Reality username"** on the Stallions tab. This is how the extension tells *your* horses apart from everyone else's — without it, "Mares" stays empty and owned horses won't auto-track.
 
 ## Your Stallions
 
@@ -123,11 +123,11 @@ Both a stallion's detail page and the Stallions tab have an **Import** button, f
 
 A record naming its own stud (`stallionName` or `stallionLifeNumber`) routes to that stallion automatically — but only if he's already in your ledger; records for a stud that isn't are skipped, and you're told which ones so you can add him first. Anything that doesn't name a stud goes to whichever stallion's page you opened Import from. A record that matches an existing one (same mare, date, foal, and price) updates it in place instead of duplicating.
 
-## My Mares
+## Mares
 
-Switch to the **My Mares** tab to see every mare *you* own — scoped by the username you set in first-time setup. A mare appears here the moment you view her page, even before she's been bred; once she has breeding history, it shows too.
+Switch to the **Mares** tab to see every mare *you* own — scoped by the username you set in first-time setup. A mare appears here the moment you view her page, even before she's been bred; once she has breeding history, it shows too.
 
-![My Mares: your own mares at a glance](images/05-my-mares.png)
+![Mares: your own mares at a glance](images/05-my-mares.png)
 
 ## A mare's detail page & pregnancy tracking
 
@@ -139,14 +139,14 @@ While she's pregnant, you'll see her due date and the covering sire (linked), pu
 
 ## My Herd
 
-The **My Herd** tab lists every horse you own that the extension has seen (it uses the same username match as My Mares). For each one you can set:
+The **My Herd** tab lists every horse you own that the extension has seen (it uses the same username match as Mares). For each one you can set:
 
 - **Role** — Broodmare, Public Stud, Private Stud, Public & Private Stud, Competition or Young Stock
 - **Status** — Active, Observation, Companion, For Sale, Sold, Retired or Deceased
 - **Project** — a free-text group name for a breeding goal (e.g. "Leopard line"); use the filters above the list to view one role or project at a time
 - **Show scores** — the highest conformation show score is captured automatically whenever you open a horse's stats page (it reads the "Latest 25 show results" list, skipping breed-type shows) and is **only ever raised**, so it stays even after that score drops off the 25-show list. If you also use the HRToolkit extension, its "All-time Confo" figure is read too. You can still type earlier scores separated by commas (e.g. `84.2, 91.5, 77`) for results the page no longer shows; the best of everything is displayed, for example "Best 91.5 · from stats page". Horse Reality's conformation grades (like "2G 9A 1BA") are shown under each horse's details automatically.
 
-When you buy a horse, the price and transport fee are picked up automatically the next time you open your Horse Reality **bank page** (the "You have bought…" row). You can also open "Purchase price & shipping" on a horse's page to enter or correct what you paid and the shipping fee (each with its own currency); figures you typed yourself are never overwritten by the automatic ones. They show as **Paid / Shipping / Total** tags on the horse's page and as rows on its Stallions or My Mares card, and under its name in My Herd. Leave them empty for horses you bred.
+When you buy a horse, the price and transport fee are picked up automatically the next time you open your Horse Reality **bank page** (the "You have bought…" row). You can also open "Purchase price & shipping" on a horse's page to enter or correct what you paid and the shipping fee (each with its own currency); figures you typed yourself are never overwritten by the automatic ones. They show as **Paid / Shipping / Total** tags on the horse's page and as rows on its Stallions or Mares card, and under its name in My Herd. Leave them empty for horses you bred.
 
 **Offers you won.** A bank row "You placed an offer of N HRC on <horse> ... and paid an additional N HRC for transport" counts as the purchase once the horse is yours (an offer that was outbid is not a purchase, so it is kept aside until the horse's page shows you as the owner).
 
@@ -172,7 +172,7 @@ When you sell a horse, the sale shows on your Horse Reality bank page. The next 
 
 ### Retired and sold horses
 
-Set a horse's **Status** to **Retired** (on My Herd, on a mare's card or page, on its own page, or on a stallion's status menu) and it leaves the Stallions, My Mares, Colts & Fillies and My Herd lists and appears on the **Retired** tab instead. Set a horse's status to **Sold** and it moves to **Other Horses**, tagged *Sold*. Nothing is deleted: change the status back to Active (or press **Restore** on a sold horse) and it returns to its usual place. A retired stallion's earnings still count in your totals.
+Set a horse's **Status** to **Retired** (on My Herd, on a mare's card or page, on its own page, or on a stallion's status menu) and it leaves the Stallions, Mares, Colts & Fillies and My Herd lists and appears under **My Herd → Retired** (the submenu at the top of My Herd) instead. Set a horse's status to **Sold** and it moves to **Other Horses**, tagged *Sold*. Nothing is deleted: change the status back to Active (or press **Restore** on a sold horse) and it returns to its usual place. A retired stallion's earnings still count in your totals.
 
 ### Highlight goals
 
@@ -187,7 +187,7 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 - **Breed page links:** on Horse Reality's Breed page, **Open mare ↗** (it follows the mare you pick in the drop-down) and **Open stallion ↗** appear beside the mare selector and open each parent's own page in a new tab.
 - **Foal Calculator pages:** each parent's card and every box of the pedigree links to that horse on Horse Reality.
 - **Refresh:** the Foal Calculator's **Refresh** button reloads the saved horses and recalculates without clearing the mare and stallion you picked, which are also remembered when you reload the page.
-- **Filter box:** every list tab (Stallions, My Mares, Colts, Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
+- **Filter box:** every list tab (Stallions, Mares, Colts, Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
 - **Open in Foal Calculator:** pairing ideas on Analytics and the stallions on a mare's Breeding suggestions page have a button that opens the Foal Calculator with both parents already chosen.
 - **Max stud fee:** the Foal Calculator suggestions have a "Max stud fee (HRC)" box that hides other players' stallions that cost more.
 - **Breeding plan:** in the Foal Calculator, add the chosen pairing to your plan and tick it off when it's done.
@@ -272,7 +272,7 @@ The age Horse Reality shows is read for you: from the **ranch page** cards (ever
 
 ## Foals as keepers, and the full reasoning
 
-The hover on a ranch card, and a **Keep or sell** panel at the top of the horse's own page in the ledger (My Herd, My Mares, Stallions), show every step of how the level was worked out: the level and rank, each measure against the group average with its weight, each adjustment with its amount, the final score and where it falls in the level bands, and any rule that overrode the rank (a keep note, a proven producer, a sell note, the "meets every goal" floor).
+The hover on a ranch card, and a **Keep or sell** panel at the top of the horse's own page in the ledger (My Herd, Mares, Stallions), show every step of how the level was worked out: the level and rank, each measure against the group average with its weight, each adjustment with its amount, the final score and where it falls in the level bands, and any rule that overrode the rank (a keep note, a proven producer, a sell note, the "meets every goal" floor).
 
 For a mare they also list **her foals as keepers**, for foals of hers that you own:
 
@@ -312,10 +312,20 @@ On the market's **Studs & Semen** pages, a stallion the ledger has saved (open h
 The ledger keeps a horse's status up to date as things happen on Horse Reality:
 
 - **Listing for sale.** When you create a listing on the **New sale** form, the ledger marks the horse **For Sale** and saves the horse's buyout price and starting bid from the form. When you open your **My Sales** page it reads each listing's buyout price too. Every change of asking price adds a line, so a horse's page keeps a tally: the date you listed it, the current asking price, how many times you changed it, the lowest and highest, and a table of each price with the change from the one before.
-- **Retiring.** When you press a **Retire** button (for example on the horse's Edit tab in your barn), the ledger marks the horse **Retired** with the date, replacing For Sale, and it moves to the Retired tab like any other retired horse. If a confirmation box opens, it waits until you confirm (cancelling does nothing). The horse is found from the page address, a link to it on the page, or the life number in the page header; if it can't tell, a message says so and opening the horse's page updates it. A horse that shows a **Retired** status on its page is marked too.
+- **Retiring.** When you press a **Retire** button (for example on the horse's Edit tab in your barn), the ledger marks the horse **Retired** with the date, replacing For Sale, and it moves to My Herd's Retired submenu like any other retired horse. If a confirmation box opens, it waits until you confirm (cancelling does nothing). The horse is found from the page address, a link to it on the page, or the life number in the page header; if it can't tell, a message says so and opening the horse's page updates it. A horse that shows a **Retired** status on its page is marked too.
 - **Selling.** A horse you had listed that now shows another owner when you open its page is marked **Sold**, with who has it and when the ledger noticed. Reading your bank page (as before) fills in the sale price, date and buyer.
 
 A horse already Sold or Retired is never put back to For Sale by an old listing. Each of these shows in the **For sale / Retired / Sold** panel on the horse's page, and For Sale horses get the price check in Sell ideas.
+
+## Sorting, and My Herd's submenu
+
+**Sort.** The Stallions, Mares, Colts, Fillies and My Herd tabs each have a **Sort** box beside the filter box: **Order as listed**, **Name** A–Z or Z–A, **Age** (oldest or youngest first), **Breed Total**, **Genetic potential** or **Conformation** (high to low), **Goals: met first**, or **Keep / sell rank: best first** (the same rank the ranch cards use). Each tab remembers its own order.
+
+**Retired.** Retired horses are no longer a tab of their own: **My Herd** has a small menu at the top, **Herd** and **Retired**.
+
+## Analytics sections
+
+The **Analytics** tab is built from sections you can open and close: click a heading to open or close it, use the bar of names under the tiles to jump to one (it opens it), or **Open all** / **Close all**. The small overview sections (Suggestions, Goals, Breedings per month and the top lists) start open and the long tables start closed; the page remembers what you left open.
 
 ## The Settings tab
 
@@ -401,7 +411,7 @@ Besides conformation and Breed Total, you can set a **minimum Genetic Potential*
 
 ## Breeding calendar, money and more
 
-- **My Mares** starts with **Foals due** (soonest first) and **Mares ready to breed** (longest open first).
+- **Mares** starts with **Foals due** (soonest first) and **Mares ready to breed** (longest open first).
 - The toolbar icon badge counts coverings to review plus foals due within a week.
 - **Analytics** adds **Money (HRC)**, **Stud fee changes**, **Compare two horses** and **Export to a spreadsheet** (herd, breedings or sales as CSV).
 - Every horse page has a **Notes** box (the filter box searches it) and a **Copy sales ad** button.
@@ -444,7 +454,7 @@ Every horse page (stallion, mare, or any other horse) has a **Remove from ledger
 
 When you open a horse on Horse Reality that **isn't yours**, a small box appears in the bottom-right corner asking whether to add it to your ledger (this needs your username set in Settings, so the extension can tell your horses from other people's).
 
-- **Add to ledger** puts the horse on the **Other Horses** tab. It stays out of My Herd, My Mares and the Stallions tab, so your own numbers aren't affected.
+- **Add to ledger** puts the horse on the **Other Horses** tab. It stays out of My Herd, Mares and the Stallions tab, so your own numbers aren't affected.
 - **No thanks** remembers your answer, and the box won't ask about that horse again.
 
 The Other Horses tab shows each added horse with its picture, breed, sex and owner. Click a name to open its passport, or search for it in the box at the top of any tab (added horses are tagged "Other Horses" in the results). **Remove** takes a horse off the tab but keeps it searchable; the box may appear again the next time you open its page.
@@ -486,7 +496,7 @@ The **Sell ideas** card on the Analytics tab suggests which of your horses to se
 
 ## Breeding suggestions
 
-Open a mare's page (My Mares, or any mare's profile) and click **Breeding suggestions →** to see the 10 best stallions for her, each with the reasons: the foal's estimated Breed Total (from both parents' genetic potential and top conformation), inbreeding, conformation traits where he covers her weak ones (or where you are both weak), his fertility, what he costs (stud fee, transport and semen vial when known), and whether they have been bred together before.
+Open a mare's page (Mares, or any mare's profile) and click **Breeding suggestions →** to see the 10 best stallions for her, each with the reasons: the foal's estimated Breed Total (from both parents' genetic potential and top conformation), inbreeding, conformation traits where he covers her weak ones (or where you are both weak), his fertility, what he costs (stud fee, transport and semen vial when known), and whether they have been bred together before.
 
 **Only horses saved in the ledger are considered**: stallions whose pages you have opened on Horse Reality (age 3 and over, not sold or retired, with a genetic potential saved). Open more stallions' pages and they join the list. A mare under 3 gets no suggestions, and a covered or in-foal mare shows a note that the list is for her next breeding.
 
@@ -499,6 +509,8 @@ Open a mare's page (My Mares, or any mare's profile) and click **Breeding sugges
 **Other players' stallions.** A stallion you added to **Other Horses** shows what he costs right on his row (public and private stud, semen vial, the transport fee, who offers him, and the last fee you paid him), and his profile page has a **Stud fees** panel with the same details and the date they were read. They are saved whenever you open his page or his Breed page on Horse Reality.
 
 ## Foal Calculator
+
+**Suggestions for a horse you pick.** Pick a mare or a stallion and a panel proposes partners from the horses the ledger has saved. The panels start **collapsed** with a one-line count ("4 would give a better foal, of 41 considered"). Opened, they list only the partners whose expected foal would be **better than the horse you picked**, judged on the foal's conformation score, genetic potential and conformation stats (the numbers in brackets say by how much), split into your horses and other players'. Tick **Also show partners whose foal would only match or fall short** to see the rest.
 
 There is a **Breed** picker (all 34 breeds in Horse Reality, from the wiki) above the selectors. Horse Reality has no crossbreeding, so once you choose a breed, or pick one parent, the other list shows only horses of that breed; the Compare card on Analytics works the same way, and the suggested partners and breeding suggestions only offer the same breed. Horses with no breed saved are never hidden.
 
@@ -529,7 +541,7 @@ A mare's foals are picked up three ways: from the **Offspring** tab of one of yo
 
 ## Covered and in-foal mares
 
-A mare's card on **My Mares** shows where she stands: an amber outline and a **✔ Covered** ribbon (with the date) while a covering has been recorded in the last 7 days and has no result yet, and a pink outline with a **♥ In foal** ribbon (with her due date when known) once she is pregnant. The same labels appear as a tag on her own page and in the Status column on Analytics. On Horse Reality's **Breed** page, the mare dropdown also marks them: *♥ IN FOAL (due …)* and *✔ COVERED by …* next to the mare's name, so you can see at a glance who is already bred. The ledger also reads Horse Reality's own signs, so a covering it didn't see you make still shows: the **Covered** pill on a mare's picture, her pregnancy status, and the "Covered 1 day ago … Sire: …" line on her **Info** tab (open her page once). From that line it adds the covering to her history under that sire, with its date. Mares with no label are free to breed. If you have set **Highlight goals** and a covered or in-foal mare clearly misses one of them (one of her goal boxes is red), her card gets a **red outline** and a **⚠ below goals** note on the ribbon (hover it to see which goal), and the Breed page dropdown adds “⚠ BELOW GOALS (…)” in red. Goals with no data yet are not counted as misses, so open the mare's page once to fill them in.
+A mare's card on **Mares** shows where she stands: an amber outline and a **✔ Covered** ribbon (with the date) while a covering has been recorded in the last 7 days and has no result yet, and a pink outline with a **♥ In foal** ribbon (with her due date when known) once she is pregnant. The same labels appear as a tag on her own page and in the Status column on Analytics. On Horse Reality's **Breed** page, the mare dropdown also marks them: *♥ IN FOAL (due …)* and *✔ COVERED by …* next to the mare's name, so you can see at a glance who is already bred. The ledger also reads Horse Reality's own signs, so a covering it didn't see you make still shows: the **Covered** pill on a mare's picture, her pregnancy status, and the "Covered 1 day ago … Sire: …" line on her **Info** tab (open her page once). From that line it adds the covering to her history under that sire, with its date. Mares with no label are free to breed. If you have set **Highlight goals** and a covered or in-foal mare clearly misses one of them (one of her goal boxes is red), her card gets a **red outline** and a **⚠ below goals** note on the ribbon (hover it to see which goal), and the Breed page dropdown adds “⚠ BELOW GOALS (…)” in red. Goals with no data yet are not counted as misses, so open the mare's page once to fill them in.
 
 ## Breeding dates
 
@@ -550,7 +562,7 @@ You can also change any record's status by hand at any time using the dropdown i
 
 ## Reviewing coverings before they auto-fail
 
-Since that 6-day auto-fail happens quietly the next time you're browsing Horse Reality, it's easy to miss — and you'd have no way to double-check it before it happens. So as soon as a "Pending" covering crosses the 6-day mark, it's surfaced at the top of both the Stallions and My Mares tabs, and the toolbar icon badges with a count — even if you haven't opened Horse Reality that day.
+Since that 6-day auto-fail happens quietly the next time you're browsing Horse Reality, it's easy to miss — and you'd have no way to double-check it before it happens. So as soon as a "Pending" covering crosses the 6-day mark, it's surfaced at the top of both the Stallions and Mares tabs, and the toolbar icon badges with a count — even if you haven't opened Horse Reality that day.
 
 ![The "Needs Review" panel at the top of the dashboard](images/07-needs-review.png)
 

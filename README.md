@@ -21,7 +21,7 @@ Nothing is ever auto-created just from *viewing* a horse — only the bank page 
 Click the toolbar icon to open the full dashboard — a proper tab, not a cramped popup — with:
 
 - **Stallions** — roster, public/private fees per currency (HRC/DP/FT/WT), earnings, Sold/Retired status
-- **My Mares** — scoped to mares *you* own (set your username once in Settings so it can tell your mares apart from customers')
+- **Mares** — scoped to mares *you* own (set your username once in Settings so it can tell your mares apart from customers')
 - **Needs Review** — Pending coverings 5+ days old with no foal yet, badged on the toolbar icon and linked straight to the mare's own page, since Horse Reality only notifies *her* owner when a covering fails
 - **My Herd** — tag each horse you own with a Status (Active / Observation / Companion / For Sale / Sold / Retired / Deceased), Role and Project; sold/retired/deceased horses move to an archive; herd stats at a glance
 - **Other Horses** — when you view a horse that isn't yours, a box offers to add it; added horses live on their own tab (kept out of My Herd) and are searchable

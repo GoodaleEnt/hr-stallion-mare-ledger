@@ -569,16 +569,15 @@
     info.manualAgeMonths = Math.max(0, baseMonths + deltaMonths);
     persist();
   }
-  // Sets the tracked age directly from a "times aged up" count (each unit
-  // is 6 months) — lets a misclick be corrected in one go instead of
-  // clicking -6mo repeatedly, or the age set precisely from the start.
-  function setAgeTimes(lifeNumber, times) {
+  // Months older than the birth date: the owner of a horse can age it up (Delta Points), so its age is the age by birth date
+  // plus the months it was aged up by. Entered here when Horse Reality's own age has not been read from the horse's page.
+  function setAgedUpMonths(lifeNumber, months) {
     if (!lifeNumber) return;
     if (!state.horseInfo) state.horseInfo = {};
     var info = state.horseInfo[lifeNumber];
     if (!info) { info = {}; state.horseInfo[lifeNumber] = info; }
-    var n = Math.max(0, Math.round(Number(times) || 0));
-    info.manualAgeMonths = n * 6;
+    info.agedUpMonths = Math.max(0, Math.round(Number(months) || 0));
+    delete info.manualAgeMonths;
     persist();
   }
 
@@ -597,18 +596,16 @@
         '<span class="sub" style="font-size:11px;">from Horse Reality</span></div>';
     }
     var months = info ? L.effectiveAgeMonths(info) : null;
-    var times = months != null ? Math.round(months / 6) : 0;
+    var byBirth = info && info.dateOfBirth ? Math.round((L.ageYears(info.dateOfBirth, info.birthAt) || 0) * 12) : null;
+    var up = info && info.agedUpMonths != null ? info.agedUpMonths : (info && info.manualAgeMonths != null && byBirth != null ? Math.max(0, info.manualAgeMonths - byBirth) : 0);
     return '<div class="row" style="align-items:center;flex-wrap:wrap;gap:8px;">' +
       '<span>' + (months != null ? L.formatAgeMonths(months) + ' (estimated)' : 'Age unknown') + '</span>' +
-      '<div style="display:flex;gap:6px;align-items:center;">' +
-        '<button type="button" class="btn btn-sm" data-action="age-down-horse" data-life="' + L.esc(lifeNumber) + '" title="Retract 6 months"' + (months && months > 0 ? '' : ' disabled') + '>&minus;6mo</button>' +
-        '<button type="button" class="btn btn-sm" data-action="age-up-horse" data-life="' + L.esc(lifeNumber) + '" title="Ages this horse up by 6 months">+6mo</button>' +
-      '</div>' +
-      '<form data-action="set-age-times" data-life="' + L.esc(lifeNumber) + '" style="display:flex;gap:6px;align-items:center;">' +
-        '<label style="font-size:11.5px;color:var(--text-muted);">&times; aged up</label>' +
-        '<input type="number" min="0" step="1" name="times" value="' + times + '" style="width:56px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:13px;color:var(--text);">' +
+      '<form data-action="set-aged-up" data-life="' + L.esc(lifeNumber) + '" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+        '<label style="font-size:11.5px;color:var(--text-muted);" title="Horse Reality\'s age is the age by birth date plus any months its owner aged it up with Delta Points">months older than its birth date</label>' +
+        '<input type="number" min="0" step="1" name="months" value="' + up + '" style="width:64px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:13px;color:var(--text);">' +
         '<button type="submit" class="btn btn-sm">Set</button>' +
       '</form>' +
+      (byBirth != null ? '<span class="sub" style="font-size:11px;flex-basis:100%;">By birth date alone: ' + L.esc(L.formatAgeMonths(byBirth)) + '. Open the ranch page on Horse Reality and the real age is read for you.</span>' : '') +
     '</div>';
   }
 
@@ -3205,8 +3202,6 @@
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
       else if (action === 'mark-stallion-owned') { updateStallionRec(t.getAttribute('data-id'), { owned: true }); }
-      else if (action === 'age-up-horse') { adjustAgeMonths(t.getAttribute('data-life'), 6); }
-      else if (action === 'age-down-horse') { adjustAgeMonths(t.getAttribute('data-life'), -6); }
       else if (action === 'open-stallion') {
         selectedId = t.getAttribute('data-id');
         selectedMareKey = null;
@@ -3318,8 +3313,8 @@
         horseSearchQuery = (fd.get('query') || '').trim();
         render();
       }
-      else if (action === 'set-age-times') {
-        setAgeTimes(t.getAttribute('data-life'), fd.get('times'));
+      else if (action === 'set-aged-up') {
+        setAgedUpMonths(t.getAttribute('data-life'), fd.get('months'));
       }
       else if (action === 'submit-stallion') {
         var data = {

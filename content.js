@@ -1068,10 +1068,20 @@
   function scrapeAndMergeAgeText() {
     var id = parseHorseIdFromUrl();
     if (!id) return;
+    function findAgeText() {
+      var el = document.querySelector('#age') || document.querySelector('.breed-and-age .age.desktop') || document.querySelector('[data-age]');
+      var text = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      if (text) return text;
+      // a table row labelled "Age" (the horse information box)
+      var rows = document.querySelectorAll('tr');
+      for (var i = 0; i < rows.length; i++) {
+        var cells = rows[i].querySelectorAll('th, td');
+        if (cells.length >= 2 && /^age:?$/i.test((cells[0].textContent || '').trim())) { var t = (cells[1].textContent || '').replace(/\s+/g, ' ').trim(); if (t) return t; }
+      }
+      return '';
+    }
     function tryCapture() {
-      var el = document.querySelector('#age');
-      if (!el) return false;
-      var text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      var text = findAgeText();
       if (!text) return false;
       var months = HRLib.parseAgeText(text);
       if (months == null) return false;
@@ -1686,6 +1696,36 @@
     if (!/\/market\/studs-and-semen/.test(location.pathname)) return;
     studCacheTimers = [4000, 16000, 30000].map(function (ms) { return setTimeout(function () { whenIdle(cacheMarketStuds); }, ms); });
   }
+  // ---- ranch page: the age Horse Reality shows on each card ----
+  // Owners can age horses up with Delta Points, so the birth date alone is not the age. The ranch page lists every horse's
+  // real age ("9 years, 2 months"): it is saved as the horse's age, and the months it was aged up are worked out from it.
+  var ranchAgeDone = '';
+  function scrapeRanchAges() {
+    var items = document.querySelectorAll('li.horse-item[data-horse]');
+    if (!items.length) return;
+    var seen = [];
+    items.forEach(function (li) {
+      var el = li.querySelector('.breed-and-age .age.desktop') || li.querySelector('.breed-and-age .age');
+      var text = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      var months = HRLib.parseAgeText(text);
+      if (months != null) seen.push({ life: li.getAttribute('data-horse'), text: text, months: months });
+    });
+    var sig = seen.map(function (s) { return s.life + ':' + s.months; }).join(',');
+    if (!seen.length || sig === ranchAgeDone) return;
+    HRStorage.getState(function (state) {
+      var changed = 0;
+      seen.forEach(function (s) {
+        var info = state.horseInfo && state.horseInfo[s.life];
+        if (!info) return;
+        if (info.ageMonths === s.months && info.ageText === s.text) return;
+        info.ageMonths = s.months; info.ageText = s.text; info.ageAt = Date.now();
+        changed++;
+      });
+      ranchAgeDone = sig;
+      if (!changed) return;
+      HRStorage.setState(state, function () { showToast('HR Ledger: ' + changed + ' horse age' + (changed === 1 ? '' : 's') + ' read from the ranch page'); });
+    });
+  }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
   function renderRanchAdvice() {
     var items = document.querySelectorAll('li.horse-item[data-horse]');
@@ -1753,11 +1793,11 @@
   }
   function scheduleRanch() {
     ranchTimers.forEach(clearTimeout);
-    ranchTimers = [2000].map(function (ms) { return setTimeout(function () { whenIdle(renderRanchAdvice); }, ms); });
+    ranchTimers = [2000].map(function (ms) { return setTimeout(function () { whenIdle(scrapeRanchAges); whenIdle(renderRanchAdvice); }, ms); });
     var grid = document.querySelector('ul.horse-grid, ul.horses');
     if (grid && !ranchObserver) {
       // the list can be redrawn (filters, search): watch its direct children only, so adding our block never retriggers it
-      ranchObserver = new MutationObserver(function () { clearTimeout(ranchDebounce); ranchDebounce = setTimeout(function () { whenIdle(renderRanchAdvice); }, 900); });
+      ranchObserver = new MutationObserver(function () { clearTimeout(ranchDebounce); ranchDebounce = setTimeout(function () { whenIdle(scrapeRanchAges); whenIdle(renderRanchAdvice); }, 900); });
       ranchObserver.observe(grid, { childList: true });
     }
   }

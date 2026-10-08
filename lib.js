@@ -150,6 +150,11 @@
       var phase = info.birthAt ? (((info.ageAt - info.birthAt) % GAME_MS_PER_MONTH) + GAME_MS_PER_MONTH) % GAME_MS_PER_MONTH : 0;
       return info.ageMonths + Math.floor((phase + elapsed) / GAME_MS_PER_MONTH);
     }
+    // a horse its owner aged up (with Delta Points): the age by birth date plus the months it was aged up by
+    if (info.agedUpMonths != null) {
+      var yb = ageYears(info.dateOfBirth, info.birthAt);
+      if (yb != null) return Math.round(yb * 12) + Number(info.agedUpMonths);
+    }
     if (info.manualAgeMonths != null) return info.manualAgeMonths;
     var y = ageYears(info.dateOfBirth, info.birthAt);
     return y == null ? null : Math.round(y * 12);
@@ -175,8 +180,9 @@
   // that text into whole months; returns null if it can't be read.
   function parseAgeText(text) {
     if (!text) return null;
-    var y = /(\d+)\s*year/i.exec(text);
-    var m = /(\d+)\s*month/i.exec(text);
+    // "9 years, 2 months", "9yr 2mo", "3 yrs, 7 mo", "7 years"
+    var y = /(\d+)\s*(?:years?|yrs?)\b/i.exec(text);
+    var m = /(\d+)\s*(?:months?|mos?)\b/i.exec(text);
     if (!y && !m) return null;
     return (y ? parseInt(y[1], 10) : 0) * 12 + (m ? parseInt(m[1], 10) : 0);
   }

@@ -226,6 +226,10 @@ On your **ranch (estate) page** on Horse Reality, each horse card of yours that 
 
 Hover the badge for the rank and every reason. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.
 
+## Ages
+
+The age Horse Reality shows is read for you: from the **ranch page** cards (every horse's real age, "9 years, 2 months", is saved when you open the page) and from a horse's own page. Owners can age horses up with Delta Points, so the birth date alone is not the age. When a horse's own age has not been read yet, the age control under its name lets you enter **how many months older than its birth date** it is, and the ledger adds that to the age by birth date from then on.
+
 ## Foals as keepers, and the full reasoning
 
 The hover on a ranch card, and a **Keep or sell** panel at the top of the horse's own page in the ledger (My Herd, My Mares, Stallions), show every step of how the level was worked out: the level and rank, each measure against the group average with its weight, each adjustment with its amount, the final score and where it falls in the level bands, and any rule that overrode the rank (a keep note, a proven producer, a sell note, the "meets every goal" floor).

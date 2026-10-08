@@ -2451,6 +2451,52 @@
     return true;
   }
 
+  // ---------- horse tags ----------
+  // Up to 10 short tags per horse (horseMeta[life].tags): 2 to 24 characters, lower case, spaces and underscores joined by
+  // hyphens ("comp-team", "for-sale"). They group horses beyond breed and status and are searched with #tag in the filter
+  // box above a list (a part of a tag matches). Three tags change the suggestions: keep, sell and no-breed.
+  var MAX_TAGS = 10;
+  function normalizeTag(t) {
+    var s = String(t || '').toLowerCase().trim().replace(/^#+/, '').replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    return s.length >= 2 && s.length <= 24 ? s : '';
+  }
+  function tagsOf(state, life) {
+    var m = state && state.horseMeta && state.horseMeta[life];
+    return m && Array.isArray(m.tags) ? m.tags : [];
+  }
+  // 'added', 'exists', 'full' or 'invalid'
+  function addTagTo(state, life, raw) {
+    var tag = normalizeTag(raw);
+    if (!tag || !life) return 'invalid';
+    state.horseMeta = state.horseMeta || {};
+    var meta = Object.assign({}, state.horseMeta[life]), list = Array.isArray(meta.tags) ? meta.tags.slice() : [];
+    if (list.indexOf(tag) > -1) return 'exists';
+    if (list.length >= MAX_TAGS) return 'full';
+    list.push(tag);
+    meta.tags = list;
+    state.horseMeta[life] = meta;
+    return 'added';
+  }
+  function removeTagFrom(state, life, raw) {
+    var tag = normalizeTag(raw), meta = state.horseMeta && state.horseMeta[life];
+    if (!tag || !meta || !Array.isArray(meta.tags) || meta.tags.indexOf(tag) === -1) return false;
+    var m2 = Object.assign({}, meta);
+    m2.tags = meta.tags.filter(function (t) { return t !== tag; });
+    if (!m2.tags.length) delete m2.tags;
+    state.horseMeta[life] = m2;
+    return true;
+  }
+  function allTags(state) {
+    var count = {};
+    Object.keys(state.horseMeta || {}).forEach(function (l) { tagsOf(state, l).forEach(function (t) { count[t] = (count[t] || 0) + 1; }); });
+    return Object.keys(count).sort().map(function (t) { return { tag: t, count: count[t] }; });
+  }
+  // Does a horse match every #tag term of a search (a part of a tag matches)? terms are tags without the #.
+  function tagQueryMatch(state, life, terms) {
+    var tags = tagsOf(state, life);
+    return terms.every(function (q) { return tags.some(function (t) { return t.indexOf(q) > -1; }); });
+  }
+
   // ---------- listing a horse for sale and retiring it ----------
   // A horse you list gets the status For Sale and a log of the prices you ask (horseMeta[life].askLog); a price change
   // adds a line. A horse you retire gets the status Retired and the date. A horse already Sold or Retired is not
@@ -2847,7 +2893,15 @@
     });
   }
   function overallNoteRules(state) { return parseNotes(state && state.settings && state.settings.notes, true); }
-  function horseNoteRules(state, life) { return parseNotes(state && state.horseMeta && state.horseMeta[life] && state.horseMeta[life].notes); }
+  function horseNoteRules(state, life) {
+    var r = parseNotes(state && state.horseMeta && state.horseMeta[life] && state.horseMeta[life].notes);
+    // the tags keep, sell and no-breed work like the same words in the horse's notes
+    var tg = tagsOf(state, life);
+    if (tg.indexOf('keep') > -1) { r.keep = true; r.understood.push('Tag #keep: keep her or him'); }
+    if (tg.indexOf('sell') > -1) { r.sell = true; r.understood.push('Tag #sell: sell'); }
+    if (tg.indexOf('no-breed') > -1 || tg.indexOf('dont-breed') > -1) { r.noBreed = true; r.understood.push('Tag #no-breed: do not breed'); }
+    return r;
+  }
   // What the notes of the two horses say about pairing them: { skip, bonus, reason }
   function partnerNoteEffect(state, aLife, bLife) {
     var a = horseNoteRules(state, aLife), b = horseNoteRules(state, bLife);
@@ -3755,6 +3809,13 @@
     askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
     marketRowInfo: marketRowInfo,
+    normalizeTag: normalizeTag,
+    tagsOf: tagsOf,
+    addTagTo: addTagTo,
+    removeTagFrom: removeTagFrom,
+    allTags: allTags,
+    tagQueryMatch: tagQueryMatch,
+    MAX_TAGS: MAX_TAGS,
     parseToolkitTagline: parseToolkitTagline,
     parseToolkitPrivateTag: parseToolkitPrivateTag,
     applyToolkitTags: applyToolkitTags,

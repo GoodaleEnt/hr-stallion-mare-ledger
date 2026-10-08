@@ -25,6 +25,7 @@
   var calcMare = '';
   var calcStallion = '';
   var listFilterText = '';
+  var bulkMode = false, bulkSel = {}; // My Herd: choose several horses, then add or remove a tag on all of them
   var compareA = '', compareB = '';
   var goalsEdit = 'mare'; // which goal set the Highlight goals panel is editing when mares and stallions have their own
   var calcBreed = '', compareBreed = '';
@@ -427,7 +428,7 @@
         html += '<label for="global-breed" style="font-weight:600;font-size:13px;">Breed</label><select id="global-breed" data-action="global-breed"><option value="">All breeds</option>' +
           breedNames.sort().map(function (b) { return '<option value="' + L.esc(b) + '"' + (L.breedKeyOf(b) === L.breedKeyOf(activeBreed) ? ' selected' : '') + '>' + L.esc(b) + '</option>'; }).join('') + '</select>';
       }
-      if (isListTab) html += '<input id="list-filter" type="search" data-action="list-filter" placeholder="Filter this list by name, breed or status\u2026" value="' + L.esc(listFilterText) + '" style="flex:1 1 240px;max-width:380px;">';
+      if (isListTab) html += '<input id="list-filter" type="search" data-action="list-filter" placeholder="Filter by name, breed, status or #tag\u2026" value="' + L.esc(listFilterText) + '" style="flex:1 1 240px;max-width:380px;">';
       html += '</div>';
     }
     return html;
@@ -448,7 +449,10 @@
   }
   // Hide the cards / rows that don't match the filter box (the list itself is not re-drawn).
   function applyListFilter() {
-    var q = listFilterText.trim().toLowerCase();
+    var q0 = listFilterText.trim().toLowerCase();
+    // #tag terms narrow by tag (a part of a tag matches); the rest is text
+    var tagTerms = (q0.match(/#[a-z0-9-]+/g) || []).map(function (t) { return t.slice(1); });
+    var q = q0.replace(/#[a-z0-9-]+/g, ' ').replace(/\s+/g, ' ').trim();
     var app = document.getElementById('app');
     if (!app) return;
     app.querySelectorAll('.stallion-card[data-action], .herd-row').forEach(function (el) {
@@ -457,8 +461,9 @@
       if (!life && el.getAttribute('data-id')) { var srec = state.stallions.find(function (x) { return x.id === el.getAttribute('data-id'); }); life = srec && srec.lifeNumber || ''; }
       var note = life && state.horseMeta[life] && state.horseMeta[life].notes || '';
       var textOk = !q || ((el.textContent || '') + ' ' + note).toLowerCase().indexOf(q) > -1;
+      var tagOk = !tagTerms.length || (life && L.tagQueryMatch(state, life, tagTerms));
       var breedShown = !life || lifeBreedOk(life);
-      el.style.display = textOk && breedShown ? '' : 'none';
+      el.style.display = textOk && tagOk && breedShown ? '' : 'none';
     });
   }
 
@@ -489,7 +494,7 @@
     html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
-    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife);
+    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
@@ -1162,7 +1167,7 @@
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
     html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
-    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber);
+    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
 
@@ -1216,7 +1221,7 @@
     var pic = horsePictureUrl(h.lifeNumber);
     return '<div class="herd-row' + goalClass(h.lifeNumber) + '">' +
       goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
-      '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span></div>' +
+      '<div class="name" data-label="Horse"><span>' + (bulkMode ? '<input type="checkbox" data-action="bulk-pick" data-life="' + life + '" aria-label="Select ' + L.esc(info.name || 'horse') + '"' + (bulkSel[h.lifeNumber] ? ' checked' : '') + ' style="margin-right:6px;"> ' : '') + '<button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span>' + (L.tagsOf(state, h.lifeNumber).length ? '<div style="margin-top:2px;">' + tagChipsHtml(h.lifeNumber, false) + '</div>' : '') + '</div>' +
       '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
       '<div data-label="Status"><select class="pill-select ' + L.herdStatusClass(meta.status) + '" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
@@ -1225,8 +1230,50 @@
     '</div>';
   }
 
+  // ---------- tags ----------
+  function tagChipsHtml(life, withRemove) {
+    var tags = L.tagsOf(state, life);
+    if (!tags.length) return '';
+    return '<span class="tag-chips">' + tags.map(function (t) {
+      return '<span class="tag mono" style="margin:0 4px 2px 0;"><button type="button" class="link-btn" style="font-size:11.5px;" data-action="filter-tag" data-tag="' + L.esc(t) + '" title="Show the horses with this tag">#' + L.esc(t) + '</button>' +
+        (withRemove ? ' <button type="button" class="link-btn" style="font-size:12px;" data-action="tag-remove" data-life="' + L.esc(life) + '" data-tag="' + L.esc(t) + '" title="Remove this tag" aria-label="Remove tag ' + L.esc(t) + '">\u00d7</button>' : '') + '</span>';
+    }).join('') + '</span>';
+  }
+  function tagsDatalistHtml() {
+    return '<datalist id="hr-tags-list">' + L.allTags(state).map(function (t) { return '<option value="' + L.esc(t.tag) + '" label="' + t.count + ' horse' + (t.count === 1 ? '' : 's') + '"></option>'; }).join('') + '</datalist>';
+  }
+  function tagsPanelHtml(life) {
+    if (!life || !state.horseInfo[life]) return '';
+    var n = L.tagsOf(state, life).length;
+    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Tags</strong> <span class="sub" style="font-size:12.5px;">up to ' + L.MAX_TAGS + ' \u00b7 <em>keep</em>, <em>sell</em> and <em>no-breed</em> change the suggestions</span>' +
+      '<div style="margin:8px 0;">' + (tagChipsHtml(life, true) || '<span class="sub">No tags yet.</span>') + '</div>' +
+      (n < L.MAX_TAGS ? '<form data-action="tag-add" data-life="' + L.esc(life) + '" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input name="tag" type="text" list="hr-tags-list" maxlength="30" placeholder="Add a tag, e.g. comp-team" autocomplete="off" style="max-width:240px;"><button type="submit" class="btn btn-sm">Add</button></form>' + tagsDatalistHtml() : '<span class="sub">The limit of ' + L.MAX_TAGS + ' tags is reached.</span>') +
+      '</div>';
+  }
+  function bulkBarHtml() {
+    if (!bulkMode) return '<div style="margin:0 0 8px;"><button type="button" class="btn btn-sm" data-action="bulk-toggle">Select horses to tag</button></div>';
+    var n = Object.keys(bulkSel).filter(function (k) { return bulkSel[k]; }).length;
+    return '<div class="card" style="padding:10px 14px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-color:var(--accent-2);">' +
+      '<strong id="bulk-count">' + n + ' selected</strong>' +
+      '<button type="button" class="btn btn-sm" data-action="bulk-all">Select all shown</button><button type="button" class="btn btn-sm" data-action="bulk-none">Clear</button>' +
+      '<input id="bulk-tag" type="text" list="hr-tags-list" maxlength="30" placeholder="tag" autocomplete="off" style="max-width:180px;">' +
+      '<button type="button" class="btn btn-sm btn-primary" data-action="bulk-add">Add tag</button><button type="button" class="btn btn-sm" data-action="bulk-remove">Remove tag</button>' +
+      '<button type="button" class="btn btn-sm" data-action="bulk-toggle">Done</button>' + tagsDatalistHtml() + '</div>';
+  }
+  // the horse the "select" boxes belong to is the first life number found in a row
+  function bulkApply(add) {
+    var tag = L.normalizeTag(document.getElementById('bulk-tag') && document.getElementById('bulk-tag').value);
+    if (!tag) { alert('Type a tag of 2 to 24 letters, numbers or hyphens.'); return; }
+    var lives = Object.keys(bulkSel).filter(function (k) { return bulkSel[k]; }), changed = 0, full = 0;
+    lives.forEach(function (life) {
+      if (add) { var r = L.addTagTo(state, life, tag); if (r === 'added') changed++; else if (r === 'full') full++; }
+      else if (L.removeTagFrom(state, life, tag)) changed++;
+    });
+    if (full) alert(full + ' horse' + (full === 1 ? ' is' : 's are') + ' already at the limit of ' + L.MAX_TAGS + ' tags.');
+    if (changed) persist(); else render();
+  }
   function herdListHtml(horses) {
-    var html = '<div class="ledger"><div class="herd-head"><div></div><div>Horse</div><div>Details</div><div>Role</div><div>Status</div><div>Project</div><div>Show scores</div></div><div class="card">';
+    var html = bulkBarHtml() + '<div class="ledger"><div class="herd-head"><div></div><div>Horse</div><div>Details</div><div>Role</div><div>Status</div><div>Project</div><div>Show scores</div></div><div class="card">';
     horses.forEach(function (h) { html += herdRowHtml(h); });
     return html + '</div></div>';
   }
@@ -3083,7 +3130,7 @@
 
     html += geneDetailsHtml(s.lifeNumber);
     html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
-    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber);
+    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
     html += removeHorsePanelHtml(s.lifeNumber, s.name);
@@ -3229,6 +3276,24 @@
       }
       else if (action === 'calc-clear-mare') { calcMare = ''; saveUi(); render(); }
       else if (action === 'calc-clear-stallion') { calcStallion = ''; saveUi(); render(); }
+      else if (action === 'tag-remove') { if (L.removeTagFrom(state, t.getAttribute('data-life'), t.getAttribute('data-tag'))) persist(); }
+      else if (action === 'filter-tag') {
+        listFilterText = '#' + t.getAttribute('data-tag');
+        var lf = document.getElementById('list-filter');
+        if (lf) { lf.value = listFilterText; applyListFilter(); } else { render(); }
+      }
+      else if (action === 'bulk-toggle') { bulkMode = !bulkMode; if (!bulkMode) bulkSel = {}; render(); }
+      else if (action === 'bulk-all') {
+        document.querySelectorAll('.herd-row').forEach(function (row) {
+          if (row.style.display === 'none') return;
+          var cb = row.querySelector('input[data-action="bulk-pick"]');
+          if (cb) { cb.checked = true; bulkSel[cb.getAttribute('data-life')] = true; }
+        });
+        var bc = document.getElementById('bulk-count'); if (bc) bc.textContent = Object.keys(bulkSel).filter(function (k) { return bulkSel[k]; }).length + ' selected';
+      }
+      else if (action === 'bulk-none') { bulkSel = {}; render(); }
+      else if (action === 'bulk-add') { bulkApply(true); }
+      else if (action === 'bulk-remove') { bulkApply(false); }
       else if (action === 'toggle-add-stallion') { addingStallion = !addingStallion; render(); }
       else if (action === 'cancel-stallion-form') { addingStallion = false; editingStallion = false; render(); }
       else if (action === 'edit-stallion') { editingStallion = true; render(); }
@@ -3343,6 +3408,11 @@
       if (action === 'submit-search') {
         horseSearchQuery = (fd.get('query') || '').trim();
         render();
+      }
+      else if (action === 'tag-add') {
+        var tl = t.getAttribute('data-life'), tr = L.addTagTo(state, tl, fd.get('tag'));
+        if (tr === 'invalid') { alert('A tag is 2 to 24 letters, numbers or hyphens.'); return; }
+        if (tr === 'added') persist(); else render();
       }
       else if (action === 'set-aged-up') {
         setAgedUpMonths(t.getAttribute('data-life'), fd.get('months'));
@@ -3487,6 +3557,10 @@
       }
       else if (action === 'calc-mare') { calcMare = t.value; saveUi(); render(); }
       else if (action === 'calc-stallion') { calcStallion = t.value; saveUi(); render(); }
+      else if (action === 'bulk-pick') {
+        bulkSel[t.getAttribute('data-life')] = !!t.checked;
+        var bc2 = document.getElementById('bulk-count'); if (bc2) bc2.textContent = Object.keys(bulkSel).filter(function (k) { return bulkSel[k]; }).length + ' selected';
+      }
       else if (action === 'calc-mare-text' || action === 'calc-stallion-text') {
         var isM = action === 'calc-mare-text', picked = calcResolveText(isM ? 'mare' : 'stallion', t.value);
         if (picked === null) { render(); return; } // not a horse in the list: put the box back as it was

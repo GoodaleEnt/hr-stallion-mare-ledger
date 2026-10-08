@@ -958,8 +958,21 @@
   function attachOffspringImages(stallionId, offspring) {
     if (!stallionId) return;
     var jobs = [];
+    HRStorage.peekState(function (pst) {
+      var plist = pst.breedings[stallionId] || [];
+      offspring.forEach(function (row) {
+        var k = HRLib.breedingMatchKey(row), rec = plist.find(function (b) { return HRLib.breedingMatchKey(b) === k; });
+        if (rec && rec.foalImageStored) row.__stored = true;
+      });
+      runOffspringImages(stallionId, offspring);
+    });
+  }
+  function runOffspringImages(stallionId, offspring) {
+    var jobs = [];
     offspring.forEach(function (row) {
       if (!row.foalImageUrl) return;
+      // a picture already saved apart from the ledger is not fetched again
+      if (row.__stored) return;
       jobs.push(fetchImageAsDataUrl(row.foalImageUrl).then(function (dataUrl) {
         return { row: row, dataUrl: dataUrl };
       }));
@@ -988,6 +1001,14 @@
   // stallions. Needed because the CDN blocks hotlinked/cross-origin loads.
   function attachHorseImage(stallionId, horseInfo) {
     if (!horseInfo || !horseInfo.lifeNumber || !horseInfo.imageUrl) return;
+    HRStorage.peekState(function (pst) {
+      var cur = pst.horseInfo[horseInfo.lifeNumber];
+      // the picture is already saved (apart from the ledger): do not fetch it again on every visit
+      if (cur && cur.imageStored) return;
+      fetchHorseImageNow(stallionId, horseInfo);
+    });
+  }
+  function fetchHorseImageNow(stallionId, horseInfo) {
     fetchImageAsDataUrl(horseInfo.imageUrl).then(function (dataUrl) {
       if (!dataUrl) return;
       HRStorage.getState(function (state) {

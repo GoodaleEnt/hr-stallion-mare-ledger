@@ -223,6 +223,10 @@
   // so the wrong move (a new folder, or clicking Remove) can wipe it.
   // This lets a player save/restore the whole ledger regardless.
   function exportBackup() {
+    // the pictures are stored apart from the ledger: bring them in so the backup holds everything
+    HRStorage.hydrateImages(function () { HRStorage.applyImages(state); writeBackupFile(); });
+  }
+  function writeBackupFile() {
     state.settings.lastBackupAt = Date.now();
     HRStorage.setState(state, function () {});
     var json = JSON.stringify(state, null, 2);
@@ -3187,6 +3191,7 @@
           if (!state.horseInfo) state.horseInfo = {};
           if (!state.horseMeta) state.horseMeta = {};
           if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+          HRStorage.applyImages(state);
           recompute();
           render();
         });
@@ -3650,25 +3655,37 @@
   HRStorage.getState(function (loaded) {
     state = loaded;
     var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state) + L.purgeTrash(state);
-    if (L.adoptOwnedStallions(state) || scoresChanged) { persist(openFromHash); return; }
+    if (L.adoptOwnedStallions(state) || scoresChanged) { persist(function () { openFromHash(); bringInImages(); }); return; }
     recompute();
     render();
     openFromHash();
+    bringInImages();
   });
+
+  // The pictures are stored apart from the ledger: read them after the first draw and draw again
+  function bringInImages() {
+    HRStorage.migrateImages(function () {
+      HRStorage.hydrateImages(function (n) { if (n) { HRStorage.applyImages(state); render(); } });
+    });
+  }
 
   // Live-update if a content script writes new data while this tab is open.
   var liveTimer = null, liveState = null;
   chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area !== 'local' || !changes.hrLedger) return;
-    liveState = changes.hrLedger.newValue || HRStorage.defaultState();
+    if (area !== 'local') return;
+    var imgChanged = false;
+    Object.keys(changes).forEach(function (k) { if (HRStorage.noteImageChange(k, changes[k].newValue)) imgChanged = true; });
+    if (!changes.hrLedger && !imgChanged) return;
+    if (changes.hrLedger) liveState = changes.hrLedger.newValue || HRStorage.defaultState();
     // Pages writing several times in a row are folded into one redraw
     clearTimeout(liveTimer);
     liveTimer = setTimeout(function () {
-      state = liveState; liveState = null;
+      if (liveState) { state = liveState; liveState = null; }
       if (!state.breedings) state.breedings = {};
       if (!state.horseInfo) state.horseInfo = {};
       if (!state.horseMeta) state.horseMeta = {};
       if (!state.settings) state.settings = { autoDeleteRetired: false, myUsername: '' };
+      HRStorage.applyImages(state);
       recompute();
       render();
     }, 400);

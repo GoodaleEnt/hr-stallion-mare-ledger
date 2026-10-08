@@ -25,6 +25,11 @@ function refreshReviewBadge() {
 
 chrome.runtime.onStartup.addListener(refreshReviewBadge);
 chrome.runtime.onInstalled.addListener(refreshReviewBadge);
+// older ledgers keep every horse picture inside the ledger (tens of MB read and rewritten by every page): move them out once
+function moveImages() { HRStorage.migrateImages(function (n) { if (n) refreshReviewBadge(); }); }
+chrome.runtime.onStartup.addListener(moveImages);
+chrome.runtime.onInstalled.addListener(moveImages);
+setTimeout(moveImages, 4000);
 // Storage changes (a new breeding scraped, a status edited) update the badge
 // right away; the hourly alarm catches the case where nothing changed but a
 // Pending covering has simply aged past the threshold since the service

@@ -226,6 +226,10 @@ On your **ranch (estate) page** on Horse Reality, each horse card of yours that 
 
 Hover the badge for the rank and every reason. Cards for horses not yet saved in the ledger (open their page once) show nothing. A checkbox in **My notes** turns it off.
 
+## Pictures are stored apart from the ledger
+
+Horse pictures are saved as data (the site's image server will not let other pages show its pictures directly), about 200 KB each, so a ledger of a few hundred horses had grown past 90 MB, and every Horse Reality page read and rewrote all of it. The pictures are now kept under their own storage keys that Horse Reality pages never load; the ledger itself keeps only a flag. The first time the extension runs after updating it moves your existing pictures out automatically (the pictures are saved first and the ledger is only rewritten without them once they are all saved, so an interruption loses nothing). The dashboard reads the pictures back after it has drawn, and **Backup** includes them, so a backup file is still complete and still restores everything. A picture already saved is no longer downloaded again on every visit.
+
 ## Ages
 
 The age Horse Reality shows is read for you: from the **ranch page** cards (every horse's real age, "9 years, 2 months", is saved when you open the page) and from a horse's own page. Owners can age horses up with Delta Points, so the birth date alone is not the age. When a horse's own age has not been read yet, the age control under its name lets you enter **how many months older than its birth date** it is, and the ledger adds that to the age by birth date from then on.

@@ -2302,10 +2302,22 @@
   }
   // Select per hand-entered gene for one horse. A gene Horse Reality itself
   // reports for that horse is shown read-only instead.
+  // "?/sty": one copy known, the other not sure
+  function suspectedOptionsHtml(locus, current) {
+    var cur = current ? current.join('/') : '';
+    return '<optgroup label="Suspected (not confirmed)">' + L.suspectedGenotypeOptions(locus).map(function (g) {
+      return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + ' (suspected)</option>';
+    }).join('') + '</optgroup>';
+  }
+  function peacockEditorHtml(lifeNumber) {
+    var p = (state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].peacock) || {}, life = L.esc(lifeNumber);
+    return '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;"><label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" data-action="horse-peacock" data-life="' + life + '"' + (p.expressed ? ' checked' : '') + '> Peacock expressed</label>' +
+      '<div class="field" style="margin:0;"><label for="pk-' + life + '">Line strength estimate (0\u2013100%)</label><input id="pk-' + life + '" type="number" min="0" max="100" step="5" data-action="horse-peacock-strength" data-life="' + life + '" value="' + (p.strength != null && p.strength !== '' ? L.esc(p.strength) : '') + '" placeholder="your estimate" style="max-width:150px;"></div></div>';
+  }
   function geneEditorHtml(lifeNumber, title) {
     var info = state.horseInfo[lifeNumber] || {};
     var tested = L.parseColourGenes(info.testedColours);
-    var manual = L.manualGenes(state, lifeNumber);
+    var manual = L.manualGenes(state, lifeNumber), suspected = L.suspectedGenes(state, lifeNumber);
     var life = L.esc(lifeNumber);
     var html = '<div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">' + L.esc(title) + ' — ' + L.esc(info.name || ('#' + lifeNumber)) + '</div>' +
       '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">';
@@ -2317,14 +2329,14 @@
         var opts = L.extraGenotypeOptions(l).filter(function (g) { return !tested.A || L.agoutiPlain(g.split('/')).join() === L.agoutiPlain(tested.A).join(); });
         html += '<select id="' + id + '" data-action="horse-gene" data-life="' + life + '" data-locus="A">' +
           '<option value=""' + (curA ? '' : ' selected') + '>' + (tested.A ? 'As tested (' + L.esc(tested.A.join(' / ')) + ')' : 'Not known') + '</option>' +
-          opts.map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === curA ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + '</select>';
+          opts.map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === curA ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + suspectedOptionsHtml(l, suspected[l.id]) + '</select>';
       } else if (tested[l.id]) {
         html += '<select id="' + id + '" disabled><option>' + L.esc(tested[l.id].join(' / ')) + ' (from Horse Reality)</option></select>';
       } else {
         var cur = manual[l.id] ? manual[l.id].join('/') : '';
         html += '<select id="' + id + '" data-action="horse-gene" data-life="' + life + '" data-locus="' + L.esc(l.id) + '">' +
           '<option value=""' + (cur ? '' : ' selected') + '>Not present (default)</option>' +
-          L.extraGenotypeOptions(l).map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') +
+          L.extraGenotypeOptions(l).map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + suspectedOptionsHtml(l, suspected[l.id]) +
         '</select>';
       }
       html += '</div>';
@@ -2608,6 +2620,12 @@
   }
   // The genes read for a horse (from Horse Reality's test, or entered by hand), each as a chip: green with a star if you
   // prefer or keep it, red with a cross if you do not want it.
+  function suspectedChipsHtml(life) {
+    var sus = L.suspectedGenes(state, life), pk = L.peacockOf(state, life), out = '';
+    L.MANUAL_LOCI.forEach(function (l) { if (sus[l.id]) out += '<span class="tag" style="margin:0 6px 6px 0;font-style:italic;" title="Suspected, not confirmed">' + L.esc((l.label || l.name.replace(/ \(.*\)$/, ''))) + ' ' + L.esc(sus[l.id].join(' / ')) + '</span>'; });
+    if (pk) out += '<span class="tag" style="margin:0 6px 6px 0;" title="Peacock expressed' + (pk.strength != null ? ', line strength estimate ' + pk.strength + '%' : '') + '">Peacock' + (pk.strength != null ? ' ' + L.esc(pk.strength) + '%' : '') + '</span>';
+    return out;
+  }
   function geneticsPanelHtml(life) {
     var info = state.horseInfo[life];
     if (!info) return '';
@@ -2626,7 +2644,7 @@
     var hasBad = wanted.some(function (g) { return g.level === 'avoid'; }), hasGood = wanted.some(function (g) { return g.level !== 'avoid'; });
     return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;' + (hasBad ? 'border-color:var(--danger);' : hasGood ? 'border-color:var(--accent-strong);' : '') + '"><strong>Genetics</strong>' +
       (hasGood ? ' <span class="tag" style="color:var(--accent-strong);border-color:var(--accent-strong);">\u2726 carries a preferred gene</span>' : '') + (hasBad ? ' <span class="tag" style="color:var(--danger);border-color:var(--danger);">\u2716 carries an unwanted gene</span>' : '') +
-      '<div style="margin-top:8px;">' + chips + '</div>' + (info.testedColours ? '<div class="mono sub" style="font-size:12px;">' + L.esc(info.testedColours) + '</div>' : '') +
+      '<div style="margin-top:8px;">' + chips + suspectedChipsHtml(life) + '</div>' + (info.testedColours ? '<div class="mono sub" style="font-size:12px;">' + L.esc(info.testedColours) + '</div>' : '') +
       '<p class="notes-line" style="margin:6px 0 0;">Genes the ledger knows for this horse. Green star = a gene you prefer or keep, red cross = a gene you do not want (choose these under My notes \u2192 Preferred genetics). A gene that is not listed was not tested.</p></div>';
   }
   // A star tag for a horse that carries a gene you prefer.
@@ -2932,9 +2950,10 @@
   // Short text of the hand-entered genes saved on a horse, e.g. "Sooty Sty / sty".
   function savedGenesText(lifeNumber) {
     var manual = L.manualGenes(state, lifeNumber);
-    return L.MANUAL_LOCI.filter(function (l) { return manual[l.id]; }).map(function (l) {
-      return l.name.replace(/ \(.*\)$/, '') + ' ' + manual[l.id].join(' / ');
-    }).join(', ');
+    var sus = L.suspectedGenes(state, lifeNumber), pk = L.peacockOf(state, lifeNumber);
+    return L.MANUAL_LOCI.filter(function (l) { return manual[l.id] || sus[l.id]; }).map(function (l) {
+      return l.name.replace(/ \(.*\)$/, '') + ' ' + (manual[l.id] ? manual[l.id].join(' / ') : sus[l.id].join(' / ') + ' (suspected)');
+    }).concat(pk ? ['Peacock' + (pk.strength != null ? ' ' + pk.strength + '%' : '')] : []).join(', ');
   }
   // The same editor the calculator uses, tucked under a horse's own page so
   // genes are set once on the horse and reused for every pairing.
@@ -2944,7 +2963,7 @@
     return '<details class="profile-block" style="margin:0 0 16px;"' + '><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Extra genes (Sooty, Silver, Flaxen, W20, hidden Agouti…) — ' +
       (saved ? L.esc(saved) : 'none entered yet') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;">' +
-      geneEditorHtml(lifeNumber, 'Saved on this horse') +
+      geneEditorHtml(lifeNumber, 'Saved on this horse') + peacockEditorHtml(lifeNumber) +
       '<p class="notes-line" style="margin:0;">Saved once here and used automatically by the Foal Calculator whenever this horse is a parent.</p>' +
       '</div></details>';
   }
@@ -3715,6 +3734,8 @@
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-best') { setHorseBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'horse-peacock') { var pk0 = Object.assign({}, (state.horseMeta[t.getAttribute('data-life')] || {}).peacock); pk0.expressed = !!t.checked; setHorseMeta(t.getAttribute('data-life'), { peacock: pk0 }); }
+      else if (action === 'horse-peacock-strength') { var pk1 = Object.assign({}, (state.horseMeta[t.getAttribute('data-life')] || {}).peacock); pk1.strength = t.value === '' ? '' : Math.max(0, Math.min(100, parseFloat(t.value) || 0)); setHorseMeta(t.getAttribute('data-life'), { peacock: pk1 }); }
       else if (action === 'horse-gene') { setHorseGene(t.getAttribute('data-life'), t.getAttribute('data-locus'), t.value); }
       else if (action === 'herd-status') { setLifeStatus(t.getAttribute('data-life'), t.value); }
       else if (action === 'herd-scores') { setHorseMeta(t.getAttribute('data-life'), { confScores: parseScores(t.value) }); }

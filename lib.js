@@ -429,6 +429,28 @@
     });
     return out;
   }
+  // Hidden genes you are not sure of: a "?" in place of one allele ("?/sty" = one copy of sty, the other not known). They are
+  // kept apart from the confirmed genotypes (so the colour odds are not changed) and count as a possible gene: the preferred
+  // genes lists show them, and the chance a foal gets a gene counts a suspected copy as a coin toss.
+  function suspectedGenes(state, lifeNumber) {
+    var saved = (state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].genes) || {};
+    var out = {};
+    MANUAL_LOCI.forEach(function (l) {
+      var parts = String(saved[l.id] || '').split('/');
+      if (parts.length !== 2 || parts.indexOf('?') === -1 || (parts[0] === '?' && parts[1] === '?')) return;
+      var known = parts[0] === '?' ? parts[1] : parts[0];
+      if (l.alleles.indexOf(known) > -1) out[l.id] = parts;
+    });
+    return out;
+  }
+  function suspectedGenotypeOptions(locus) { return locus.alleles.map(function (a) { return '?/' + a; }); }
+  // Peacock: whether it is expressed and your own estimate of how strong the line is (0 to 100); horseMeta[life].peacock
+  function peacockOf(state, life) {
+    var p = state && state.horseMeta && state.horseMeta[life] && state.horseMeta[life].peacock;
+    if (!p || !p.expressed) return null;
+    var s = Number(p.strength);
+    return { expressed: true, strength: isFinite(s) && s >= 0 ? Math.min(100, s) : null };
+  }
   function splitAlleles(token, alleles) {
     var sorted = alleles.slice().sort(function (a, b) { return b.length - a.length; });
     var out = [], rest = token;
@@ -1405,7 +1427,7 @@
         if (gc.active && gc.met) { A(0.3, 'Meets all your goals'); x.flags.met = true; x.why.push('Meets all your goals'); }
       }
       var genes = preferredGenesOf(state, life);
-      var avoid = genes.filter(function (g) { return g.level === 'avoid'; }), keepG = genes.filter(function (g) { return g.level === 'keep'; });
+      var avoid = genes.filter(function (g) { return g.level === 'avoid'; }), keepG = genes.filter(function (g) { return g.level === 'keep' && !g.suspected; });
       if (avoid.length) { A(-0.5, 'Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); x.why.push('Carries ' + avoid.map(function (g) { return g.name; }).join(', ') + ', a gene you do not want'); }
       if (keepG.length) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you keep'); x.why.push('Carries ' + keepG.map(function (g) { return g.name; }).join(', ') + ', a gene you want to keep'); }
       if (nr.keep || overall.keepGroups[x.young ? (x.sex === 'mare' ? 'filly' : 'colt') : x.sex]) { x.flags.core = true; (x.coreWhy = x.coreWhy || []).push('your notes say to keep'); x.why.push('Your notes say to keep'); }
@@ -2498,6 +2520,7 @@
     var tags = tagsOf(state, life);
     // horses of your breeding partners also answer to #partner and #bp
     if (partnerOwnerOf(state, state.horseInfo && state.horseInfo[life])) tags = tags.concat(['partner', 'bp']);
+    if (peacockOf(state, life)) tags = tags.concat(['peacock']);
     return terms.every(function (q) { return tags.some(function (t) { return t.indexOf(q) > -1; }); });
   }
 
@@ -2697,6 +2720,13 @@
       if (!pm[l.id] || !g[l.id]) return;
       if (g[l.id].indexOf(interestingAllele(l)) > -1) out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')), level: pm[l.id] });
     });
+    // a suspected copy of a gene you care about, where the horse's genotype is not otherwise known
+    var sus = suspectedGenes(state, life);
+    preferLoci().forEach(function (l) {
+      if (!pm[l.id] || g[l.id] || !sus[l.id]) return;
+      var allele = interestingAllele(l);
+      if (sus[l.id].indexOf(allele) > -1 || sus[l.id].indexOf('?') > -1) out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')) + '?', level: pm[l.id], suspected: true });
+    });
     return out;
   }
   // Chance that a foal of a x b has each preferred gene: [{ id, name, level, p }] (p 0 to 1)
@@ -2711,6 +2741,25 @@
       var gene = res.genes.find(function (g) { return g.id === l.id; });
       var p = 0, allele = interestingAllele(l);
       if (gene) gene.outcomes.forEach(function (o) { if (o.genotype.split(' / ').indexOf(allele) > -1) p += o.pct / 100; });
+      // a parent with a suspected copy: average the chance over the "?" being the gene and not being it
+      var susA = suspectedGenes(state, aLife)[l.id], susB = suspectedGenes(state, bLife)[l.id];
+      if (susA || susB) {
+        var other = l.alleles.find(function (x) { return x !== allele; }) || allele;
+        var fill = function (parts, a1) { return parts.map(function (x) { return x === '?' ? a1 : x; }); };
+        var variantsA = susA ? [fill(susA, allele), fill(susA, other)] : [null], variantsB = susB ? [fill(susB, allele), fill(susB, other)] : [null];
+        var sum = 0, cnt = 0;
+        variantsA.forEach(function (va) {
+          variantsB.forEach(function (vb) {
+            var mA = Object.assign({}, manualGenes(state, aLife)), mB = Object.assign({}, manualGenes(state, bLife));
+            if (va) mA[l.id] = va;
+            if (vb) mB[l.id] = vb;
+            var r2 = colourOutcomes(a.testedColours, b.testedColours, mA, mB), g2 = r2.genes.find(function (g) { return g.id === l.id; }), q = 0;
+            if (g2) g2.outcomes.forEach(function (o) { if (o.genotype.split(' / ').indexOf(allele) > -1) q += o.pct / 100; });
+            sum += q; cnt++;
+          });
+        });
+        if (cnt) p = sum / cnt;
+      }
       out.push({ id: l.id, name: (l.label || l.name.replace(/ \(.*\)$/, '')), level: pm[l.id], p: p });
     });
     return out;
@@ -3534,7 +3583,7 @@
       }
       // genes you want to keep
       var allGenes = preferredGenesOf(state, x.life);
-      var keepGenes = allGenes.filter(function (g) { return g.level !== 'avoid'; });
+      var keepGenes = allGenes.filter(function (g) { return g.level !== 'avoid' && !g.suspected; });
       var avoidGenes = allGenes.filter(function (g) { return g.level === 'avoid'; });
       if (avoidGenes.length) { score += 2; reasons.push('Carries ' + avoidGenes.map(function (g) { return g.name; }).join(', ') + ', a gene you don\'t want'); }
       var hardGene = keepGenes.filter(function (g) { return g.level === 'keep'; });
@@ -3963,6 +4012,9 @@
     agoutiPlain: agoutiPlain,
     extraGenotypeOptions: extraGenotypeOptions,
     manualGenes: manualGenes,
+    suspectedGenes: suspectedGenes,
+    suspectedGenotypeOptions: suspectedGenotypeOptions,
+    peacockOf: peacockOf,
     adoptOwnedStallions: adoptOwnedStallions,
     ancestorMap: ancestorMap,
     commonAncestors: commonAncestors,

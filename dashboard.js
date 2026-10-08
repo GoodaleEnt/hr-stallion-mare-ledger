@@ -2467,7 +2467,7 @@
   }
   // Select per hand-entered gene for one horse. A gene Horse Reality itself
   // reports for that horse is shown read-only instead.
-  // "?/sty": one copy known, the other not sure
+  // "?/n": one copy known, the other not sure
   function suspectedOptionsHtml(locus, current) {
     var cur = current ? current.join('/') : '';
     return '<optgroup label="Suspected (not confirmed)">' + L.suspectedGenotypeOptions(locus).map(function (g) {
@@ -2488,7 +2488,7 @@
       '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">';
     L.MANUAL_LOCI.forEach(function (l) {
       var id = 'gene-' + life + '-' + l.id;
-      html += '<div class="field"><label for="' + id + '">' + L.esc(l.id === 'A' ? 'Agouti, hidden alleles (A+, At)' : l.name) + '</label>';
+      html += '<div class="field"><label for="' + id + '">' + L.esc(l.id === 'A' ? 'Agouti, hidden alleles (A+, At)' : l.name) + (l.id === 'STY' && L.isYoungInfo(info) ? ' \u2014 cannot be told before age 3' : '') + '</label>';
       if (l.id === 'A') {
         var curA = manual.A ? manual.A.join('/') : '';
         var opts = L.extraGenotypeOptions(l).filter(function (g) { return !tested.A || L.agoutiPlain(g.split('/')).join() === L.agoutiPlain(tested.A).join(); });
@@ -3122,7 +3122,7 @@
       '</div></details>';
   }
 
-  // Short text of the hand-entered genes saved on a horse, e.g. "Sooty Sty / sty".
+  // Short text of the hand-entered genes saved on a horse, e.g. "Sooty STY / n".
   function savedGenesText(lifeNumber) {
     var manual = L.manualGenes(state, lifeNumber);
     var sus = L.suspectedGenes(state, lifeNumber), pk = L.peacockOf(state, lifeNumber);

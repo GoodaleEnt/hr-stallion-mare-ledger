@@ -397,7 +397,9 @@
   // Modelled as simple dominant (or, for Flaxen, recessive) genes; real-world
   // interactions beyond that are not simulated.
   var EXTRA_LOCI = [
-    { id: 'STY', name: 'Sooty (Sty)', alleles: ['Sty', 'sty'], absent: ['sty', 'sty'], label: 'Sooty' },
+    // Sooty shows on a black-based coat (EE or Ee) with one copy, but on a chestnut (ee) it needs two (one copy is only a
+    // carrier). It cannot be seen on a foal until the foal turns 3.
+    { id: 'STY', name: 'Sooty (STY)', alleles: ['STY', 'n'], absent: ['n', 'n'], label: 'Sooty', sooty: true },
     { id: 'FL', name: 'Flaxen (F)', alleles: ['F', 'f'], absent: ['F', 'F'], recessive: true, label: 'Flaxen', only: 'chestnut' },
     { id: 'Z', name: 'Silver (Z)', alleles: ['Z', 'n'], absent: ['n', 'n'], label: 'Silver', only: 'blackBased' },
     { id: 'CH', name: 'Champagne (Ch)', alleles: ['Ch', 'n'], absent: ['n', 'n'], label: 'Champagne' },
@@ -421,8 +423,9 @@
   }
   // Flaxen is written ff (shows flaxen), Ff (carrier) and FF (not there). Genotypes saved before that as Fl / fl are read as F / f.
   function normGeneText(locusId, text) {
-    if (locusId !== 'FL') return String(text || '');
-    return String(text || '').split('/').map(function (p) { return p === 'Fl' ? 'F' : p === 'fl' ? 'f' : p; }).join('/');
+    var map = locusId === 'FL' ? { Fl: 'F', fl: 'f' } : locusId === 'STY' ? { Sty: 'STY', sty: 'n' } : null;
+    if (!map) return String(text || '');
+    return String(text || '').split('/').map(function (p) { return map[p] || p; }).join('/');
   }
   // How a genotype is written: flaxen as FF / Ff / ff, the others as "a / b"
   function genotypeText(locus, alleles) {
@@ -436,7 +439,17 @@
       var t = genotypeText(locus, parts);
       return t + (t === 'ff' ? ' (shows flaxen)' : t === 'Ff' ? ' (carrier)' : ' (not present)');
     }
+    if (locus.id === 'STY' && parts.indexOf('?') === -1) {
+      var n = parts.filter(function (x) { return x === 'STY'; }).length;
+      return g.replace('/', ' / ') + (n === 2 ? ' (sooty on any coat)' : n === 1 ? ' (sooty on a black-based coat, carrier on chestnut)' : ' (not present)');
+    }
     return g.replace('/', ' / ');
+  }
+  // Does the gene show on a coat? black-based = EE or Ee. Sooty shows with one copy on a black-based coat and needs two on a
+  // chestnut; flaxen only shows on a chestnut; silver only on a black-based coat. blackBased null = base not known.
+  function sootyShows(alleles, blackBased) {
+    var c = copies(alleles, 'STY');
+    return c === 2 || (c === 1 && blackBased === true);
   }
   // Hand-entered genotypes for one horse, validated against the gene table.
   function manualGenes(state, lifeNumber) {
@@ -448,7 +461,7 @@
     });
     return out;
   }
-  // Hidden genes you are not sure of: a "?" in place of one allele ("?/sty" = one copy of sty, the other not known). They are
+  // Hidden genes you are not sure of: a "?" in place of one allele ("?/n" = one copy of n, the other not known). They are
   // kept apart from the confirmed genotypes (so the colour odds are not changed) and count as a possible gene: the preferred
   // genes lists show them, and the chance a foal gets a gene counts a suspected copy as a coin toss.
   function suspectedGenes(state, lifeNumber) {
@@ -524,6 +537,7 @@
     if (id === 'LP') { c = copies(al, 'LP'); return c === 0 ? 'no leopard complex' : (c === 1 ? 'one LP copy' : 'two LP copies'); }
     if (id === 'PATN1') { c = copies(al, 'PATN1'); return c === 0 ? 'no PATN1' : (c === 1 ? 'one PATN1 copy' : 'two PATN1 copies'); }
     var extra = EXTRA_LOCI.find(function (l) { return l.id === id; });
+    if (extra && extra.sooty) { c = copies(al, 'STY'); return c === 2 ? 'sooty' : c === 1 ? 'sooty if black-based, carrier on chestnut' : 'no sooty'; }
     if (extra) {
       var shown = extra.recessive ? copies(al, extra.alleles[1]) === 2 : al.indexOf(extra.alleles[0]) > -1;
       return shown ? extra.label.toLowerCase() : 'no ' + extra.label.toLowerCase();
@@ -541,7 +555,7 @@
     EXTRA_LOCI.forEach(function (l) {
       var al = g[l.id];
       if (!al || l.only) return;
-      var expressed = l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1;
+      var expressed = l.sooty ? sootyShows(al, null) : (l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1);
       if (expressed) parts.push(l.label);
     });
     var name = 'Base colour unknown' + (parts.length ? ' + ' + parts.join(' + ') : '');
@@ -571,7 +585,7 @@
     EXTRA_LOCI.forEach(function (l) {
       var al = g[l.id];
       if (!al) return;
-      var expressed = l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1;
+      var expressed = l.sooty ? sootyShows(al, blackBased) : (l.recessive ? copies(al, l.alleles[1]) === 2 : al.indexOf(l.alleles[0]) > -1);
       if (!expressed) return;
       if (l.only === 'chestnut' && blackBased) return;
       if (l.only === 'blackBased' && !blackBased) return;
@@ -623,6 +637,9 @@
       } else if (l.recessive) {
         k = copies(al, l.alleles[1]);
         if (k === 2) { var pc = l.only === 'chestnut' && ctx.pChest != null ? ctx.pChest : 1; v += p * pc; c += p * (1 - pc); } else if (k === 1) c += p; else n += p;
+      } else if (l.sooty) {
+        k = copies(al, 'STY');
+        if (k === 2) v += p; else if (k === 1) { var pbs = ctx.pBlack == null ? 1 : ctx.pBlack; v += p * pbs; c += p * (1 - pbs); } else n += p;
       } else if (al.indexOf(l.alleles[0]) > -1) {
         var pd = l.only === 'blackBased' && ctx.pBlack != null ? ctx.pBlack : 1; v += p * pd; c += p * (1 - pd);
       } else n += p;
@@ -664,12 +681,13 @@
     var extras = EXTRA_LOCI.filter(function (l) { return dist[l.id] && touched[l.id]; }).map(function (l) {
       var shown = 0;
       dist[l.id].forEach(function (o) {
+        if (l.sooty) { var kk = copies(o.alleles, 'STY'); shown += o.p * (kk === 2 ? 1 : kk === 1 ? (ctx.pBlack == null ? 1 : ctx.pBlack) : 0); return; }
         var expressed = l.recessive ? copies(o.alleles, l.alleles[1]) === 2 : o.alleles.indexOf(l.alleles[0]) > -1;
         if (expressed) shown += o.p;
       });
       return {
         id: l.id, name: l.name, label: l.label, pct: shown * 100,
-        note: l.only === 'chestnut' ? 'shows on chestnut coats only' : (l.only === 'blackBased' ? 'shows on black-based coats only' : ''),
+        note: l.sooty ? 'one copy shows on a black-based coat, a chestnut needs two; cannot be seen on a foal until it turns 3' : (l.only === 'chestnut' ? 'shows on chestnut coats only' : (l.only === 'blackBased' ? 'shows on black-based coats only' : '')),
         outcomes: dist[l.id].map(function (o) { return { genotype: o.alleles.join(' / '), label: genotypeText(l, o.alleles), pct: o.p * 100 }; })
       };
     });

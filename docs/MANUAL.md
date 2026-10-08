@@ -254,13 +254,19 @@ The **Mare** and **Stallion** boxes in the Foal Calculator are typeahead boxes: 
 
 Under **My notes → Breeding partners**, add the Horse Reality user names of up to 20 players whose stallions you breed to. Their stallions saved in the ledger are marked **Partner** on the suggestion cards and ranked a little higher, and `#partner` (or `#bp`) in a list filter finds their horses. Horses of theirs you open are saved like any other horse.
 
+### How each gene shows
+
+- **Dominant, shows with one copy:** Tobiano, Sabino, Agouti (A), White spotting (W20), Champagne, Roan and Silver (silver only on a black-based coat).
+- **Flaxen is recessive:** it shows only with two copies (**ff**) and only on a chestnut; **Ff** is a carrier and **FF** is not there.
+- **Sooty** is written **STY / STY**, **STY / n** and **n / n**. On a black-based coat (EE or Ee) one copy shows; on a chestnut (ee) it needs **STY / STY**, and STY / n is only a carrier. Sooty cannot be told on a foal until it turns 3 (the gene editor says so for a horse under 3). Genotypes saved earlier as Sty / sty are read as STY / n.
+
 ### Flaxen notation
 
 Flaxen is written **ff** (shows flaxen), **Ff** (carrier) and **FF** (not there), in the Extra genes choices, the genetics chips and the Foal Calculator's colour odds. Flaxen only shows on a chestnut. Genotypes you saved earlier as Fl / fl are read as F / f automatically.
 
 ### Suspected genes and Peacock
 
-In **Extra genes** on a horse's page, each hidden gene has a **Suspected (not confirmed)** group of choices such as `? / sty` (one copy of sty, the other not known). A suspected copy does not change the colour odds, but it counts as a possible gene: it shows as an italic chip, appears in the preferred and unwanted gene lists with a **?** (a suspected unwanted gene counts against the horse; a suspected preferred one does not protect it), and the Foal Calculator's chance of a gene counts a suspected copy as a coin toss. **Peacock** has its own tick box and a line-strength estimate (0 to 100%); `#peacock` in a list filter finds those horses.
+In **Extra genes** on a horse's page, each hidden gene has a **Suspected (not confirmed)** group of choices such as `? / n` (one copy of sty, the other not known). A suspected copy does not change the colour odds, but it counts as a possible gene: it shows as an italic chip, appears in the preferred and unwanted gene lists with a **?** (a suspected unwanted gene counts against the horse; a suspected preferred one does not protect it), and the Foal Calculator's chance of a gene counts a suspected copy as a coin toss. **Peacock** has its own tick box and a line-strength estimate (0 to 100%); `#peacock` in a list filter finds those horses.
 
 ### Address-bar search and the side panel
 

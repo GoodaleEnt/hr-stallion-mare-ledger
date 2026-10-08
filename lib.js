@@ -757,7 +757,7 @@
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
-    if (!t) return null;
+    if (!t) return info && info.tagCounts ? Object.assign({ VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, info.tagCounts) : null;
     // Ratings: Very good (VG), Good+ (G+), Good (G), Average (A), Below average (BA).
     var c = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 };
     Object.keys(t).forEach(function (k) {
@@ -2376,6 +2376,81 @@
     return { chips: chips, extraPills: extra, verdict: verdict, paint: paint, hover: lines.join('\n'), mares: mares, bench: null, judged: judged.length };
   }
 
+  // ---------- taglines written by HRToolkit, read from the ranch page ----------
+  // With HRToolkit installed, each horse's tagline holds numbers the ledger would otherwise need a visit to the horse's
+  // page for, e.g. "3G|6A|3BA|580|64|69.176" = 3 Good, 6 Average, 3 Below average traits | genetic potential 580 | Breed
+  // Total 64 (rounded) | conformation score 69.176, and its private stable tag "69.18-62.69|GGGGG" = all-time high and low
+  // conformation | the five health ratings (colic, hoof, back, respiratory, lameness). The ranch page lists every horse, so one
+  // visit fills them all. A tag is only used when its numbers agree with each other (the Breed Total must match the genetic
+  // potential and conformation), so a differently laid out tagline is ignored.
+  function parseToolkitTagline(text) {
+    var parts = String(text || '').replace(/\s+/g, '').split('|');
+    if (parts.length < 3) return null;
+    var conf = parseFloat(parts[parts.length - 1]), bt = parseInt(parts[parts.length - 2], 10), gp = parseInt(parts[parts.length - 3], 10);
+    if (!(conf >= 20 && conf <= 100) || !(bt >= 20 && bt <= 100) || !(gp >= 300 && gp <= 1000)) return null;
+    if (!/^\d+(\.\d+)?$/.test(parts[parts.length - 1]) || !/^\d+$/.test(parts[parts.length - 2]) || !/^\d+$/.test(parts[parts.length - 3])) return null;
+    if (Math.abs(Math.round((gp / 10 + conf) / 2) - bt) > 1) return null;
+    var counts = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, n = 0;
+    for (var i = 0; i < parts.length - 3; i++) {
+      var m = /^(\d+)(VG|G\+|G|A|BA)$/i.exec(parts[i]);
+      if (!m) return null;
+      var k = m[2].toUpperCase() === 'G+' ? 'GP' : m[2].toUpperCase();
+      counts[k] += parseInt(m[1], 10); n++;
+    }
+    return { counts: n ? counts : null, gp: gp, bt: bt, conf: conf };
+  }
+  var TOOLKIT_HEALTH_ORDER = ['Colic resistance', 'Hoof quality', 'Back problems', 'Respiratory disease', 'Resistance to lameness'];
+  var TOOLKIT_RATING = { E: 'Excellent', G: 'Good', A: 'Average', F: 'Fair', P: 'Poor' };
+  function parseToolkitPrivateTag(text) {
+    var m = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\|([EGAFPegafp]{5})$/.exec(String(text || '').replace(/\s+/g, ''));
+    if (!m) return null;
+    var a = parseFloat(m[1]), b = parseFloat(m[2]);
+    if (!(a >= 20 && a <= 100 && b >= 20 && b <= 100)) return null;
+    return { high: Math.max(a, b), low: Math.min(a, b), health: m[3].toUpperCase().split('') };
+  }
+  // Puts what the tags say into the ledger for one horse; returns true when anything changed.
+  function applyToolkitTags(state, life, tagline, priv) {
+    life = String(life || '');
+    var info = state.horseInfo && state.horseInfo[life];
+    if (!info) return false;
+    var changed = false;
+    state.horseMeta = state.horseMeta || {};
+    var meta = Object.assign({}, state.horseMeta[life]);
+    if (tagline) {
+      if (!(Number(info.geneticPotential) > 0)) { info.geneticPotential = tagline.gp; changed = true; }
+      if (tagline.conf > (Number(meta.confBest) || 0)) { meta.confBest = tagline.conf; meta.confBestAt = Date.now(); meta.confBestEvent = 'HRToolkit tag'; meta.confBestDate = ''; changed = true; }
+      if (tagline.counts && !info.confTraits) {
+        var same = info.tagCounts && JSON.stringify(info.tagCounts) === JSON.stringify(tagline.counts);
+        if (!same) { info.tagCounts = tagline.counts; changed = true; }
+      }
+    }
+    if (priv) {
+      if (priv.high > (Number(meta.confBest) || 0) + 0.006) { meta.confBest = priv.high; meta.confBestAt = Date.now(); meta.confBestEvent = 'HRToolkit all-time high'; meta.confBestDate = ''; changed = true; }
+      // the all-time low and range (see recordLowScore for the guard)
+      if (recordLowScore(meta, priv.low, Math.max(priv.high, Number(meta.confBest) || 0), 'HRToolkit all-time low')) changed = true;
+      if (!info.health && !info.healthFromTag) {
+        var h = {};
+        priv.health.forEach(function (c, i) { if (TOOLKIT_RATING[c]) h[TOOLKIT_HEALTH_ORDER[i]] = TOOLKIT_RATING[c]; });
+        info.health = h; info.healthFromTag = true; changed = true;
+      }
+    }
+    if (changed) { meta.toolkitSeenAt = Date.now(); state.horseMeta[life] = meta; }
+    return changed;
+  }
+  // The lowest conformation score a horse has had. Only ever goes down, and a low further than MAX_SCORE_RANGE below the
+  // all-time high is ignored (a wrongly entered show would otherwise drag it out of reach). Returns true if it changed.
+  var MAX_SCORE_RANGE = 12;
+  function recordLowScore(meta, low, high, source, force) {
+    low = Number(low);
+    if (!(low > 0)) return false;
+    var cur = Number(meta.confLow) || 0;
+    if (!force && high > 0 && high - low > MAX_SCORE_RANGE) return false;
+    if (cur > 0 && low >= cur && !force) return false;
+    if (low === cur) return false;
+    meta.confLow = low; meta.confLowAt = Date.now(); meta.confLowSource = source || '';
+    return true;
+  }
+
   // ---------- listing a horse for sale and retiring it ----------
   // A horse you list gets the status For Sale and a log of the prices you ask (horseMeta[life].askLog); a price change
   // adds a line. A horse you retire gets the status Retired and the date. A horse already Sold or Retired is not
@@ -3680,6 +3755,11 @@
     askSummary: askSummary,
     buyCriteriaOf: buyCriteriaOf,
     marketRowInfo: marketRowInfo,
+    parseToolkitTagline: parseToolkitTagline,
+    parseToolkitPrivateTag: parseToolkitPrivateTag,
+    applyToolkitTags: applyToolkitTags,
+    recordLowScore: recordLowScore,
+    MAX_SCORE_RANGE: MAX_SCORE_RANGE,
     studRowInfo: studRowInfo,
     pairEstimate: pairEstimate,
     marketComps: marketComps,

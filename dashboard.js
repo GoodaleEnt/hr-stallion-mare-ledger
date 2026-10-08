@@ -2302,10 +2302,12 @@
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var info = (state.horseInfo && state.horseInfo[life]) || {};
     var conf = L.bestConformation(meta).best;
-    var out = { conf: null, bt: null };
+    var out = { conf: null, bt: null, low: null };
     if (conf) {
       out.conf = { value: round3(conf), when: highDateText(meta.confBestDate, meta.confBestAt), event: meta.confBestEvent || '' };
     }
+    var lowV = Number(meta.confLow) || 0;
+    if (conf && lowV && lowV <= conf) out.low = { value: round3(lowV), range: round3(conf - lowV), source: meta.confLowSource || '' };
     var btNow = L.breedTotal(info.geneticPotential, conf);
     var btVal = Math.max(Number(meta.btBest) || 0, btNow);
     if (btVal) {
@@ -2326,6 +2328,7 @@
     if (h.conf) {
       out += '<div class="row"><span>Top conformation</span><span class="v mono">' + L.esc(h.conf.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.conf.when, h.conf.event].filter(Boolean).join(' · ')) + '</div>';
+      if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + ')</span></span></div>';
     }
     if (h.bt) {
       out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
@@ -2827,6 +2830,10 @@
       var n = parseFloat(String(value).replace(',', '.'));
       if (isFinite(n) && n > 0 && n <= 100) { meta.confBest = n; meta.confBestAt = Date.now(); if (!meta.confBestEvent || meta.confBestEvent === 'entered by hand') meta.confBestEvent = 'entered by hand'; }
       else { delete meta.confBest; delete meta.confBestAt; delete meta.confBestDate; delete meta.confBestEvent; }
+    } else if (field === 'confLow') {
+      var lw = parseFloat(String(value).replace(',', '.'));
+      if (isFinite(lw) && lw > 0 && lw <= 100) { meta.confLow = lw; meta.confLowAt = Date.now(); meta.confLowSource = 'entered by hand'; }
+      else { delete meta.confLow; delete meta.confLowAt; delete meta.confLowSource; }
     } else if (field === 'confBestDate') { meta.confBestDate = String(value || '').trim(); }
     else if (field === 'confBestEvent') { meta.confBestEvent = String(value || '').trim().slice(0, 90); }
     persist();
@@ -2838,9 +2845,10 @@
     return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Highest conformation score \u2014 ' + (b.best ? L.esc(Math.round(b.best * 1000) / 1000) : 'not recorded') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' +
         '<div class="field"><label for="hb-score-' + life + '">Highest score</label><input id="hb-score-' + life + '" type="number" min="0" max="100" step="any" data-action="horse-best" data-life="' + life + '" data-field="confBest" value="' + (meta.confBest ? L.esc(meta.confBest) : '') + '" placeholder="e.g. 87.425"></div>' +
+        '<div class="field"><label for="hb-low-' + life + '">Lowest score (range ' + (meta.confLow && b.best ? L.esc(Math.round((b.best - meta.confLow) * 1000) / 1000) : '—') + ')</label><input id="hb-low-' + life + '" type="number" min="0" max="100" step="any" data-action="horse-best" data-life="' + life + '" data-field="confLow" value="' + (meta.confLow ? L.esc(meta.confLow) : '') + '" placeholder="e.g. 80.1"></div>' +
         '<div class="field"><label for="hb-date-' + life + '">Date earned (optional)</label><input id="hb-date-' + life + '" type="date" data-action="horse-best" data-life="' + life + '" data-field="confBestDate" value="' + L.esc(meta.confBestDate || '') + '"></div>' +
         '<div class="field"><label for="hb-event-' + life + '">Show (optional)</label><input id="hb-event-' + life + '" type="text" data-action="horse-best" data-life="' + life + '" data-field="confBestEvent" value="' + L.esc(meta.confBestEvent || '') + '" placeholder="e.g. Dressage, Oct 2026"></div>' +
-        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Horse Reality\'s stats page only lists recent shows, so a horse with many shows (often one you bought) can have a higher best score than the ledger has read. Enter it here and it is used for Breed Total, rankings and suggestions. A higher score read later from a page replaces it; clear the box to remove it.' + (shows ? ' ' + shows + ' show result' + (shows === 1 ? '' : 's') + ' saved from results pages.' : '') + '</p>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Horse Reality\'s stats page only lists recent shows, so a horse with many shows (often one you bought) can have a higher best score than the ledger has read. Enter it here and it is used for Breed Total, rankings and suggestions. A higher score read later from a page replaces it; clear the box to remove it. The lowest score only ever goes down, and one read automatically that is more than ' + L.MAX_SCORE_RANGE + ' points under the highest is ignored (a wrongly entered show would otherwise stretch the range); one you enter by hand is always kept.' + (shows ? ' ' + shows + ' show result' + (shows === 1 ? '' : 's') + ' saved from results pages.' : '') + '</p>' +
       '</div></details>';
   }
   function purchaseDetailsHtml(lifeNumber) {

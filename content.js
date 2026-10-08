@@ -1153,7 +1153,8 @@
     return '';
   }
   function readConfoHighs() {
-    var highs = [];
+    var highs = [], lows = [];
+    highs.lows = lows;
     function number(text) {
       var m = /\d+(?:\.\d+)?/.exec(String(text || '').replace(/,/g, ''));
       return m ? parseFloat(m[0]) : NaN;
@@ -1179,15 +1180,18 @@
           if (d && !date) date = d; else if (!d) details.push(t);
         }
         highs.push({ value: value, date: date, event: details.join(' · ').slice(0, 90) });
+        lows.push(value);
       });
     });
     document.querySelectorAll('tr').forEach(function (tr) {
       var cells = tr.querySelectorAll('th, td');
       if (cells.length < 2) return;
       var label = (cells[0].textContent || '').replace(/\s+/g, ' ').trim();
-      if (!/^(all-time|current) confo$/i.test(label)) return;
+      var isLow = /^all-time low( confo)?$/i.test(label);
+      if (!/^(all-time|current) confo$/i.test(label) && !isLow) return;
       var value = number(cells[1].textContent);
-      if (isFinite(value) && value > 0) highs.push({ value: value, date: '', event: 'HRToolkit all-time' });
+      if (!(isFinite(value) && value > 0)) return;
+      if (isLow) lows.push(value); else highs.push({ value: value, date: '', event: 'HRToolkit all-time' });
     });
     return highs;
   }
@@ -1207,9 +1211,12 @@
         var meta = Object.assign({}, state.horseMeta[id]);
         var prev = Number(meta.confBest) || 0;
         var raised = best > prev;
+        // the lowest of the scores listed (and HRToolkit's all-time low) counts as the low when it is within the range guard
+        var lowMoved = false;
+        (highs.lows || []).forEach(function (lv) { if (HRLib.recordLowScore(meta, lv, Math.max(best, prev), 'show results')) lowMoved = true; });
         // A same-score re-read can still fill in a date/details that were missing.
         var fillsDetails = best === prev && ((top.date && !meta.confBestDate) || (top.event && !meta.confBestEvent));
-        if (!raised && !fillsDetails) return;
+        if (!raised && !fillsDetails) { if (lowMoved) { state.horseMeta[id] = meta; HRStorage.setState(state); } return; }
         meta.confBest = best;
         if (raised) meta.confBestAt = Date.now();
         if (top.date || raised) meta.confBestDate = top.date || '';
@@ -1730,22 +1737,30 @@
       var el = li.querySelector('.breed-and-age .age.desktop') || li.querySelector('.breed-and-age .age');
       var text = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
       var months = HRLib.parseAgeText(text);
-      if (months != null) seen.push({ life: li.getAttribute('data-horse'), text: text, months: months });
+      // HRToolkit's tagline and private stable tag on the card
+      var tagline = null, priv = null;
+      li.querySelectorAll('.name-and-tagline .tagline').forEach(function (t) {
+        var tt = (t.textContent || '').trim();
+        if (t.hasAttribute('data-hrtoolkit-stable-private-tag')) priv = priv || HRLib.parseToolkitPrivateTag(tt);
+        else tagline = tagline || HRLib.parseToolkitTagline(tt);
+      });
+      if (months != null || tagline || priv) seen.push({ life: li.getAttribute('data-horse'), text: text, months: months, tagline: tagline, priv: priv });
     });
-    var sig = seen.map(function (s) { return s.life + ':' + s.months; }).join(',');
+    var sig = seen.map(function (s) { return s.life + ':' + s.months + ':' + JSON.stringify(s.tagline) + JSON.stringify(s.priv); }).join(',');
     if (!seen.length || sig === ranchAgeDone) return;
     HRStorage.getState(function (state) {
       var changed = 0;
       seen.forEach(function (s) {
         var info = state.horseInfo && state.horseInfo[s.life];
         if (!info) return;
-        if (info.ageMonths === s.months && info.ageText === s.text) return;
-        info.ageMonths = s.months; info.ageText = s.text; info.ageAt = Date.now();
-        changed++;
+        var did = false;
+        if (s.months != null && !(info.ageMonths === s.months && info.ageText === s.text)) { info.ageMonths = s.months; info.ageText = s.text; info.ageAt = Date.now(); did = true; }
+        if ((s.tagline || s.priv) && HRLib.applyToolkitTags(state, s.life, s.tagline, s.priv)) did = true;
+        if (did) changed++;
       });
       ranchAgeDone = sig;
       if (!changed) return;
-      HRStorage.setState(state, function () { showToast('HR Ledger: ' + changed + ' horse age' + (changed === 1 ? '' : 's') + ' read from the ranch page'); });
+      HRStorage.setState(state, function () { showToast('HR Ledger: ' + changed + ' horse' + (changed === 1 ? '' : 's') + ' updated from the ranch page (age, scores, tags)'); });
     });
   }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
@@ -1964,6 +1979,7 @@
         if (existing) { if (existing.score !== r.score || existing.rank !== r.rank) { Object.assign(existing, entry); changed = true; } }
         else { log.push(entry); changed = true; }
         var prev = Number(meta.confBest) || 0;
+        if (HRLib.recordLowScore(meta, r.score, Math.max(r.score, prev), 'show results')) changed = true;
         if (r.score > prev) {
           meta.confBest = r.score; meta.confBestAt = Date.now(); meta.confBestDate = ''; meta.confBestEvent = res.name.slice(0, 90);
           raisedCount++; changed = true;

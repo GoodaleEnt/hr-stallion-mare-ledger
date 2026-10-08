@@ -1736,10 +1736,8 @@
         function stud(b) { return b.name + (b.estBT != null ? ' \u00b7 BT ' + b.estBT : ''); }
         // the best stallion for a free mare is worked out afterwards, a few at a time while the browser is idle
         if (a.freeMare) queue.push({ life: li.getAttribute('data-horse'), show: function (pa) {
-          if (pa.best && pa.bestOwn) {
-            pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F');
-            pill('\u2191 Better: ' + stud(pa.best) + (pa.best.cost ? ' \u00b7 ' + pa.best.cost : ''), '#5B3E8A');
-          } else if (pa.best) pill('\u2192 ' + stud(pa.best) + (pa.best.yours ? ' (yours)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), pa.best.yours ? '#2E3B1F' : '#5B3E8A');
+          if (pa.bestOwn) pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F');
+          if (pa.best && !pa.best.yours) pill('\u2192 Other: ' + stud(pa.best) + (pa.best.unlisted ? ' (no fee saved)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), '#5B3E8A');
           if (pa.reasons.length) box.title = box.title + '\n\n' + pa.reasons.join('\n');
         } });
         // the very bottom of the card, so it sits in the same place on every card

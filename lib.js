@@ -1490,16 +1490,20 @@
   // { best, bestOwn, reasons }. Slow-ish (it looks at every stallion), so the ranch page asks for it a mare at a time.
   function partnerAdvice(state, l) {
     var out = { best: null, bestOwn: null, reasons: [] };
-    var sg = breedingSuggestions(state, l, 20), top = sg.suggestions && sg.suggestions[0];
-    var ownTop = (sg.suggestions || []).find(function (t) { return t.yours; });
-    var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, yours: t.yours, cost: t.terms && t.terms.summary ? t.terms.summary : '' }; };
-    if (ownTop && top && top !== ownTop) out.bestOwn = pack(ownTop);
-    if (top) {
-      out.best = pack(top);
-      if (out.bestOwn) out.reasons.push('Best of your own stallions: ' + out.bestOwn.name + (out.bestOwn.estBT != null ? ' (estimated foal Breed Total ' + out.bestOwn.estBT + ')' : ''));
-      out.reasons.push((out.bestOwn ? 'Better stallion in the ledger: ' : 'Best stallion to breed her to: ') + top.name + (top.estBT != null ? ' (estimated foal Breed Total ' + top.estBT + ')' : '') + (top.yours ? ', your own stallion' : top.terms && top.terms.summary ? ', ' + top.terms.summary : ''));
-      (top.reasons || []).slice(0, 3).forEach(function (t) { out.reasons.push('  ' + t); });
-    } else if (sg.error !== 'young') out.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')');
+    var sg = breedingSuggestions(state, l, 40);
+    var pack = function (t) { return { life: t.life, name: t.name, estBT: t.estBT, conf: t.conf, yours: t.yours, unlisted: !!t.unlisted, cost: t.yours ? '' : (t.terms && t.terms.summary ? t.terms.summary : 'no fee saved') }; };
+    var mine = sg.mine || [], others = sg.others || [];
+    if (!mine.length && !others.length) { if (sg.error !== 'young') out.reasons.push('No stallion suggestion yet (' + (sg.noData ? 'some horses are missing saved data' : 'none available') + ')'); return out; }
+    out.bestOwn = mine[0] ? pack(mine[0]) : null;
+    // the best-crossing stallion of another player that is saved in the ledger (marked when no fee is known)
+    var bestOther = others[0] || null;
+    out.best = bestOther ? pack(bestOther) : (mine[0] ? pack(mine[0]) : null);
+    var line = function (t, i) { return '  ' + (i + 1) + '. ' + t.name + ' \u2014 expected foal conformation ' + (t.conf != null ? t.conf : '?') + ', GP ' + Math.round(t.gp) + (t.traitAvg != null ? ', ' + (t.weakTraits || 0) + ' weak traits' : '') + (t.yours ? '' : (t.terms && t.terms.summary ? ' \u00b7 ' + t.terms.summary : ' \u00b7 no stud fee saved')); };
+    if (mine.length) { out.reasons.push('YOUR STALLIONS (top ' + mine.length + ')'); mine.forEach(function (t, i) { out.reasons.push(line(t, i)); }); }
+    if (others.length) { out.reasons.push('OTHER PLAYERS\u2019 STALLIONS SAVED IN THE LEDGER (top ' + others.length + ')'); others.forEach(function (t, i) { out.reasons.push(line(t, i)); }); }
+    var top = bestOther || mine[0];
+    out.reasons.push('', 'Why ' + top.name + ': ');
+    (top.reasons || []).slice(0, 4).forEach(function (t) { out.reasons.push('  ' + t); });
     return out;
   }
   function herdAdvice(state, lives, opts) {
@@ -1541,6 +1545,19 @@
     if (rec && rec.owned !== false) return rec.status === 'Active' || (!rec.status && meta.status !== 'Observation');
     return false;
   }
+  // 'yes': yours and active, or has a stud fee / semen saved; 'unlisted': another player's stallion that is saved in the
+  // ledger but no fee is known (he may not be at stud, so he is offered with a note); 'no': retired, sold or deceased
+  function stallionUsable(state, life) {
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var info = state.horseInfo && state.horseInfo[life], meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    var inactive = function (st) { return st === 'Retired' || st === 'Sold' || st === 'Deceased'; };
+    if (inactive(meta.status) || (rec && inactive(rec.status))) return 'no';
+    if (stallionAvailable(state, life)) return 'yes';
+    var mine = !!me && info && String(info.ownerName || '').trim().toLowerCase() === me;
+    if (mine) return meta.status === 'Observation' || meta.status === 'Companion' ? 'no' : 'yes';
+    return 'unlisted';
+  }
   function breedingSuggestions(state, mareLife, limit) {
     mareLife = String(mareLife || '');
     var mInfo = state.horseInfo && state.horseInfo[mareLife];
@@ -1560,7 +1577,8 @@
       var sInfo = state.horseInfo[life];
       if (!sInfo || sInfo.sex !== 'stallion' || isYoungInfo(sInfo)) return;
       if (!sameBreed(sInfo, mInfo)) return;
-      if (!stallionAvailable(state, life)) { out.notAvailable++; return; }
+      var usable = stallionUsable(state, life);
+      if (usable === 'no') { out.notAvailable++; return; }
       var noteFx = partnerNoteEffect(state, mareLife, life);
       if (noteFx.skip) { out.byNotes++; return; }
       var sMeta = (state.horseMeta && state.horseMeta[life]) || {};
@@ -1601,6 +1619,7 @@
       var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
       var yours = !!(rec && rec.owned !== false);
       var terms = yours ? null : studTermsOf(state, life);
+      var isMineHorse = yours || usable === 'yes' && !terms && String((sInfo.ownerName || '')).trim().toLowerCase() === String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
       // what she and he have produced together already
       var hist = { foals: 0, failed: 0, bestScore: 0 };
       if (rec) {
@@ -1623,6 +1642,7 @@
       else reasons.push('His fertility is not recorded' + (isYoungInfo(sInfo) ? '' : ' (open his page after a fertility test)'));
       var lf = LM.on ? learnedFailure(state, life) : null;
       if (lf && lf.expected != null && Math.abs(lf.rate - lf.expected) >= 0.1) { learnedFail = (lf.expected - lf.rate) * 5; reasons.push('Learned: ' + lf.failed + ' of his ' + lf.n + ' coverings failed (' + Math.round(lf.rate * 100) + '%), against ' + Math.round(lf.expected * 100) + '% expected for his fertility'); }
+      if (usable === 'unlisted') reasons.push('No stud fee or semen saved for him, so he may not be at stud (open his page or the Studs & Semen market to check)');
       if (yours) reasons.push('Your own stallion: no stud fee');
       else if (terms) reasons.push('Cost: ' + terms.summary);
       else reasons.push('Stud fee not known yet (open his page or his Breed page to record it)');
@@ -1632,7 +1652,7 @@
       var geneFx = preferredGeneBonus(state, mareLife, life);
       geneFx.reasons.forEach(function (r) { reasons.push(r); });
       var score = baseScore + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + learnedFail + noteFx.bonus + geneFx.bonus;
-      list.push({ life: life, conf: conf != null ? Math.round(conf * 10) / 10 : null, traitAvg: foalExp.traitAvg, weakTraits: tr.weak, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
+      list.push({ unlisted: usable === 'unlisted', life: life, conf: conf != null ? Math.round(conf * 10) / 10 : null, traitAvg: foalExp.traitAvg, weakTraits: tr.weak, name: sInfo.name || ('#' + life), yours: yours, gp: Math.round(gp * 10) / 10, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, terms: terms, reasons: reasons, score: score });
     });
     // a breeder focus lifts partners that are strong in it (by how far above the others they stand)
     var FXp = focusOf(state);
@@ -1654,6 +1674,9 @@
     }
     list.sort(function (a, b) { return b.score - a.score; });
     out.suggestions = list.slice(0, limit || 10);
+    // your own stallions and other players' stallions, each ranked on its own
+    out.mine = list.filter(function (x) { return x.yours; }).slice(0, 5);
+    out.others = list.filter(function (x) { return !x.yours; }).slice(0, 5);
     return out;
   }
 
@@ -2841,7 +2864,8 @@
       if (ci.geneticPotential == null || info.geneticPotential == null) return;
       if (!isMare && mareBreedStatus(state, cl).status) return;
       if (!sameBreed(ci, info)) return;
-      if (isMare && !stallionAvailable(state, cl)) { out.notAvailable++; return; }
+      var usableQ = isMare ? stallionUsable(state, cl) : 'yes';
+      if (usableQ === 'no') { out.notAvailable++; return; }
       var noteFx = partnerNoteEffect(state, life, cl);
       if (noteFx.skip) { out.byNotes++; return; }
       var maxFee = parseFloat(state.settings && state.settings.calcMaxFee);
@@ -2890,12 +2914,12 @@
       if (fixes.length) reasons.push('Covers ' + fixes.join(', '));
       if (shared.length) reasons.push('Both weak in ' + shared.join(', '));
       if (myMet && otherMet) reasons.push('Both parents meet your goals');
-      if (isMare && !mine) { var terms = studTermsOf(state, cl); if (terms) reasons.push('Cost: ' + terms.summary); }
+      if (isMare && !mine) { var terms = studTermsOf(state, cl); if (terms) reasons.push('Cost: ' + terms.summary); else if (usableQ === 'unlisted') reasons.push('No stud fee or semen saved for him, so he may not be at stud'); }
       if (noteFx.reason) reasons.push(noteFx.reason);
       var geneFx2 = preferredGeneBonus(state, life, cl);
       geneFx2.reasons.forEach(function (r) { reasons.push(r); });
       var score = (conf != null ? foalScoreOf(foalQ, FXq) / 2 : gp / 10) + 0.3 * fixes.length - 0.6 * shared.length - 0.2 * coi + fertBonus * (overallRules.fertilityMatters ? 2.5 : 1) + (fits ? 1 : 0) + (myMet && otherMet ? 0.5 : 0) + noteFx.bonus + geneFx2.bonus;
-      list.push({ life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
+      list.push({ unlisted: usableQ === 'unlisted', life: cl, name: ci.name || ('#' + cl), mine: mine, fits: fits, estBT: estBT != null ? Math.round(estBT * 10) / 10 : null, coi: Math.round(coi * 100) / 100, score: score, reasons: reasons });
     });
     list.sort(function (a, b) { return b.score - a.score; });
     out.mine = list.filter(function (x) { return x.mine; }).slice(0, limit || 10);

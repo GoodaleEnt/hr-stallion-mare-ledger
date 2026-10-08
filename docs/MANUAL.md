@@ -252,6 +252,8 @@ On your ranch page, a blue **◆ Ranged** pill under the keep/sell badge (an ill
 
 ![The Ranged pill on a ranch page card](images/13-ranged-ranch-card.png)
 
+**On a show entry page** (conformation shows and the discipline competitions, the page where you tick horses and press Enter), every horse gets a coloured badge and a coloured edge: blue **◆ Ranged 6.928 / 6.928**, orange **Range 6.846 / 6.928 — 0.082 to go** (still worth showing), or grey **Range unknown** (no lowest score saved yet). A bar above the list counts them and has a **Tick the ones not ranged** button, which ticks every horse that still needs showing and unticks the ranged ones. Nothing is entered until you press the site's own Enter button.
+
 ### Competition scores
 
 The highest and lowest **competition** score of each horse, overall and per discipline (Dressage, Driving, Endurance, Eventing, Flat Racing, Show Jumping, Western Reining, Basic Training), is read from a competition's **results page** (a list of horses with a score; the discipline comes from the page title or address) and from the competition results block on a horse's **stats page**. A message says how many scores were read. They show in a **Competition scores** box on the horse's page. Conformation shows are kept separate.

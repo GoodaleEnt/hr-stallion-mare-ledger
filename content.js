@@ -2034,6 +2034,80 @@
     });
     return out.rows.length ? out : null;
   }
+  // ---- the conformation show entry page: who is ranged, and how far the others have to go ----
+  // Each horse in the entry list gets its range (highest minus lowest score) out of the full range for its breed, and
+  // "Ranged" once it is complete, so the horses that still need showing stand out. A button ticks the ones not ranged yet.
+  var entrySig = '';
+  function annotateShowEntry() {
+    if (!/\/(conformation-shows|competitions)\//.test(location.pathname) || !/\/enter\/?$/.test(location.pathname)) return;
+    var rows = document.querySelectorAll('.responsive-table-body .responsive-tr');
+    if (!rows.length) return;
+    var sig = rows.length + '|' + document.querySelectorAll('.hr-range-badge').length;
+    if (sig === entrySig && document.getElementById('hr-range-bar')) return;
+    HRStorage.peekState(function (state) {
+      var L = HRLib, counts = { ranged: 0, open: 0, unknown: 0 }, todo = [];
+      rows.forEach(function (row) {
+        var a = row.querySelector('a[href*="/horses/"]');
+        var m = a && /\/horses\/(\d+)/.exec(a.getAttribute('href') || '');
+        var tag = row.querySelector('.horse-tagline');
+        if (!m || !tag) return;
+        var life = m[1], meta = (state.horseMeta && state.horseMeta[life]) || {}, info = (state.horseInfo && state.horseInfo[life]) || {};
+        var stats = 0;
+        (tag.textContent.match(/\d+(?:\+\d+)?(?:VG|GP|G|BA|A)\b/g) || []).forEach(function (t) { (t.match(/\d+/g) || []).forEach(function (n) { stats += Number(n); }); });
+        var full = L.fullScoreRange(info) || L.fullScoreRange({ tagCounts: { G: stats } });
+        var high = Number(meta.confBest) || 0, low = Number(meta.confLow) || 0;
+        var kind, text, title;
+        if (high > 0 && low > 0 && low <= high) {
+          var range = Math.round((high - low) * 1000) / 1000;
+          if (full && range >= full - 0.002) { kind = 'ranged'; text = '◆ Ranged ' + range + (full ? ' / ' + full : ''); }
+          else { kind = 'open'; text = 'Range ' + range + (full ? ' / ' + full : '') + (full ? ' — ' + Math.round((full - range) * 1000) / 1000 + ' to go' : ''); }
+          title = 'High ' + high + ', low ' + low + '. A horse is ranged when high minus low reaches the full range for its breed' + (full ? ' (' + full + ')' : ' (not known for this breed)') + '.';
+        } else {
+          kind = 'unknown'; text = 'Range unknown' + (high > 0 ? ' — high ' + high + ', no low yet' : ' — no scores saved');
+          title = 'The ledger has no lowest score for this horse yet. Show it, or enter its high and low on its page.';
+        }
+        counts[kind]++;
+        if (kind !== 'ranged') todo.push(row);
+        var old = row.querySelector('.hr-range-badge');
+        if (old) old.remove();
+        var b = document.createElement('div');
+        b.className = 'hr-range-badge';
+        var colour = kind === 'ranged' ? '#3A78C2' : kind === 'open' ? '#C77700' : '#777';
+        b.style.cssText = 'display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;color:#fff;background:' + colour;
+        b.textContent = text; b.title = title;
+        tag.appendChild(b);
+        row.style.boxShadow = 'inset 4px 0 0 ' + colour;
+        row.dataset.hrRange = kind;
+      });
+      var bar = document.getElementById('hr-range-bar');
+      if (!bar) {
+        var first = document.querySelector('.horse-enter .row.mb-15');
+        if (!first) return;
+        bar = document.createElement('div');
+        bar.id = 'hr-range-bar';
+        bar.style.cssText = 'margin:0 0 12px;padding:8px 12px;border-radius:6px;background:rgba(58,120,194,.12);border:1px solid #3A78C2;font-size:13px;';
+        first.parentNode.insertBefore(bar, first.nextSibling);
+      }
+      bar.innerHTML = '';
+      var span = document.createElement('span');
+      span.textContent = 'HR Ledger — ranged: ' + counts.ranged + ' · still to range: ' + counts.open + ' · range unknown: ' + counts.unknown + '   ';
+      bar.appendChild(span);
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn btn-sm btn-warning'; btn.textContent = 'Tick the ones not ranged';
+      btn.title = 'Ticks every horse in the list that is not ranged yet (and unticks the ranged ones). Nothing is entered until you press the Enter button.';
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        document.querySelectorAll('.responsive-table-body .responsive-tr').forEach(function (row) {
+          var cb = row.querySelector('input[type=checkbox]');
+          if (!cb) return;
+          var want = row.dataset.hrRange !== 'ranged';
+          if (cb.checked !== want) cb.click();
+        });
+      });
+      bar.appendChild(btn);
+      entrySig = rows.length + '|' + document.querySelectorAll('.hr-range-badge').length;
+    });
+  }
   function scrapeShowResults(force) {
     if (!force && !(/conformation-shows/.test(location.pathname) && /\/results\/?$/.test(location.pathname))) return;
     var res = readShowResults();
@@ -2758,6 +2832,7 @@
     annotateBreedDropdown();
     addBreedParentLinks();
     scrapeShowResults();
+    annotateShowEntry();
     scrapeCompetitionResults();
     scrapeCompetitionStats();
     scrapeAgeFromProfile();

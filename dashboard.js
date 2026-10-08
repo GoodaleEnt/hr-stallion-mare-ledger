@@ -2,6 +2,8 @@
   'use strict';
   var L = HRLib;
 
+  // opened in Chrome's side panel (hrl panel): a narrow layout (see html.sidepanel in dashboard.html)
+  if (/[?&]sidepanel=1/.test(location.search)) document.documentElement.classList.add('sidepanel');
   var state = HRStorage.defaultState();
   var allBreedingsFlat = [];
   var aggregates = {};
@@ -375,7 +377,7 @@
       '<p>Every covering, every mare, every fee — captured as you browse.' +
       (version ? ' <span class="mono" style="color:var(--text-muted);font-size:12px;">v' + L.esc(version) + '</span>' : '') +
       '</p>' +
-      '</div><a class="btn btn-sm" style="text-decoration:none;" href="' + L.esc((chrome.runtime.getURL && chrome.runtime.getURL('manual.html')) || 'https://github.com/GoodaleEnt/hr-stallion-mare-ledger/blob/master/docs/MANUAL.md') + '" target="_blank" rel="noopener">User Manual</a></header>';
+      '</div>' + (document.documentElement.classList.contains('sidepanel') ? '<a class="btn btn-sm" style="text-decoration:none;" href="dashboard.html" target="_blank" rel="noopener" title="Open the full ledger in a tab">Full view ↗</a>' : '') + '<a class="btn btn-sm" style="text-decoration:none;" href="' + L.esc((chrome.runtime.getURL && chrome.runtime.getURL('manual.html')) || 'https://github.com/GoodaleEnt/hr-stallion-mare-ledger/blob/master/docs/MANUAL.md') + '" target="_blank" rel="noopener">User Manual</a></header>';
 
     html += apiWarningBannerHtml();
     html += renderNeedsReviewHtml();

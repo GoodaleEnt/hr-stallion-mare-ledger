@@ -253,6 +253,44 @@
     .detail-head .name-row{ flex-direction:column; }
   }
 
+
+  /* ---- the side panel (dashboard.html?sidepanel=1): one narrow column, nothing wider than the panel ---- */
+  html.sidepanel body{ padding:0 8px; }
+  html.sidepanel .wrap{ max-width:none; padding-block:10px 40px; }
+  html.sidepanel header.top{ margin-bottom:10px; gap:6px; }
+  html.sidepanel header.top .titles h1{ font-size:20px; }
+  html.sidepanel header.top .titles p{ display:none; }
+  html.sidepanel .tabs{ flex-wrap:wrap; width:auto; gap:3px; margin-bottom:12px; }
+  html.sidepanel .tab-btn{ padding:6px 9px; font-size:12.5px; }
+  html.sidepanel .stats-bar{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:14px; }
+  html.sidepanel .stat-tile{ padding:9px 11px; }
+  html.sidepanel .stat-tile .num{ font-size:18px; }
+  html.sidepanel .stat-tile .label{ font-size:10.5px; }
+  html.sidepanel .stallion-grid{ grid-template-columns:minmax(0, 1fr); gap:10px; }
+  html.sidepanel .section-head{ margin:16px 0 8px; }
+  html.sidepanel .section-head h2{ font-size:17px; }
+  html.sidepanel .card, html.sidepanel .an-card{ max-width:100%; overflow-x:auto; }
+  html.sidepanel table{ display:block; max-width:100%; overflow-x:auto; }
+  html.sidepanel .row{ flex-wrap:wrap; gap:0 10px; }
+  html.sidepanel details > summary{ font-size:12.5px; }
+  html.sidepanel .search-row input, html.sidepanel #list-filter{ font-size:13px; max-width:100%; }
+  html.sidepanel [style*="display:grid"]{ grid-template-columns:minmax(0, 1fr) !important; }
+  html.sidepanel .goal-strip{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  html.sidepanel .stallion-card .portrait{ aspect-ratio:16/10; }
+  html.sidepanel .settings-row{ gap:8px 14px; }
+  html.sidepanel .username-setting input{ width:120px; }
+  html.sidepanel input, html.sidepanel select, html.sidepanel textarea{ max-width:100%; }
+  html.sidepanel .btn{ padding:7px 10px; font-size:13px; }
+  /* settings live in the full view: the side panel keeps to lists and details */
+  html.sidepanel details.goals-panel, html.sidepanel details.notes-panel, html.sidepanel details.buy-panel{ display:none; }
+  html.sidepanel .stats-bar{ grid-template-columns:repeat(auto-fit, minmax(105px, 1fr)); }
+  html.sidepanel .goal-strip, html.sidepanel .herd-row > .goal-strip{ display:grid !important; grid-template-columns:repeat(3, minmax(0, 1fr)) !important; }
+  html.sidepanel .herd-row{ overflow:hidden; }
+  html.sidepanel .herd-row > div{ flex-wrap:wrap; min-width:0; }
+  html.sidepanel .herd-row input, html.sidepanel .herd-row select, html.sidepanel .herd-row select.role-select{ width:100% !important; }
+  html.sidepanel .herd-pic img{ width:100%; height:auto; max-height:150px; object-fit:contain; }
+  html.sidepanel .herd-pic .nopic{ height:60px; min-height:0; }
+
   .overlay{ position:fixed; inset:0; background:rgba(20,20,14,0.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
   .confirm-box{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; max-width:360px; box-shadow:var(--shadow); }
   .confirm-box p{ margin:0 0 16px; font-size:14.5px; }

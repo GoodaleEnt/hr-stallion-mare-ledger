@@ -260,7 +260,7 @@ In **Extra genes** on a horse's page, each hidden gene has a **Suspected (not co
 
 ### Address-bar search and the side panel
 
-In Chrome's address bar type **hrl**, press **Tab**, then a horse's name or life number to open it in the ledger, or one of **mares**, **stallions**, **colts**, **fillies**, **herd**, **retired**, **others**, **analytics**, **calc** to open that tab. **hrl panel** opens the ledger in Chrome's **side panel**, beside the Horse Reality page you are on.
+In Chrome's address bar type **hrl**, press **Tab**, then a horse's name or life number to open it in the ledger, or one of **mares**, **stallions**, **colts**, **fillies**, **herd**, **retired**, **others**, **analytics**, **calc** to open that tab. **hrl panel** opens the ledger in Chrome's **side panel**, beside the Horse Reality page you are on. The side panel uses a compact one-column layout of lists and details (the goals, notes and purchase-criteria settings stay in the full view; the **Full view** button at the top opens the ledger in a tab).
 
 ## Pictures are stored apart from the ledger
 

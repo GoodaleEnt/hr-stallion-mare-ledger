@@ -2660,15 +2660,17 @@
     return '';
   }
   // Returns true when something changed. A score of 0 or over 1000 is ignored.
-  function recordCompScore(meta, score, discipline) {
+  // detail = { event } (the competition the score came from), kept with the high and the low like the conformation scores.
+  function recordCompScore(meta, score, discipline, detail) {
     score = Number(score);
     if (!(score > 0 && score <= 1000)) return false;
     var c = Object.assign({}, meta.comp), by = Object.assign({}, c.by), changed = false;
     function bump(rec) {
       rec = Object.assign({ n: 0 }, rec);
       var ch = false;
-      if (!(rec.high >= score)) { rec.high = score; ch = true; }
-      if (!(rec.low > 0) || (score < rec.low && (rec.high - score) <= MAX_COMP_RANGE)) { if (rec.low !== score) { rec.low = score; ch = true; } }
+      var ev = detail && detail.event ? String(detail.event).slice(0, 90) : '';
+      if (!(rec.high >= score)) { rec.high = score; rec.highAt = Date.now(); rec.highEvent = ev; delete rec.highDate; ch = true; }
+      if (!(rec.low > 0) || (score < rec.low && (rec.high - score) <= MAX_COMP_RANGE)) { if (rec.low !== score) { rec.low = score; rec.lowAt = Date.now(); rec.lowEvent = ev; delete rec.lowDate; ch = true; } }
       return { rec: rec, changed: ch };
     }
     var all = bump(c); c.high = all.rec.high; c.low = all.rec.low; changed = all.changed;
@@ -2680,7 +2682,7 @@
   function compSummary(state, life) {
     var m = state && state.horseMeta && state.horseMeta[life], c = m && m.comp;
     if (!c || !(c.high > 0)) return null;
-    var rows = Object.keys(c.by || {}).map(function (k) { return { discipline: k, high: c.by[k].high, low: c.by[k].low, n: c.by[k].n || 0 }; }).sort(function (a, b) { return b.high - a.high; });
+    var rows = Object.keys(c.by || {}).map(function (k) { var r = c.by[k]; return { discipline: k, high: r.high, low: r.low, n: r.n || 0, highAt: r.highAt, highDate: r.highDate, highEvent: r.highEvent, lowAt: r.lowAt, lowDate: r.lowDate, lowEvent: r.lowEvent }; }).sort(function (a, b) { return b.high - a.high; });
     return { high: c.high, low: c.low || null, range: c.low ? Math.round((c.high - c.low) * 1000) / 1000 : null, by: rows, log: Array.isArray(m.compLog) ? m.compLog.length : 0 };
   }
 

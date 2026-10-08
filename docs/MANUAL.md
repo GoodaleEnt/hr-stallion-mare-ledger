@@ -314,6 +314,8 @@ Under **My notes** tick what you breed for: **Conformation**, **Genetic potentia
 
 **Competition scores in the decisions.** Scores earned in competitions (read from results pages and a horse's stats page) show on the horse's card (*Top competition*, with the discipline) and in its page header (*Top comp*). They count in keep/sell ranking, partner suggestions and buying advice. How much depends on your focus: with **Conformation** ticked, the conformation score leads; with **Competition** ticked (and not Conformation), the score earned in your chosen discipline leads, is listed first on cards and tags, and counts more than conformation. With neither ticked, competition scores count a little. The reasons in the card hover list it as *Competition score*.
 
+**Seeing and adding competition scores.** On any horse's page, near the bottom, the **Competition scores** box (click to open) lists the high, low, range, how many results and when and where the high was earned, per discipline. Under it, pick a discipline and type its highest and lowest score, with an optional date and competition, exactly like the conformation box. The ledger also reads scores itself when you open a competition's results page or the horse's stats page. The best score shows on the horse's card (*Top competition*) and in the page header (*Top comp*). The **Keep or sell** box on a horse's page is a toggle: its title is the keep/sell pill, and clicking it opens the reasons.
+
 ## What the ledger learns
 
 Nothing is stored and nothing comes from outside: each time it is needed the ledger looks again at your own records, and the **Analytics** tab shows **What the ledger has learned**.

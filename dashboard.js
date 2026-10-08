@@ -2550,7 +2550,7 @@
     var cs = L.compSummary(state, life);
     if (cs) {
       var fd = state.settings && state.settings.focusDiscipline, row = fd ? cs.by.find(function (r) { return r.discipline === fd; }) : cs.by[0];
-      if (row) out.comp = { value: round3(row.high), discipline: row.discipline, n: row.n, low: row.low ? round3(row.low) : null };
+      if (row) out.comp = { value: round3(row.high), discipline: row.discipline, n: row.n, low: row.low ? round3(row.low) : null, when: highDateText(row.highDate, row.highAt), event: row.highEvent || '' };
     }
     if (conf) {
       out.conf = { value: round3(conf), when: highDateText(meta.confBestDate, meta.confBestAt), event: meta.confBestEvent || '' };
@@ -2576,7 +2576,7 @@
     var out = '';
     // a competition breeder sees the competition score first, everyone else the conformation score
     var fx = (state.settings && state.settings.breederFocus) || {}, compFirst = !!fx.comp && !fx.conf;
-    var compRow = h.comp ? '<div class="row"><span>Top competition</span><span class="v mono">' + L.esc(h.comp.value) + ' <span class="sub">(' + L.esc(h.comp.discipline) + (h.comp.n > 1 ? ', ' + h.comp.n + ' results' : '') + ')</span></span></div>' : '';
+    var compRow = h.comp ? '<div class="row"><span>Top competition</span><span class="v mono">' + L.esc(h.comp.value) + ' <span class="sub">(' + L.esc(h.comp.discipline) + (h.comp.n > 1 ? ', ' + h.comp.n + ' results' : '') + ')</span></span></div>' + (h.comp.when || h.comp.event ? '<div style="' + sub + '">' + L.esc([h.comp.when, h.comp.event].filter(Boolean).join(' \u00b7 ')) + '</div>' : '') : '';
     if (compFirst) out += compRow;
     if (h.conf) {
       out += '<div class="row"><span>Top conformation</span><span class="v mono">' + L.esc(h.conf.value) + '</span></div>' +
@@ -2783,15 +2783,55 @@
         '<span style="background:var(--surface-2);border-radius:6px;height:10px;overflow:hidden;"><span style="display:block;height:100%;width:' + Math.round(c.p * 100) + '%;background:var(--' + (c.level === 'avoid' ? 'danger' : 'accent') + ');"></span></span><span class="mono">' + Math.round(c.p * 100) + '%</span></div>';
     }).join('') + '<p class="notes-line" style="margin:6px 0 0;">The chance the foal has at least one copy. A gene neither parent is tested for counts as not there.</p></div>';
   }
-  // Competition scores (high, low and per discipline) read from results pages and the horse's stats page
+  // Competition scores (high, low and per discipline), read from results pages and the horse's stats page, or entered by hand
+  // exactly like the conformation scores: pick the discipline, then its highest and lowest score with date and show.
+  var compEditDisc = {};
+  function setCompBest(life, field, value) {
+    if (!life) return;
+    var sel = document.getElementById('cb-disc-' + life), disc = (sel && sel.value) || compEditDisc[life];
+    if (!disc) return;
+    var meta = state.horseMeta[life] = Object.assign({}, state.horseMeta[life]);
+    var c = Object.assign({}, meta.comp), by = Object.assign({}, c.by), rec = Object.assign({ n: 0 }, by[disc]);
+    var num = parseFloat(String(value).replace(',', '.')), ok = isFinite(num) && num > 0 && num <= 1000;
+    if (field === 'high' || field === 'low') {
+      if (ok) { rec[field] = num; rec[field + 'At'] = Date.now(); if (!rec[field + 'Event']) rec[field + 'Event'] = 'entered by hand'; }
+      else { delete rec[field]; delete rec[field + 'At']; delete rec[field + 'Date']; delete rec[field + 'Event']; }
+    } else if (field === 'highDate' || field === 'lowDate') rec[field] = String(value || '').trim();
+    else if (field === 'highEvent' || field === 'lowEvent') rec[field] = String(value || '').trim().slice(0, 90);
+    if (!(rec.high > 0) && !(rec.low > 0)) delete by[disc]; else by[disc] = rec;
+    c.by = by;
+    var highs = Object.keys(by).map(function (k) { return by[k].high; }).filter(function (v) { return v > 0; });
+    var lows = Object.keys(by).map(function (k) { return by[k].low; }).filter(function (v) { return v > 0; });
+    if (highs.length) c.high = Math.max.apply(null, highs); else delete c.high;
+    if (lows.length) c.low = Math.min.apply(null, lows); else delete c.low;
+    c.at = Date.now(); meta.comp = c;
+    persist();
+  }
   function compPanelHtml(life) {
-    var cs = L.compSummary(state, life);
-    if (!cs) return '';
-    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Competition scores</strong> <span class="tag mono">high ' + L.esc(cs.high) + '</span>' + (cs.low ? ' <span class="tag mono">low ' + L.esc(cs.low) + ' \u00b7 range ' + L.esc(cs.range) + '</span>' : '') +
-      (cs.by.length ? '<div style="overflow-x:auto;margin-top:8px;"><table class="an-table"><thead><tr><th>Discipline</th><th class="num">High</th><th class="num">Low</th><th class="num">Seen</th></tr></thead><tbody>' + cs.by.map(function (r) {
-        return '<tr><td>' + L.esc(r.discipline) + '</td><td class="num mono">' + L.esc(r.high) + '</td><td class="num mono">' + (r.low ? L.esc(r.low) : '\u2014') + '</td><td class="num mono">' + (r.n || '\u2014') + '</td></tr>';
-      }).join('') + '</tbody></table></div>' : '') +
-      '<p class="notes-line" style="margin:8px 0 0;">Read when you open a competition\'s results page or a horse\'s stats page; the high only goes up and the low only goes down. Conformation shows are kept apart (Highest conformation score).</p></div>';
+    if (!life || !state.horseInfo[life]) return '';
+    var meta = state.horseMeta[life] || {}, cs = L.compSummary(state, life), by = (meta.comp && meta.comp.by) || {}, id = L.esc(life);
+    var discs = L.COMP_DISCIPLINES.slice();
+    Object.keys(by).forEach(function (k) { if (discs.indexOf(k) < 0) discs.push(k); });
+    var disc = compEditDisc[life] || (state.settings && state.settings.focusDiscipline) || Object.keys(by)[0] || discs[0];
+    if (discs.indexOf(disc) < 0) disc = discs[0];
+    var rec = by[disc] || {};
+    var att = function (field) { return ' data-action="comp-best" data-life="' + id + '" data-field="' + field + '"'; };
+    var head = 'Competition scores \u2014 ' + (cs ? 'best ' + L.esc(cs.high) + (cs.by[0] ? ' (' + L.esc(cs.by[0].discipline) + ')' : '') : 'not recorded');
+    var table = cs && cs.by.length ? '<div style="overflow-x:auto;"><table class="an-table"><thead><tr><th>Discipline</th><th class="num">High</th><th class="num">Low</th><th class="num">Range</th><th class="num">Seen</th><th>When \u00b7 where (high)</th></tr></thead><tbody>' + cs.by.map(function (r) {
+      return '<tr><td>' + L.esc(r.discipline) + '</td><td class="num mono">' + L.esc(r.high) + '</td><td class="num mono">' + (r.low ? L.esc(r.low) : '\u2014') + '</td><td class="num mono">' + (r.low ? L.esc(round3(r.high - r.low)) : '\u2014') + '</td><td class="num mono">' + (r.n || '\u2014') + '</td><td>' + L.esc([highDateText(r.highDate, r.highAt), r.highEvent].filter(Boolean).join(' \u00b7 ')) + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '';
+    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">' + head + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;">' + table +
+      '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:' + (table ? '12' : '0') + 'px;">' +
+        '<div class="field"><label for="cb-disc-' + id + '">Discipline</label><select id="cb-disc-' + id + '" data-action="comp-disc" data-life="' + id + '">' + discs.map(function (n) { return '<option' + (n === disc ? ' selected' : '') + '>' + L.esc(n) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="cb-high-' + id + '">Highest score</label><input id="cb-high-' + id + '" type="number" min="0" max="1000" step="any"' + att('high') + ' value="' + (rec.high ? L.esc(rec.high) : '') + '" placeholder="e.g. 83.774"></div>' +
+        '<div class="field"><label for="cb-low-' + id + '">Lowest score (range ' + (rec.high && rec.low ? L.esc(round3(rec.high - rec.low)) : '\u2014') + ')</label><input id="cb-low-' + id + '" type="number" min="0" max="1000" step="any"' + att('low') + ' value="' + (rec.low ? L.esc(rec.low) : '') + '" placeholder="e.g. 70.1"></div>' +
+        '<div class="field"><label for="cb-hdate-' + id + '">Highest: date earned (optional)</label><input id="cb-hdate-' + id + '" type="date"' + att('highDate') + ' value="' + L.esc(rec.highDate || '') + '"></div>' +
+        '<div class="field"><label for="cb-hevent-' + id + '">Highest: competition (optional)</label><input id="cb-hevent-' + id + '" type="text"' + att('highEvent') + ' value="' + L.esc(rec.highEvent || '') + '" placeholder="e.g. Western Reining, Training Level"></div>' +
+        '<div class="field"><label for="cb-ldate-' + id + '">Lowest: date earned (optional)</label><input id="cb-ldate-' + id + '" type="date"' + att('lowDate') + ' value="' + L.esc(rec.lowDate || '') + '"></div>' +
+        '<div class="field"><label for="cb-levent-' + id + '">Lowest: competition (optional)</label><input id="cb-levent-' + id + '" type="text"' + att('lowEvent') + ' value="' + L.esc(rec.lowEvent || '') + '" placeholder="e.g. Western Reining, Training Level"></div>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Pick a discipline, then enter its highest and lowest score by hand if the ledger has not read them (it reads them when you open a competition\'s results page or the horse\'s stats page). The high only goes up and the low only goes down when read automatically; one you enter is always kept, and clearing a box removes it. Competition scores show on the card (Top competition) and in the page header, and count in ranking and suggestions most for a competition breeder (Settings \u2192 Breeder focus). Conformation shows are kept apart (Highest conformation score).</p>' +
+      '</div></div></details>';
   }
   // Keep or sell: the level, how it was worked out, and (for a mare or a foal of a mare of yours) the foals as keepers
   function keeperPanelHtml(life) {
@@ -2801,9 +2841,9 @@
     try { adv = L.herdAdvice(state, [life])[life]; } catch (e) { return ''; }
     if (!adv) return '';
     var colours = { top: 'var(--success)', keep: 'var(--success)', middle: 'var(--text-muted)', consider: '#B9770E', sell: 'var(--danger)', forsale: 'var(--text-muted)', nodata: 'var(--text-muted)' };
-    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><strong>Keep or sell</strong> <span class="tag" style="color:' + (colours[adv.action] || 'inherit') + ';">' + (adv.protectedHorse ? '\u2605 ' : '') + L.esc(adv.label) + (adv.rank && adv.of ? ' \u00b7 ' + adv.rank + '/' + adv.of : '') + '</span>' +
-      '<div style="margin-top:8px;white-space:pre-wrap;font-size:12.5px;line-height:1.55;">' + adv.reasons.map(function (t) { return L.esc(t); }).join('\n') + '</div>' +
-      '<p class="notes-line" style="margin:8px 0 0;">The same information is in the hover on the ranch page cards. It is worked out again from your ledger each time.</p></div>';
+    return '<details class="card profile-block" style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px;"><strong>Keep or sell</strong> <span class="tag" style="color:' + (colours[adv.action] || 'inherit') + ';">' + (adv.protectedHorse ? '\u2605 ' : '') + L.esc(adv.label) + (adv.rank && adv.of ? ' \u00b7 ' + adv.rank + '/' + adv.of : '') + '</span></summary>' +
+      '<div style="margin-top:10px;white-space:pre-wrap;font-size:12.5px;line-height:1.55;">' + adv.reasons.map(function (t) { return L.esc(t); }).join('\n') + '</div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">The same information is in the hover on the ranch page cards. It is worked out again from your ledger each time.</p></details>';
   }
   // For a horse that is listed for sale (or was): what you ask and how it changed; and when it was retired.
   function saleHistoryPanelHtml(life) {
@@ -3974,6 +4014,8 @@
         render();
       }
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'comp-best') { setCompBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'comp-disc') { compEditDisc[t.getAttribute('data-life')] = t.value; persist(); }
       else if (action === 'horse-best') { setHorseBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-peacock') { var pk0 = Object.assign({}, (state.horseMeta[t.getAttribute('data-life')] || {}).peacock); pk0.expressed = !!t.checked; setHorseMeta(t.getAttribute('data-life'), { peacock: pk0 }); }

@@ -1953,7 +1953,7 @@
         if (log.some(function (e) { return e.comp === res.id && e.score === r.score; })) return;
         log.push({ comp: res.id, name: res.name, discipline: res.discipline, score: r.score, seenAt: Date.now() });
         meta.compLog = log.slice(-40);
-        HRLib.recordCompScore(meta, r.score, res.discipline);
+        HRLib.recordCompScore(meta, r.score, res.discipline, { event: res.name });
         var by = Object.assign({}, meta.comp && meta.comp.by), rec = Object.assign({}, by[res.discipline]);
         rec.n = (rec.n || 0) + 1; by[res.discipline] = rec; meta.comp = Object.assign({}, meta.comp, { by: by });
         state.horseMeta[r.life] = meta; saved++;

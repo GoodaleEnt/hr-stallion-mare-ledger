@@ -1180,7 +1180,7 @@
           if (d && !date) date = d; else if (!d) details.push(t);
         }
         highs.push({ value: value, date: date, event: details.join(' · ').slice(0, 90) });
-        lows.push(value);
+        lows.push({ value: value, date: date, event: details.join(' · ').slice(0, 90) });
       });
     });
     document.querySelectorAll('tr').forEach(function (tr) {
@@ -1191,7 +1191,7 @@
       if (!/^(all-time|current) confo$/i.test(label) && !isLow) return;
       var value = number(cells[1].textContent);
       if (!(isFinite(value) && value > 0)) return;
-      if (isLow) lows.push(value); else highs.push({ value: value, date: '', event: 'HRToolkit all-time' });
+      if (isLow) lows.push({ value: value, date: '', event: 'HRToolkit all-time low' }); else highs.push({ value: value, date: '', event: 'HRToolkit all-time' });
     });
     return highs;
   }
@@ -1213,7 +1213,7 @@
         var raised = best > prev;
         // the lowest of the scores listed (and HRToolkit's all-time low) counts as the low when it is within the range guard
         var lowMoved = false;
-        (highs.lows || []).forEach(function (lv) { if (HRLib.recordLowScore(meta, lv, Math.max(best, prev), 'show results')) lowMoved = true; });
+        (highs.lows || []).forEach(function (lv) { if (HRLib.recordLowScore(meta, lv.value, Math.max(best, prev), 'show results', false, state.horseInfo[id], { date: lv.date, event: lv.event })) lowMoved = true; });
         // A same-score re-read can still fill in a date/details that were missing.
         var fillsDetails = best === prev && ((top.date && !meta.confBestDate) || (top.event && !meta.confBestEvent));
         if (!raised && !fillsDetails) { if (lowMoved) { state.horseMeta[id] = meta; HRStorage.setState(state); } return; }
@@ -1798,6 +1798,7 @@
           return d;
         }
         pill((a.protectedHorse ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
+        if (a.ranged) pill('\u25C6 Ranged', '#3A78C2');
         // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
         if (a.pips) {
           var bar = document.createElement('span');
@@ -2058,7 +2059,7 @@
         if (existing) { if (existing.score !== r.score || existing.rank !== r.rank) { Object.assign(existing, entry); changed = true; } }
         else { log.push(entry); changed = true; }
         var prev = Number(meta.confBest) || 0;
-        if (HRLib.recordLowScore(meta, r.score, Math.max(r.score, prev), 'show results')) changed = true;
+        if (HRLib.recordLowScore(meta, r.score, Math.max(r.score, prev), 'show results', false, state.horseInfo && state.horseInfo[r.life], { date: '', event: res.name.slice(0, 90) })) changed = true;
         if (r.score > prev) {
           meta.confBest = r.score; meta.confBestAt = Date.now(); meta.confBestDate = ''; meta.confBestEvent = res.name.slice(0, 90);
           raisedCount++; changed = true;

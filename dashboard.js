@@ -529,7 +529,7 @@
   var SORT_MODES = [
     ['', 'Order as listed'], ['name', 'Name A\u2013Z'], ['name-desc', 'Name Z\u2013A'], ['age', 'Age: oldest first'], ['age-young', 'Age: youngest first'],
     ['bt', 'Breed Total: high to low'], ['gp', 'Genetic potential: high to low'], ['conf', 'Conformation: high to low'],
-    ['goals', 'Goals: met first'], ['rank', 'Keep / sell rank: best first']
+    ['goals', 'Goals: met first'], ['rank', 'Keep / sell rank: best first'], ['ranged', 'Ranged first']
   ];
   function lifeOfEl(el) {
     var life = el.getAttribute('data-life') || (el.querySelector('[data-life]') && el.querySelector('[data-life]').getAttribute('data-life')) || '';
@@ -548,6 +548,7 @@
     if (mode === 'gp') return Number(info.geneticPotential) || -1;
     if (mode === 'conf') return L.bestConformation(meta).best || -1;
     if (mode === 'goals') { if (!life) return -1; var c = L.goalCheck(state, life); return c.met ? 2 : (c.active && L.goalMisses(state, life).length === 1 ? 1 : 0); }
+    if (mode === 'ranged') { var rg = life ? L.rangeStatus(state, life) : null; return rg ? (rg.ranged ? 1000 : 0) + rg.range : -1; }
     if (mode === 'rank') { var r = ranking && ranking[life]; return r && r.pct != null ? r.pct : (r && r.level ? r.level / 10 : -1); }
     return 0;
   }
@@ -2549,7 +2550,7 @@
       out.conf = { value: round3(conf), when: highDateText(meta.confBestDate, meta.confBestAt), event: meta.confBestEvent || '' };
     }
     var lowV = Number(meta.confLow) || 0;
-    if (conf && lowV && lowV <= conf) out.low = { value: round3(lowV), range: round3(conf - lowV), source: meta.confLowSource || '' };
+    if (conf && lowV && lowV <= conf) { var rst = L.rangeStatus(state, life); out.low = { value: round3(lowV), range: round3(conf - lowV), when: highDateText(meta.confLowDate, meta.confLowAt), event: meta.confLowEvent || '', source: meta.confLowSource || '', full: rst && rst.full, ranged: !!(rst && rst.ranged) }; }
     var btNow = L.breedTotal(info.geneticPotential, conf);
     var btVal = Math.max(Number(meta.btBest) || 0, btNow);
     if (btVal) {
@@ -2570,7 +2571,7 @@
     if (h.conf) {
       out += '<div class="row"><span>Top conformation</span><span class="v mono">' + L.esc(h.conf.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.conf.when, h.conf.event].filter(Boolean).join(' · ')) + '</div>';
-      if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + ')</span></span></div>';
+      if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + (h.low.full ? ' of ' + L.esc(h.low.full) : '') + ')</span></span></div>' + '<div style="' + sub + '">' + L.esc([h.low.when, h.low.event].filter(Boolean).join(' · ')) + '</div>' + (h.low.ranged ? '<div style="' + sub + 'color:var(--near);font-weight:600;">\u25C6 Ranged: high and low span the full range</div>' : '');
     }
     if (h.bt) {
       out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
@@ -2583,6 +2584,8 @@
     var h = highScoreInfo(life);
     var out = '';
     if (h.conf) out += '<span class="tag mono" title="' + L.esc(['Highest conformation show score', h.conf.event].filter(Boolean).join(' — ')) + '">Top confo ' + L.esc(h.conf.value) + (h.conf.when ? ' · ' + L.esc(h.conf.when) : '') + '</span>';
+    if (h.low) out += '<span class="tag mono" title="' + L.esc(['Lowest conformation show score', h.low.event].filter(Boolean).join(' — ')) + '">Low confo ' + L.esc(h.low.value) + (h.low.when ? ' · ' + L.esc(h.low.when) : '') + '</span>';
+    if (h.low && h.low.ranged) out += '<span class="tag mono" style="color:var(--near);border-color:var(--near);" title="Highest minus lowest conformation score has reached the full range of ' + L.esc(h.low.full) + ' for this breed, so no later show can widen it">\u25C6 Ranged</span>';
     if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
     return out;
   }
@@ -3099,9 +3102,11 @@
       else { delete meta.confBest; delete meta.confBestAt; delete meta.confBestDate; delete meta.confBestEvent; }
     } else if (field === 'confLow') {
       var lw = parseFloat(String(value).replace(',', '.'));
-      if (isFinite(lw) && lw > 0 && lw <= 100) { meta.confLow = lw; meta.confLowAt = Date.now(); meta.confLowSource = 'entered by hand'; }
-      else { delete meta.confLow; delete meta.confLowAt; delete meta.confLowSource; }
-    } else if (field === 'confBestDate') { meta.confBestDate = String(value || '').trim(); }
+      if (isFinite(lw) && lw > 0 && lw <= 100) { meta.confLow = lw; meta.confLowAt = Date.now(); meta.confLowSource = 'entered by hand'; if (!meta.confLowEvent) meta.confLowEvent = 'entered by hand'; }
+      else { delete meta.confLow; delete meta.confLowAt; delete meta.confLowSource; delete meta.confLowDate; delete meta.confLowEvent; }
+    } else if (field === 'confLowDate') { meta.confLowDate = String(value || '').trim(); }
+    else if (field === 'confLowEvent') { meta.confLowEvent = String(value || '').trim().slice(0, 90); }
+    else if (field === 'confBestDate') { meta.confBestDate = String(value || '').trim(); }
     else if (field === 'confBestEvent') { meta.confBestEvent = String(value || '').trim().slice(0, 90); }
     persist();
   }
@@ -3113,6 +3118,8 @@
       '<div class="card" style="padding:14px;margin-top:8px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">' +
         '<div class="field"><label for="hb-score-' + life + '">Highest score</label><input id="hb-score-' + life + '" type="number" min="0" max="100" step="any" data-action="horse-best" data-life="' + life + '" data-field="confBest" value="' + (meta.confBest ? L.esc(meta.confBest) : '') + '" placeholder="e.g. 87.425"></div>' +
         '<div class="field"><label for="hb-low-' + life + '">Lowest score (range ' + (meta.confLow && b.best ? L.esc(Math.round((b.best - meta.confLow) * 1000) / 1000) : '—') + ')</label><input id="hb-low-' + life + '" type="number" min="0" max="100" step="any" data-action="horse-best" data-life="' + life + '" data-field="confLow" value="' + (meta.confLow ? L.esc(meta.confLow) : '') + '" placeholder="e.g. 80.1"></div>' +
+        '<div class="field"><label for="hb-lowdate-' + life + '">Lowest: date earned (optional)</label><input id="hb-lowdate-' + life + '" type="date" data-action="horse-best" data-life="' + life + '" data-field="confLowDate" value="' + L.esc(meta.confLowDate || '') + '"></div>' +
+        '<div class="field"><label for="hb-lowevent-' + life + '">Lowest: show (optional)</label><input id="hb-lowevent-' + life + '" type="text" data-action="horse-best" data-life="' + life + '" data-field="confLowEvent" value="' + L.esc(meta.confLowEvent || '') + '" placeholder="e.g. Show name"></div>' +
         '<div class="field"><label for="hb-date-' + life + '">Date earned (optional)</label><input id="hb-date-' + life + '" type="date" data-action="horse-best" data-life="' + life + '" data-field="confBestDate" value="' + L.esc(meta.confBestDate || '') + '"></div>' +
         '<div class="field"><label for="hb-event-' + life + '">Show (optional)</label><input id="hb-event-' + life + '" type="text" data-action="horse-best" data-life="' + life + '" data-field="confBestEvent" value="' + L.esc(meta.confBestEvent || '') + '" placeholder="e.g. Dressage, Oct 2026"></div>' +
         '<p class="notes-line" style="margin:0;grid-column:1/-1;">Horse Reality\'s stats page only lists recent shows, so a horse with many shows (often one you bought) can have a higher best score than the ledger has read. Enter it here and it is used for Breed Total, rankings and suggestions. A higher score read later from a page replaces it; clear the box to remove it. The lowest score only ever goes down, and one read automatically that is more than ' + L.MAX_SCORE_RANGE + ' points under the highest is ignored (a wrongly entered show would otherwise stretch the range); one you enter by hand is always kept.' + (shows ? ' ' + shows + ' show result' + (shows === 1 ? '' : 's') + ' saved from results pages.' : '') + '</p>' +

@@ -1489,6 +1489,9 @@
         var lf = learnedFailure(state, life);
         if (lf && lf.rate >= 0.4) { A(-0.4, 'Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); x.why.push('Fails ' + Math.round(lf.rate * 100) + '% of his ' + lf.n + ' coverings'); }
       }
+      var rgs = rangeStatus(state, life);
+      if (rgs && rgs.ranged) x.why.push('Ranged: its high ' + rgs.high + ' and low ' + rgs.low + ' span the full ' + rgs.full + ', so its top score is its true top');
+      x.ranged = !!(rgs && rgs.ranged);
       x.price = priceIdea(state, life, form.pace, comps);
       if (FX.keys.indexOf('profit') > -1) {
         var cost = x.price.floor;
@@ -1519,7 +1522,7 @@
       else if (x.flags.core) { level = 5; x.over.push('It is protected as a keeper (' + (x.coreWhy || []).join('; ') + '), so it is a Top keeper whatever its rank'); }
       else level = rankLevel;
       var prot = !!x.flags.core && !x.flags.sell;
-      out[x.life] = { parts: x.parts, adjParts: x.adjParts, over: x.over, z: x.z, adj: x.adj, value: x.value, level: level, rankLevel: rankLevel, protectedHorse: prot, protectedWhy: prot ? (x.coreWhy || []) : [], label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
+      out[x.life] = { ranged: x.ranged, parts: x.parts, adjParts: x.adjParts, over: x.over, z: x.z, adj: x.adj, value: x.value, level: level, rankLevel: rankLevel, protectedHorse: prot, protectedWhy: prot ? (x.coreWhy || []) : [], label: level ? RANK_LEVELS[level] : (x.value != null ? 'Too few to rank' : 'Not enough data'), rank: x.rank || null, of: x.of, group: x.groupName, pct: x.pct, why: x.why.slice(), price: x.price, young: x.young, sex: x.sex };
     });
     return out;
   }
@@ -1579,7 +1582,7 @@
       var info = state.horseInfo && state.horseInfo[l], meta = (state.horseMeta && state.horseMeta[l]) || {}, r = rk[l];
       if (!info || (info.sex !== 'mare' && info.sex !== 'stallion')) return;
       if (meta.status === 'Sold' || meta.status === 'Retired' || meta.status === 'Deceased' || meta.status === 'Companion') return;
-      var a = { action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, pips: r ? (r.rankLevel || r.level) : null, protectedHorse: !!(r && r.protectedHorse), label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
+      var a = { ranged: !!(r && r.ranged), action: r && r.level ? ['', 'sell', 'consider', 'middle', 'keep', 'top'][r.level] : 'nodata', level: r ? r.level : null, pips: r ? (r.rankLevel || r.level) : null, protectedHorse: !!(r && r.protectedHorse), label: r ? r.label : 'Not enough data', rank: r && r.rank, of: r ? r.of : 0, group: r && r.group, reasons: r ? r.why.slice() : [], price: null, best: null, infoal: '' };
       if (r) a.reasons = rankExplanation(r, a);
       var kl = keeperLines(state, l);
       if (kl.length) { a.reasons.push(''); kl.forEach(function (t) { a.reasons.push(t); }); }
@@ -2488,7 +2491,7 @@
     if (priv) {
       if (priv.high > (Number(meta.confBest) || 0) + 0.006) { meta.confBest = priv.high; meta.confBestAt = Date.now(); meta.confBestEvent = 'HRToolkit all-time high'; meta.confBestDate = ''; changed = true; }
       // the all-time low and range (see recordLowScore for the guard)
-      if (recordLowScore(meta, priv.low, Math.max(priv.high, Number(meta.confBest) || 0), 'HRToolkit all-time low')) changed = true;
+      if (recordLowScore(meta, priv.low, Math.max(priv.high, Number(meta.confBest) || 0), 'HRToolkit all-time low', false, info, { event: 'HRToolkit all-time low' })) changed = true;
       if (!info.health && !info.healthFromTag) {
         var h = {};
         priv.health.forEach(function (c, i) { if (TOOLKIT_RATING[c]) h[TOOLKIT_HEALTH_ORDER[i]] = TOOLKIT_RATING[c]; });
@@ -2498,17 +2501,46 @@
     if (changed) { meta.toolkitSeenAt = Date.now(); state.horseMeta[life] = meta; }
     return changed;
   }
+  // The widest a horse's conformation score can range, by how many conformation stats its breed has: a horse with 12 stats can
+  // vary by 6.928 between its lowest and its highest score. A horse whose highest minus lowest score reaches that is "ranged":
+  // both ends are found, so no later show can widen it. (Only the 12-stat range is known; other breeds are not marked.)
+  var FULL_RANGE_BY_STATS = { 12: 6.928 };
+  var RANGE_TOLERANCE = 0.002;
+  function statCountOf(info) {
+    if (info && info.confTraits) return Object.keys(info.confTraits).length;
+    var tc = info && info.tagCounts;
+    return tc ? (tc.VG || 0) + (tc.GP || 0) + (tc.G || 0) + (tc.A || 0) + (tc.BA || 0) : 0;
+  }
+  function fullScoreRange(info) { return FULL_RANGE_BY_STATS[statCountOf(info)] || null; }
+  // { full, range, high, low, ranged } or null when the high or low is not known
+  function rangeStatus(state, life) {
+    var meta = state.horseMeta && state.horseMeta[life], info = state.horseInfo && state.horseInfo[life];
+    var high = bestConformation(meta).best, low = Number(meta && meta.confLow) || 0;
+    if (!(high > 0) || !(low > 0) || low > high) return null;
+    var full = fullScoreRange(info), range = Math.round((high - low) * 1000) / 1000;
+    return { full: full, range: range, high: high, low: low, ranged: !!full && (high - low) >= full - RANGE_TOLERANCE };
+  }
   // The lowest conformation score a horse has had. Only ever goes down, and a low further than MAX_SCORE_RANGE below the
   // all-time high is ignored (a wrongly entered show would otherwise drag it out of reach). Returns true if it changed.
   var MAX_SCORE_RANGE = 12;
-  function recordLowScore(meta, low, high, source, force) {
+  // detail = { date, event } (when and in which show the low was earned), kept like the highest score's.
+  function recordLowScore(meta, low, high, source, force, info, detail) {
     low = Number(low);
     if (!(low > 0)) return false;
     var cur = Number(meta.confLow) || 0;
-    if (!force && high > 0 && high - low > MAX_SCORE_RANGE) return false;
+    // a low further under the high than the breed's full range allows (or 12 points when the range is not known) is a misread
+    var full = fullScoreRange(info);
+    if (!force && high > 0 && high - low > (full ? full + 0.01 : MAX_SCORE_RANGE)) return false;
     if (cur > 0 && low >= cur && !force) return false;
-    if (low === cur) return false;
+    if (low === cur) {
+      var fills = detail && ((detail.date && !meta.confLowDate) || (detail.event && !meta.confLowEvent));
+      if (!fills) return false;
+      if (detail.date && !meta.confLowDate) meta.confLowDate = detail.date;
+      if (detail.event && !meta.confLowEvent) meta.confLowEvent = String(detail.event).slice(0, 90);
+      return true;
+    }
     meta.confLow = low; meta.confLowAt = Date.now(); meta.confLowSource = source || '';
+    meta.confLowDate = (detail && detail.date) || ''; meta.confLowEvent = (detail && detail.event) ? String(detail.event).slice(0, 90) : (source || '');
     return true;
   }
 
@@ -2558,6 +2590,8 @@
     // horses of your breeding partners also answer to #partner and #bp
     if (partnerOwnerOf(state, state.horseInfo && state.horseInfo[life])) tags = tags.concat(['partner', 'bp']);
     if (peacockOf(state, life)) tags = tags.concat(['peacock']);
+    var rs = rangeStatus(state, life);
+    if (rs && rs.ranged) tags = tags.concat(['ranged']);
     return terms.every(function (q) { return tags.some(function (t) { return t.indexOf(q) > -1; }); });
   }
 
@@ -3995,6 +4029,8 @@
     parseToolkitPrivateTag: parseToolkitPrivateTag,
     applyToolkitTags: applyToolkitTags,
     recordLowScore: recordLowScore,
+    rangeStatus: rangeStatus,
+    fullScoreRange: fullScoreRange,
     MAX_SCORE_RANGE: MAX_SCORE_RANGE,
     studRowInfo: studRowInfo,
     pairEstimate: pairEstimate,

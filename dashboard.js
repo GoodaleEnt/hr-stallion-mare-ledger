@@ -2832,8 +2832,8 @@
   // prefer or keep it, red with a cross if you do not want it.
   function suspectedChipsHtml(life) {
     var sus = L.suspectedGenes(state, life), pk = L.peacockOf(state, life), out = '';
-    L.MANUAL_LOCI.forEach(function (l) { if (sus[l.id]) out += '<span class="tag" style="margin:0 6px 6px 0;font-style:italic;" title="Suspected, not confirmed">' + L.esc((l.label || l.name.replace(/ \(.*\)$/, ''))) + ' ' + L.esc(sus[l.id].join(' / ')) + '</span>'; });
-    if (pk) out += '<span class="tag" style="margin:0 6px 6px 0;" title="Peacock expressed' + (pk.strength != null ? ', line strength estimate ' + pk.strength + '%' : '') + '">Peacock' + (pk.strength != null ? ' ' + L.esc(pk.strength) + '%' : '') + '</span>';
+    L.MANUAL_LOCI.forEach(function (l) { if (sus[l.id]) out += '<span class="tag" style="margin:0;white-space:nowrap;font-style:italic;" title="Suspected, not confirmed">' + L.esc((l.label || l.name.replace(/ \(.*\)$/, ''))) + ' ' + L.esc(sus[l.id].join(' / ')) + '</span>'; });
+    if (pk) out += '<span class="tag" style="margin:0;white-space:nowrap;" title="Peacock expressed' + (pk.strength != null ? ', line strength estimate ' + pk.strength + '%' : '') + '">Peacock' + (pk.strength != null ? ' ' + L.esc(pk.strength) + '%' : '') + '</span>';
     return out;
   }
   function geneticsPanelHtml(life) {
@@ -2848,14 +2848,14 @@
       var lvl = pm[l.id], carries = lvl && geno[l.id].indexOf(l.recessive ? l.alleles[1] : l.alleles[0]) > -1;
       var bad = carries && lvl === 'avoid', good = carries && !bad;
       var nm = l.label || l.name.replace(/ \(.*\)$/, '');
-      return '<span class="tag" style="margin:0 6px 6px 0;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '')) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + L.esc(l.id === 'FL' ? L.genotypeText(l, geno[l.id]) : geno[l.id].join('/')) + '</span></span>';
+      return '<span class="tag" style="margin:0;white-space:nowrap;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '')) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + L.esc(l.id === 'FL' ? L.genotypeText(l, geno[l.id]) : geno[l.id].join('/')) + '</span></span>';
     }).join('');
     var wanted = L.preferredGenesOf(state, life);
     var hasBad = wanted.some(function (g) { return g.level === 'avoid'; }), hasGood = wanted.some(function (g) { return g.level !== 'avoid'; });
-    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;' + (hasBad ? 'border-color:var(--danger);' : hasGood ? 'border-color:var(--accent-strong);' : '') + '"><strong>Genetics</strong>' +
-      (hasGood ? ' <span class="tag" style="color:var(--accent-strong);border-color:var(--accent-strong);">\u2726 carries a preferred gene</span>' : '') + (hasBad ? ' <span class="tag" style="color:var(--danger);border-color:var(--danger);">\u2716 carries an unwanted gene</span>' : '') +
-      '<div style="margin-top:8px;">' + chips + suspectedChipsHtml(life) + '</div>' + (info.testedColours ? '<div class="mono sub" style="font-size:12px;">' + L.esc(info.testedColours) + '</div>' : '') +
-      '<p class="notes-line" style="margin:6px 0 0;">Genes the ledger knows for this horse. Green star = a gene you prefer or keep, red cross = a gene you do not want (choose these under My notes \u2192 Preferred genetics). A gene that is not listed was not tested.</p></div>';
+    return '<div class="card profile-block" style="padding:12px 16px;margin-bottom:16px;' + (hasBad ? 'border-color:var(--danger);' : hasGood ? 'border-color:var(--accent-strong);' : '') + '"><div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;"><strong>Genetics</strong>' +
+      (hasGood ? '<span class="tag" style="color:var(--accent-strong);border-color:var(--accent-strong);">\u2726 carries a preferred gene</span>' : '') + (hasBad ? '<span class="tag" style="color:var(--danger);border-color:var(--danger);">\u2716 carries an unwanted gene</span>' : '') + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">' + chips + suspectedChipsHtml(life) + '</div>' + (info.testedColours ? '<div class="mono sub" style="font-size:12px;margin-top:12px;line-height:1.5;">' + L.esc(info.testedColours) + '</div>' : '') +
+      '<p class="notes-line" style="margin:12px 0 0;line-height:1.55;">Genes the ledger knows for this horse. Green star = a gene you prefer or keep, red cross = a gene you do not want (choose these under My notes \u2192 Preferred genetics). A gene that is not listed was not tested.</p></div>';
   }
   // A star tag for a horse that carries a gene you prefer.
   function preferredGeneTagHtml(life) {

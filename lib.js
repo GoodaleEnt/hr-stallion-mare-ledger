@@ -398,7 +398,7 @@
   // interactions beyond that are not simulated.
   var EXTRA_LOCI = [
     { id: 'STY', name: 'Sooty (Sty)', alleles: ['Sty', 'sty'], absent: ['sty', 'sty'], label: 'Sooty' },
-    { id: 'FL', name: 'Flaxen (Fl)', alleles: ['Fl', 'fl'], absent: ['Fl', 'Fl'], recessive: true, label: 'Flaxen', only: 'chestnut' },
+    { id: 'FL', name: 'Flaxen (F)', alleles: ['F', 'f'], absent: ['F', 'F'], recessive: true, label: 'Flaxen', only: 'chestnut' },
     { id: 'Z', name: 'Silver (Z)', alleles: ['Z', 'n'], absent: ['n', 'n'], label: 'Silver', only: 'blackBased' },
     { id: 'CH', name: 'Champagne (Ch)', alleles: ['Ch', 'n'], absent: ['n', 'n'], label: 'Champagne' },
     { id: 'RN', name: 'Roan (Rn)', alleles: ['Rn', 'rn'], absent: ['rn', 'rn'], label: 'Roan' },
@@ -419,12 +419,31 @@
   function agoutiCompatible(tested, manual) {
     return !tested || agoutiPlain(tested).join() === agoutiPlain(manual).join();
   }
+  // Flaxen is written ff (shows flaxen), Ff (carrier) and FF (not there). Genotypes saved before that as Fl / fl are read as F / f.
+  function normGeneText(locusId, text) {
+    if (locusId !== 'FL') return String(text || '');
+    return String(text || '').split('/').map(function (p) { return p === 'Fl' ? 'F' : p === 'fl' ? 'f' : p; }).join('/');
+  }
+  // How a genotype is written: flaxen as FF / Ff / ff, the others as "a / b"
+  function genotypeText(locus, alleles) {
+    if (locus && locus.id === 'FL') return alleles.slice().sort(function (a, b) { return a === b ? 0 : a === 'F' ? -1 : 1; }).join('');
+    return alleles.join(' / ');
+  }
+  // What a choice in the gene editor says
+  function genotypeOptionLabel(locus, g) {
+    var parts = g.split('/');
+    if (locus.id === 'FL' && parts.indexOf('?') === -1) {
+      var t = genotypeText(locus, parts);
+      return t + (t === 'ff' ? ' (shows flaxen)' : t === 'Ff' ? ' (carrier)' : ' (not present)');
+    }
+    return g.replace('/', ' / ');
+  }
   // Hand-entered genotypes for one horse, validated against the gene table.
   function manualGenes(state, lifeNumber) {
     var saved = (state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].genes) || {};
     var out = {};
     MANUAL_LOCI.forEach(function (l) {
-      var parts = String(saved[l.id] || '').split('/');
+      var parts = normGeneText(l.id, saved[l.id]).split('/');
       if (parts.length === 2 && l.alleles.indexOf(parts[0]) > -1 && l.alleles.indexOf(parts[1]) > -1) out[l.id] = parts;
     });
     return out;
@@ -436,7 +455,7 @@
     var saved = (state.horseMeta && state.horseMeta[lifeNumber] && state.horseMeta[lifeNumber].genes) || {};
     var out = {};
     MANUAL_LOCI.forEach(function (l) {
-      var parts = String(saved[l.id] || '').split('/');
+      var parts = normGeneText(l.id, saved[l.id]).split('/');
       if (parts.length !== 2 || parts.indexOf('?') === -1 || (parts[0] === '?' && parts[1] === '?')) return;
       var known = parts[0] === '?' ? parts[1] : parts[0];
       if (l.alleles.indexOf(known) > -1) out[l.id] = parts;
@@ -636,7 +655,7 @@
     if (dist.LP) ctx.pLP = dist.LP.reduce(function (t, o) { return t + (o.alleles.indexOf('LP') > -1 ? o.p : 0); }, 0);
     var genes = ALL_LOCI.filter(function (l) { return dist[l.id] && (!l.absent || touched[l.id]); }).map(function (l) {
       return { id: l.id, name: l.name, vis: visibilityOf(l, dist[l.id], ctx), outcomes: dist[l.id].map(function (o) {
-        return { genotype: o.alleles.join(' / '), pct: o.p * 100, effect: geneEffect(l.id, o.alleles) };
+        return { genotype: o.alleles.join(' / '), label: genotypeText(l, o.alleles), pct: o.p * 100, effect: geneEffect(l.id, o.alleles) };
       }) };
     });
     // Chance the foal actually shows each extra gene (a dominant one needs a
@@ -651,7 +670,7 @@
       return {
         id: l.id, name: l.name, label: l.label, pct: shown * 100,
         note: l.only === 'chestnut' ? 'shows on chestnut coats only' : (l.only === 'blackBased' ? 'shows on black-based coats only' : ''),
-        outcomes: dist[l.id].map(function (o) { return { genotype: o.alleles.join(' / '), pct: o.p * 100 }; })
+        outcomes: dist[l.id].map(function (o) { return { genotype: o.alleles.join(' / '), label: genotypeText(l, o.alleles), pct: o.p * 100 }; })
       };
     });
     var colourIds = ['E', 'A', 'CR', 'D', 'G'].concat(EXTRA_LOCI.map(function (l) { return l.id; })).filter(function (id) { return dist[id]; });
@@ -4061,6 +4080,8 @@
     agoutiPlain: agoutiPlain,
     extraGenotypeOptions: extraGenotypeOptions,
     manualGenes: manualGenes,
+    genotypeText: genotypeText,
+    genotypeOptionLabel: genotypeOptionLabel,
     suspectedGenes: suspectedGenes,
     suspectedGenotypeOptions: suspectedGenotypeOptions,
     peacockOf: peacockOf,

@@ -2496,12 +2496,12 @@
           '<option value=""' + (curA ? '' : ' selected') + '>' + (tested.A ? 'As tested (' + L.esc(tested.A.join(' / ')) + ')' : 'Not known') + '</option>' +
           opts.map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === curA ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + suspectedOptionsHtml(l, suspected[l.id]) + '</select>';
       } else if (tested[l.id]) {
-        html += '<select id="' + id + '" disabled><option>' + L.esc(tested[l.id].join(' / ')) + ' (from Horse Reality)</option></select>';
+        html += '<select id="' + id + '" disabled><option>' + L.esc(L.genotypeText(l, tested[l.id])) + ' (from Horse Reality)</option></select>';
       } else {
         var cur = manual[l.id] ? manual[l.id].join('/') : '';
         html += '<select id="' + id + '" data-action="horse-gene" data-life="' + life + '" data-locus="' + L.esc(l.id) + '">' +
           '<option value=""' + (cur ? '' : ' selected') + '>Not present (default)</option>' +
-          L.extraGenotypeOptions(l).map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(g.replace('/', ' / ')) + '</option>'; }).join('') + suspectedOptionsHtml(l, suspected[l.id]) +
+          L.extraGenotypeOptions(l).map(function (g) { return '<option value="' + L.esc(g) + '"' + (g === cur ? ' selected' : '') + '>' + L.esc(L.genotypeOptionLabel(l, g)) + '</option>'; }).join('') + suspectedOptionsHtml(l, suspected[l.id]) +
         '</select>';
       }
       html += '</div>';
@@ -2813,7 +2813,7 @@
       var lvl = pm[l.id], carries = lvl && geno[l.id].indexOf(l.recessive ? l.alleles[1] : l.alleles[0]) > -1;
       var bad = carries && lvl === 'avoid', good = carries && !bad;
       var nm = l.label || l.name.replace(/ \(.*\)$/, '');
-      return '<span class="tag" style="margin:0 6px 6px 0;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '')) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + L.esc(geno[l.id].join('/')) + '</span></span>';
+      return '<span class="tag" style="margin:0 6px 6px 0;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '')) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + L.esc(l.id === 'FL' ? L.genotypeText(l, geno[l.id]) : geno[l.id].join('/')) + '</span></span>';
     }).join('');
     var wanted = L.preferredGenesOf(state, life);
     var hasBad = wanted.some(function (g) { return g.level === 'avoid'; }), hasGood = wanted.some(function (g) { return g.level !== 'avoid'; });
@@ -3127,7 +3127,7 @@
     var manual = L.manualGenes(state, lifeNumber);
     var sus = L.suspectedGenes(state, lifeNumber), pk = L.peacockOf(state, lifeNumber);
     return L.MANUAL_LOCI.filter(function (l) { return manual[l.id] || sus[l.id]; }).map(function (l) {
-      return l.name.replace(/ \(.*\)$/, '') + ' ' + (manual[l.id] ? manual[l.id].join(' / ') : sus[l.id].join(' / ') + ' (suspected)');
+      return l.name.replace(/ \(.*\)$/, '') + ' ' + (manual[l.id] ? L.genotypeText(l, manual[l.id]) : sus[l.id].join(' / ') + ' (suspected)');
     }).concat(pk ? ['Peacock' + (pk.strength != null ? ' ' + pk.strength + '%' : '')] : []).join(', ');
   }
   // The same editor the calculator uses, tucked under a horse's own page so
@@ -3181,13 +3181,13 @@
     }
     if (c.extras.length) {
       html += oddsCardHtml('Extra genes — chance the foal shows each', c.extras.map(function (g) {
-        var split = g.outcomes.map(function (o) { return o.genotype + ' ' + pctText(o.pct); }).join(' · ');
+        var split = g.outcomes.map(function (o) { return (o.label || o.genotype) + ' ' + pctText(o.pct); }).join(' · ');
         return oddsRowHtml(g.label, g.pct, split + (g.note ? ' — ' + g.note : ''));
       }).join(''));
     }
     html += '<details style="margin-bottom:12px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Gene-by-gene odds</summary>';
     c.genes.forEach(function (g) {
-      html += oddsCardHtml(g.name, g.outcomes.map(function (o) { return oddsRowHtml(o.genotype, o.pct, o.effect); }).join(''));
+      html += oddsCardHtml(g.name, g.outcomes.map(function (o) { return oddsRowHtml(o.label || o.genotype, o.pct, o.effect); }).join(''));
     });
     html += '</details>';
     if (c.unread && c.unread.length) {

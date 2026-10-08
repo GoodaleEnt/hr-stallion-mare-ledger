@@ -62,6 +62,7 @@
     if (savedUi.activeBreed) { activeBreed = String(savedUi.activeBreed); }
     if (savedUi.calcFilter) ['mare', 'stallion'].forEach(function (k) { if (savedUi.calcFilter[k]) calcFilter[k] = Object.assign(defaultCalcFilter(), savedUi.calcFilter[k]); });
     if (savedUi.tab === 'calc') activeTab = 'calc';
+    if (savedUi.tab === 'young') activeTab = 'colts';
   } catch (e) {}
 
   // ---------- derived data ----------
@@ -271,7 +272,8 @@
     else if (selectedId) html = renderDetail();
     else if (selectedMareKey) html = renderMareDetail();
     else if (activeTab === 'mares') html = renderMaresList();
-    else if (activeTab === 'young') html = renderYoungList();
+    else if (activeTab === 'colts') html = renderYoungList('stallion');
+    else if (activeTab === 'fillies') html = renderYoungList('mare');
     else if (activeTab === 'herd') html = renderHerdList();
     else if (activeTab === 'others') html = renderOthersList();
     else if (activeTab === 'retired') html = renderRetiredList();
@@ -404,7 +406,8 @@
     html += '<div class="tabs">' +
         '<button class="tab-btn' + (activeTab === 'stallions' ? ' active' : '') + '" data-action="show-tab" data-tab="stallions">Stallions</button>' +
         '<button class="tab-btn' + (activeTab === 'mares' ? ' active' : '') + '" data-action="show-tab" data-tab="mares">My Mares</button>' +
-        '<button class="tab-btn' + (activeTab === 'young' ? ' active' : '') + '" data-action="show-tab" data-tab="young">Colts &amp; Fillies</button>' +
+        '<button class="tab-btn' + (activeTab === 'colts' ? ' active' : '') + '" data-action="show-tab" data-tab="colts">Colts</button>' +
+        '<button class="tab-btn' + (activeTab === 'fillies' ? ' active' : '') + '" data-action="show-tab" data-tab="fillies">Fillies</button>' +
         '<button class="tab-btn' + (activeTab === 'herd' ? ' active' : '') + '" data-action="show-tab" data-tab="herd">My Herd</button>' +
         '<button class="tab-btn' + (activeTab === 'retired' ? ' active' : '') + '" data-action="show-tab" data-tab="retired">Retired</button>' +
         '<button class="tab-btn' + (activeTab === 'others' ? ' active' : '') + '" data-action="show-tab" data-tab="others">Other Horses</button>' +
@@ -417,7 +420,7 @@
       if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(b); }
     });
     (state.stallions || []).forEach(function (s) { var k = L.breedKeyOf(s.breed); if (k && !breedsHere[k]) { breedsHere[k] = true; breedNames.push(s.breed); } });
-    var isListTab = ['stallions', 'mares', 'young', 'herd', 'retired', 'others'].indexOf(activeTab) > -1;
+    var isListTab = ['stallions', 'mares', 'colts', 'fillies', 'herd', 'retired', 'others'].indexOf(activeTab) > -1;
     if (breedNames.length > 1 || activeBreed || isListTab) {
       html += '<div style="margin:-6px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">';
       if (breedNames.length > 1 || activeBreed) {
@@ -560,7 +563,7 @@
   // then every further nudge just adds/subtracts another 6 months on top
   // (never below 0 — an accidental extra click just gets retracted with the
   // -6mo button rather than going negative). Once the total crosses 3 years
-  // he/she drops out of Colts & Fillies and appears on the Stallions/My
+  // he/she drops out of Colts or Fillies and appears on the Stallions/My
   // Mares tab automatically, and vice versa if retracted back under 3.
   function adjustAgeMonths(lifeNumber, deltaMonths) {
     if (!lifeNumber) return;
@@ -939,7 +942,7 @@
     return html;
   }
 
-  function renderYoungList() {
+  function renderYoungList(only) {
     var html = topHeaderHtml();
     var myName = (state.settings.myUsername || '').trim();
 
@@ -959,11 +962,12 @@
       '<div class="stat-tile"><div class="num mono">' + fillies.length + '</div><div class="label">Active fillies</div>' + goalTallyHtml(goalTally(fillies.map(function (h) { return h.lifeNumber; }))) + '</div>' +
       '</div>';
 
-    html += '<div class="section-head"><h2>Colts &amp; Fillies</h2></div>';
+    var shown = only === 'mare' ? fillies : colts, word = only === 'mare' ? 'Fillies' : 'Colts';
+    html += '<div class="section-head"><h2>' + word + '</h2></div>';
 
-    if (!young.length) {
-      html += '<div class="empty"><h3>No young horses cached yet</h3>' +
-        '<p>Once you view one of your under-3yo horses\' pages on Horse Reality, it\'ll show up here — split into colts and fillies until they turn 3 and move to the Stallions or My Mares tab.</p></div>';
+    if (!shown.length) {
+      html += '<div class="empty"><h3>No ' + word.toLowerCase() + ' cached yet</h3>' +
+        '<p>Once you view one of your under-3yo ' + word.toLowerCase() + '\' pages on Horse Reality, it\'ll show up here until ' + (only === 'mare' ? 'she turns 3 and moves to the My Mares tab' : 'he turns 3 and moves to the Stallions tab') + '.</p></div>';
       return html;
     }
 
@@ -985,12 +989,7 @@
       return out;
     }
 
-    if (colts.length) {
-      html += '<h3 style="margin:20px 0 10px;">Colts</h3>' + youngGrid(colts);
-    }
-    if (fillies.length) {
-      html += '<h3 style="margin:20px 0 10px;">Fillies</h3>' + youngGrid(fillies);
-    }
+    html += youngGrid(shown);
     return html;
   }
 

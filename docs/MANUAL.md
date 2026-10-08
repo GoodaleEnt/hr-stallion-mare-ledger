@@ -185,7 +185,7 @@ Every horse card, herd row and horse page then shows five labelled boxes above i
 - **Breed page links:** on Horse Reality's Breed page, **Open mare ↗** (it follows the mare you pick in the drop-down) and **Open stallion ↗** appear beside the mare selector and open each parent's own page in a new tab.
 - **Foal Calculator pages:** each parent's card and every box of the pedigree links to that horse on Horse Reality.
 - **Refresh:** the Foal Calculator's **Refresh** button reloads the saved horses and recalculates without clearing the mare and stallion you picked, which are also remembered when you reload the page.
-- **Filter box:** every list tab (Stallions, My Mares, Colts & Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
+- **Filter box:** every list tab (Stallions, My Mares, Colts, Fillies, My Herd, Retired, Other Horses) has a box under the tabs that hides the horses that don't match what you type (name, breed or status).
 - **Open in Foal Calculator:** pairing ideas on Analytics and the stallions on a mare's Breeding suggestions page have a button that opens the Foal Calculator with both parents already chosen.
 - **Max stud fee:** the Foal Calculator suggestions have a "Max stud fee (HRC)" box that hides other players' stallions that cost more.
 - **Breeding plan:** in the Foal Calculator, add the chosen pairing to your plan and tick it off when it's done.
@@ -396,7 +396,7 @@ The **Analytics** tab turns what the ledger has saved into numbers and advice. I
 - **Breedings per month:** the last 12 months as a bar chart.
 - **Top Breed Total, top conformation and goals:** your best horses and how many meet your highlight goals.
 - **Stallion and mare tables:** breedings, success rate, failures, foals, foal scores, fees earned and when each was last bred. These list horses aged 3 and over only.
-- **Colts & Fillies:** horses under 3 are listed separately, a young stallion as a **Colt** and a young mare as a **Filly**, with age, genetic potential, top conformation and Breed Total.
+- **Colts and Fillies:** horses under 3 are listed on two tabs of their own, a young stallion on **Colts** and a young mare on **Fillies**, with age, genetic potential, top conformation and Breed Total.
 
 Click any column heading in the stallion, mare or Colts & Fillies tables to sort by it; click it again to reverse the order (a small arrow shows the direction). Empty values always sort to the bottom. Foal scores are out of 100 (the highest a foal can score). Success rate counts every covering with a known result (pending ones are left out) and counts a covering that produced a foal once.
 

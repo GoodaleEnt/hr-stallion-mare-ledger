@@ -44,6 +44,7 @@ A visual walkthrough of installing and using the extension. For a quick technica
 36. [Purchase criteria](#purchase-criteria)
 37. [Market board colours](#market-board-colours)
 38. [Listing, retiring and selling a horse](#listing-retiring-and-selling-a-horse)
+39. [Card colours at a glance](#card-colours-at-a-glance)
 
 ## Installing
 
@@ -280,6 +281,29 @@ The ledger keeps a horse's status up to date as things happen on Horse Reality:
 - **Selling.** A horse you had listed that now shows another owner when you open its page is marked **Sold**, with who has it and when the ledger noticed. Reading your bank page (as before) fills in the sale price, date and buyer.
 
 A horse already Sold or Retired is never put back to For Sale by an old listing. Each of these shows in the **For sale / Retired / Sold** panel on the horse's page, and For Sale horses get the price check in Sell ideas.
+
+## Card colours at a glance
+
+The coloured ring around a horse's card (and the outline on a row or a horse's page) says where the horse stands. Rings can combine, so a card can show more than one colour at once.
+
+![What each ring and mark around a horse's card means](images/10-card-colours.png)
+
+| Ring or mark | What it means | More detail |
+|---|---|---|
+| **No outline** | The horse misses two or more of your highlight goals, or you have no goals set | [Highlight goals](#highlight-goals) |
+| **Gold** outline | The horse meets **every** goal | [Highlight goals](#highlight-goals) |
+| **Blue** outline | The horse misses **exactly one** goal box ("off by one") | [Highlight goals](#highlight-goals) |
+| **Amber** outline and a **✔ Covered** ribbon | A covering was recorded in the last 7 days and has no result yet | [Foals, covered mares and breeding dates](#foals) |
+| **Pink** outline and a **♥ In foal** ribbon | The mare is pregnant (her due date shows when known) | [Foals, covered mares and breeding dates](#foals) |
+| **Red** ring and **⚠ below goals** on the ribbon | A mare that is covered or in foal clearly misses one of your goals (hover the ribbon to see which) | [Foals, covered mares and breeding dates](#foals) |
+| A big faint **$** behind the card | The horse is marked **For Sale** | [Listing, retiring and selling a horse](#listing-retiring-and-selling-a-horse) |
+
+**Combinations.** The goal outline (gold or blue) and the breeding ring (amber, pink or red) are separate, so they can appear together:
+
+- **Red and blue:** an in-foal or covered mare that misses **exactly one** goal. The ring is red because she is below your goals, and the outline inside it is blue because only one goal box is missed. If she misses two or more, the ring is red with no blue.
+- **Gold and pink** (or amber): an in-foal or covered mare that meets every goal.
+
+Inside each card, the six small boxes at the top are the goals: **green** means the horse meets that goal, **red** that it does not, **grey** that there is no goal set or no data yet, and a **gold** box marks an exceptional score (more than 3 Excellent health ratings, or Excellent fertility). The colours on the market pages and the ranch page are explained in [Market board colours](#market-board-colours) and [Ranch page cards](#ranch-page-cards-keep-or-sell-and-the-best-stallion).
 
 ## Market board colours
 

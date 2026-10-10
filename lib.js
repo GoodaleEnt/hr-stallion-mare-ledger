@@ -1063,7 +1063,7 @@
     if (mine) { pub = ''; priv = ''; sem = ''; } // the fees on your own stallion are what you charge, not what you pay
     var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
     var last = rec && rec.lastFee && Number(rec.lastFee.fee) > 0 ? fmtMoney(rec.lastFee.fee) + ' ' + (rec.lastFee.currency || 'HRC') : '';
-    return { mine: mine, partner: partner, privateOffer: priv, publicFee: pub, semen: sem, lastFee: last, seen: t.seenAt || '', breedable: mine || !!partner || !!(pub || priv || sem) };
+    return { retired: meta.status === 'Retired' || meta.status === 'Deceased', mine: mine, partner: partner, privateOffer: priv, publicFee: pub, semen: sem, lastFee: last, seen: t.seenAt || '', breedable: mine || !!partner || !!(pub || priv || sem) };
   }
   // ---------- learning from the ledger ----------
   // Nothing is stored and nothing is guessed from outside: every time it is needed the ledger looks again at what has
@@ -1636,8 +1636,9 @@
     var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var inactive = function (st) { return st === 'Retired' || st === 'Sold' || st === 'Deceased'; };
-    if (inactive(meta.status) || (rec && inactive(rec.status))) return false;
     var t = meta.studTerms;
+    // a retired stallion is still usable while semen vials are available
+    if (inactive(meta.status) || (rec && inactive(rec.status))) return !!(t && t.semen && priceList(t.semen));
     if (t && ((t.semen && priceList(t.semen)) || (t.public && priceList(t.public)) || (t.private && priceList(t.private)) || (t.cheapest && priceList(t.cheapest)))) return true;
     if (rec && rec.owned !== false) return rec.status === 'Active' || (!rec.status && meta.status !== 'Observation');
     return false;
@@ -1649,7 +1650,7 @@
     var info = state.horseInfo && state.horseInfo[life], meta = (state.horseMeta && state.horseMeta[life]) || {};
     var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
     var inactive = function (st) { return st === 'Retired' || st === 'Sold' || st === 'Deceased'; };
-    if (inactive(meta.status) || (rec && inactive(rec.status))) return 'no';
+    if (inactive(meta.status) || (rec && inactive(rec.status))) return stallionAvailable(state, life) ? 'yes' : 'no';
     if (stallionAvailable(state, life)) return 'yes';
     var mine = !!me && info && String(info.ownerName || '').trim().toLowerCase() === me;
     if (mine) return meta.status === 'Observation' || meta.status === 'Companion' ? 'no' : 'yes';
@@ -3224,7 +3225,7 @@
       var ci = state.horseInfo[cl];
       if (!ci || cl === life || ci.sex !== (isMare ? 'stallion' : 'mare') || isYoungInfo(ci)) return;
       var cm = (state.horseMeta && state.horseMeta[cl]) || {};
-      if (isSoldLife(state, cl) || cm.status === 'Retired' || cm.status === 'Deceased') return;
+      if (isSoldLife(state, cl) || cm.status === 'Retired' || cm.status === 'Deceased') { if (!(isMare && stallionAvailable(state, cl))) return; }
       if (ci.geneticPotential == null || info.geneticPotential == null) return;
       if (!isMare && mareBreedStatus(state, cl).status) return;
       if (!sameBreed(ci, info)) return;

@@ -2187,6 +2187,9 @@
     if (other && state.horseInfo[other]) { try { var pr = L.pairIdeas(state, other, 3000); pr.mine.concat(pr.other).forEach(function (x) { ideas[x.life] = x; }); } catch (e) { /* no ranking */ } }
     var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).filter(function (life) {
       if (life === selected) return true;
+      // a retired horse is left out, unless it is a stallion with semen vials available
+      var st = (state.horseMeta[life] || {}).status;
+      if (st === 'Retired' || st === 'Deceased') { if (sex !== 'stallion' || !L.stallionAvailable(state, life)) return false; }
       var young = L.isYoungInfo(state.horseInfo[life]);
       if (young ? !f.young : !f.adult) return false;
       if (mine[life] ? !f.mine : !f.other) return false;
@@ -2214,6 +2217,7 @@
     var out = [];
     if (!a) return out;
     if (a.mine) out.push({ text: 'Yours', cls: 'mine' });
+    if (a.retired) out.push({ text: 'Retired — semen vials only', cls: 'none' });
     if (a.partner) out.push({ text: 'Breeding partner (' + a.partner + ')', cls: 'partner' });
     if (a.privateOffer) out.push({ text: 'Private offer to you: ' + a.privateOffer, cls: 'private' });
     if (a.publicFee) out.push({ text: 'Stud fee ' + a.publicFee, cls: 'fee' });

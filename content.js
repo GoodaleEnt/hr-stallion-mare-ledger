@@ -1780,10 +1780,12 @@
     document.querySelectorAll('li.horse-item[data-horse]').forEach(function (li) { ranchSuggOpen[li.getAttribute('data-horse')] = open; });
     syncRanchSugg();
   }
-  function ranchSuggBar(id) {
+  // the two buttons as a group pushed to the right of the screen; the top one sits in the sort bar, the bottom one under the horses
+  function ranchSuggBar(id, inSortBar) {
     var bar = document.createElement('div');
     bar.id = id;
-    bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin:6px 0 10px;font:600 13px system-ui,sans-serif;';
+    bar.style.cssText = inSortBar ? 'display:flex;align-items:center;gap:8px;margin-left:auto;font:600 13px system-ui,sans-serif;'
+      : 'display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:6px 0 10px;font:600 13px system-ui,sans-serif;';
     [['Expand all suggestions', true], ['Close all suggestions', false]].forEach(function (b) {
       var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0];
       btn.style.cssText = 'padding:3px 10px;font:inherit;cursor:pointer;border:1px solid #888;border-radius:6px;background:#fff;color:#222;';
@@ -1827,7 +1829,7 @@
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'hr-ranch-sort';
-      bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 0 10px;font:600 13px system-ui,sans-serif;';
+      bar.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;font:600 13px system-ui,sans-serif;';
       var lab = document.createElement('label'); lab.textContent = 'HR Ledger sort'; lab.htmlFor = 'hr-ranch-sort-sel';
       var sel = document.createElement('select'); sel.id = 'hr-ranch-sort-sel'; sel.style.cssText = 'padding:3px 6px;font:inherit;';
       RANCH_SORTS.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
@@ -1835,7 +1837,7 @@
       bar.appendChild(lab); bar.appendChild(sel);
       grid.parentNode.insertBefore(bar, grid);
     }
-    if (!document.getElementById('hr-ranch-sugg-top')) bar.parentNode.insertBefore(ranchSuggBar('hr-ranch-sugg-top'), grid);
+    if (!document.getElementById('hr-ranch-sugg-top')) bar.appendChild(ranchSuggBar('hr-ranch-sugg-top', true));
     if (!document.getElementById('hr-ranch-sugg-bottom')) grid.parentNode.insertBefore(ranchSuggBar('hr-ranch-sugg-bottom'), grid.nextSibling);
     var selEl = document.getElementById('hr-ranch-sort-sel');
     if (selEl && selEl.value !== key) selEl.value = key;

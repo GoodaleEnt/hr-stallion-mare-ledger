@@ -304,7 +304,7 @@
   }
   function picWrap(imgHtml, life) { return '<span class="pic-wrap">' + imgHtml + picStarsHtml(life) + '</span>'; }
   var STAR_OPTIONS = {
-    conf: { label: 'Conformation has nothing lower than', note: 'gold star', values: (function () { var a = []; for (var v = 55; v <= 75; v++) a.push(v); return a; })() },
+    conf: { label: 'Conformation stats have nothing lower than', note: 'gold star', choices: [['A', 'Average (no Below average stats)'], ['G', 'Good (nothing below Good)'], ['GP', 'Good+ (nothing below Good+)'], ['VG', 'Very good (all Very good)']] },
     gp: { label: 'Genetic potential at least', note: 'teal GP star', values: (function () { var a = []; for (var v = 500; v <= 640; v += 5) a.push(v); return a; })() },
     bt: { label: 'Breed Total at least', note: 'violet BT star', values: (function () { var a = []; for (var v = 60; v <= 76; v += 0.5) a.push(v); return a; })() }
   };
@@ -313,12 +313,12 @@
     function pick(key) {
       var o = STAR_OPTIONS[key];
       return '<div class="field" style="min-width:210px;"><label for="star-' + key + '">' + o.label + ' <span class="sub">(' + o.note + ')</span></label><select id="star-' + key + '" data-action="update-star" data-star="' + key + '"><option value="">Off</option>' +
-        o.values.map(function (v) { return '<option value="' + v + '"' + (Number(cfg[key]) === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></div>';
+        (o.choices ? o.choices.map(function (c) { return '<option value="' + c[0] + '"' + (String(cfg[key]) === c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }) : o.values.map(function (v) { return '<option value="' + v + '"' + (Number(cfg[key]) === v ? ' selected' : '') + '>' + v + '</option>'; })).join('') + '</select></div>';
     }
     return '<div class="card" style="padding:14px 16px;margin-bottom:14px;"><strong>Stars on pictures</strong>' +
-      '<p class="notes-line" style="margin:6px 0 10px;">A star in the top-left corner of a horse\'s picture (on the cards here and the profile, and on your ranch page) shows it clears a limit you choose. <span class="pic-star conf" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> gold: none of its conformation scores is lower than the limit; <span class="pic-star gp" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> teal \u201cGP\u201d: genetic potential at or above its limit; <span class="pic-star bt" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> violet \u201cBT\u201d: Breed Total at or above its limit. Leave a limit Off for no star.</p>' +
+      '<p class="notes-line" style="margin:6px 0 10px;">A star in the top-left corner of a horse\'s picture (on the cards here and the profile, and on your ranch page) shows it clears a limit you choose. <span class="pic-star conf" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> gold: none of its conformation stats (the trait ratings) is rated lower than the limit; <span class="pic-star gp" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> teal \u201cGP\u201d: genetic potential at or above its limit; <span class="pic-star bt" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> violet \u201cBT\u201d: Breed Total at or above its limit. Leave a limit Off for no star.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:14px;">' + pick('conf') + pick('gp') + pick('bt') + '</div>' +
-      '<p class="notes-line" style="margin:8px 0 0;">The conformation star uses the lowest score the ledger knows for the horse (the lowest recorded, any saved show score, and the highest), so a horse with no low recorded yet is judged on the scores it has.</p></div>';
+      '<p class="notes-line" style="margin:8px 0 0;">The conformation star reads the trait ratings of the horse (the 2G 8A 2BA you see on its card): it needs the ratings to be known, and with Average chosen any horse with no Below average trait gets it.</p></div>';
   }
   function renderSettings() {
     // the panels start open the first time this page is shown
@@ -4027,7 +4027,7 @@
         persist();
       }
       else if (action === 'update-focus') { var bf = Object.assign({}, state.settings.breederFocus); if (t.checked) bf[t.getAttribute('data-focus')] = true; else delete bf[t.getAttribute('data-focus')]; state.settings.breederFocus = bf; notesOpen = true; persist(); }
-      else if (action === 'update-star') { var stars = Object.assign({}, state.settings.stars); var sk = t.getAttribute('data-star'); if (t.value) stars[sk] = Number(t.value); else delete stars[sk]; state.settings.stars = stars; persist(); }
+      else if (action === 'update-star') { var stars = Object.assign({}, state.settings.stars); var sk = t.getAttribute('data-star'); if (t.value) stars[sk] = sk === 'conf' ? t.value : Number(t.value); else delete stars[sk]; state.settings.stars = stars; persist(); }
       else if (action === 'update-focus-discipline') { state.settings.focusDiscipline = t.value; notesOpen = true; persist(); }
       else if (action === 'update-save-studs') { state.settings.saveMarketStuds = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-ranch-advice') { state.settings.ranchAdvice = !!t.checked; notesOpen = true; persist(); }

@@ -1823,12 +1823,12 @@
         // stars in the top-left corner of the horse's picture (limits are set in the ledger's Settings)
         var stars = HRLib.starsOf(state, li.getAttribute('data-horse'));
         if (stars.length) {
-          var img = li.querySelector('img'), pbox = img && img.parentElement;
+          var pbox = li; // the card itself, so the stars sit in the corner of the picture whatever layers the horse is drawn in
           if (pbox) {
             if (getComputedStyle(pbox).position === 'static') pbox.style.position = 'relative';
             var sb = document.createElement('span');
             sb.setAttribute('data-hr-advice', '1');
-            sb.style.cssText = 'position:absolute;top:4px;left:6px;display:flex;gap:1px;z-index:5;pointer-events:auto;';
+            sb.style.cssText = 'position:absolute;top:8px;left:10px;display:flex;gap:1px;z-index:20;pointer-events:auto;';
             stars.forEach(function (x) {
               var s = document.createElement('span');
               s.title = 'HR Ledger: ' + x.title;

@@ -1769,6 +1769,7 @@
   // Breed Total, genetic potential or the keep/sell rank. Horses with no value for it go last; ties keep the site's own order.
   var RANCH_SORTS = [
     ['', 'Site order'], ['conf', 'Conformation score: high to low'], ['conf:asc', 'Conformation score: low to high'],
+    ['stats', 'Conformation stats: better first'], ['stats:asc', 'Conformation stats: weaker first'],
     ['bt', 'Breed Total: high to low'], ['bt:asc', 'Breed Total: low to high'], ['gp', 'Genetic potential: high to low'], ['gp:asc', 'Genetic potential: low to high'],
     ['range', 'Conformation range: widest first'], ['ranged', 'Ranged first'], ['rank', 'Keep / sell rank: best first']
   ];
@@ -1777,6 +1778,12 @@
     var meta = (state.horseMeta && state.horseMeta[life]) || {}, info = (state.horseInfo && state.horseInfo[life]) || {};
     var hi = HRLib.bestConformation(meta).best, lo = Number(meta.confLow) || 0;
     if (key === 'conf') return hi > 0 ? hi : null;
+    if (key === 'stats') {
+      // the trait ratings (the 2G 8A 2BA on the card): average rating, Below average = 0 ... Very good = 4; fewer Below average breaks a tie
+      var tc = HRLib.traitCounts(info);
+      var n = tc ? tc.VG + tc.GP + tc.G + tc.A + tc.BA : 0;
+      return n > 0 ? (4 * tc.VG + 3 * tc.GP + 2 * tc.G + tc.A) / n * 1000 - tc.BA : null;
+    }
     if (key === 'range') return hi > 0 && lo > 0 && lo <= hi ? hi - lo : null;
     if (key === 'ranged') { var rs = HRLib.rangeStatus(state, life); return rs ? (rs.ranged ? 1000 : 0) + rs.range : null; }
     if (key === 'gp') { var g = Number(info.geneticPotential); return g > 0 ? g : null; }

@@ -1764,6 +1764,55 @@
     });
   }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
+  // ---- sorting the ranch page by what the ledger knows ----
+  // A small "Sort" box above the horse grid orders the cards by a conformation score recorded in the ledger (top, lowest, range),
+  // Breed Total, genetic potential or the keep/sell rank. Horses with no value for it go last; ties keep the site's own order.
+  var RANCH_SORTS = [
+    ['', 'Site order'], ['conf', 'Top conformation (high to low)'], ['low', 'Lowest conformation (high to low)'], ['range', 'Conformation range (widest first)'],
+    ['ranged', 'Ranged first'], ['bt', 'Breed Total (high to low)'], ['gp', 'Genetic potential (high to low)'], ['rank', 'Keep / sell rank (best first)']
+  ];
+  function ranchSortValue(key, state, life, advice) {
+    var meta = (state.horseMeta && state.horseMeta[life]) || {}, info = (state.horseInfo && state.horseInfo[life]) || {};
+    var hi = HRLib.bestConformation(meta).best, lo = Number(meta.confLow) || 0;
+    if (key === 'conf') return hi > 0 ? hi : null;
+    if (key === 'low') return lo > 0 ? lo : null;
+    if (key === 'range') return hi > 0 && lo > 0 && lo <= hi ? hi - lo : null;
+    if (key === 'ranged') { var rs = HRLib.rangeStatus(state, life); return rs ? (rs.ranged ? 1000 : 0) + rs.range : null; }
+    if (key === 'gp') { var g = Number(info.geneticPotential); return g > 0 ? g : null; }
+    if (key === 'bt') { var b = Math.max(Number(meta.btBest) || 0, HRLib.breedTotal(info.geneticPotential, hi)); return b > 0 ? b : null; }
+    if (key === 'rank') { var a = advice && advice[life]; return a && a.level ? a.level * 1000 - (a.rank || 0) : null; }
+    return null;
+  }
+  function applyRanchSort(state, advice) {
+    var grid = document.querySelector('ul.horse-grid, ul.horses');
+    if (!grid) return;
+    var key = ''; try { key = localStorage.getItem('hrLedgerRanchSort') || ''; } catch (e) { /* no storage */ }
+    var bar = document.getElementById('hr-ranch-sort');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'hr-ranch-sort';
+      bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 0 10px;font:600 13px system-ui,sans-serif;';
+      var lab = document.createElement('label'); lab.textContent = 'HR Ledger sort'; lab.htmlFor = 'hr-ranch-sort-sel';
+      var sel = document.createElement('select'); sel.id = 'hr-ranch-sort-sel'; sel.style.cssText = 'padding:3px 6px;font:inherit;';
+      RANCH_SORTS.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+      sel.addEventListener('change', function () { try { localStorage.setItem('hrLedgerRanchSort', sel.value); } catch (e) { /* no storage */ } renderRanchAdvice(); });
+      bar.appendChild(lab); bar.appendChild(sel);
+      grid.parentNode.insertBefore(bar, grid);
+    }
+    var selEl = document.getElementById('hr-ranch-sort-sel');
+    if (selEl && selEl.value !== key) selEl.value = key;
+    var items = Array.prototype.slice.call(grid.querySelectorAll(':scope > li.horse-item[data-horse]'));
+    items.forEach(function (li, i) { if (li.getAttribute('data-hr-pos') == null) li.setAttribute('data-hr-pos', String(i)); });
+    var rows = items.map(function (li) { return { li: li, pos: Number(li.getAttribute('data-hr-pos')), v: key ? ranchSortValue(key, state, li.getAttribute('data-horse'), advice) : null }; });
+    rows.sort(function (a, b) {
+      if (!key) return a.pos - b.pos;
+      if ((a.v == null) !== (b.v == null)) return a.v == null ? 1 : -1;
+      if (a.v !== b.v) return b.v - a.v;
+      return a.pos - b.pos;
+    });
+    var disp = getComputedStyle(grid).display, useOrder = /flex|grid/.test(disp);
+    rows.forEach(function (r, i) { if (useOrder) r.li.style.order = String(i); else if (grid.children[i] !== r.li) grid.insertBefore(r.li, grid.children[i] || null); });
+  }
   function renderRanchAdvice() {
     var items = document.querySelectorAll('li.horse-item[data-horse]');
     if (!items.length) return;
@@ -1780,6 +1829,7 @@
       // one colour per level, from a dark green (top keeper) to red (sell)
       var COL = { top: '#146C3B', keep: '#1E8449', middle: '#7D8A2B', consider: '#B9770E', sell: '#C0281E', forsale: '#6E7260', nodata: '#8A8F85' };
       var queue = [];
+      try { applyRanchSort(state, advice); } catch (e) { /* sorting is optional */ }
       items.forEach(function (li) {
         li.querySelectorAll('[data-hr-advice]').forEach(function (e) { e.remove(); });
         var a = advice[li.getAttribute('data-horse')];

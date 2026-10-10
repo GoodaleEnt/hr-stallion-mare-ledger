@@ -2095,7 +2095,7 @@
           var tagText = x.better === 'better' ? 'better foal' : x.better === 'worse' ? 'foal falls short' : 'about the same';
           var f = x.foal || {}, dd = x.d || {};
           return '<div style="border-top:1px solid var(--border);padding:7px 0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">' +
-            '<strong>' + L.esc(x.name) + (x.partner ? ' <span class="tag">Partner</span>' : '') + '</strong><button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(x.life) + '">Use</button></div>' +
+            '<strong>' + L.esc(x.name) + (x.partner ? ' <span class="tag">Partner</span>' : '') + ' ' + calcSaleTagHtml(x.life) + '</strong><button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(x.life) + '">Use</button></div>' +
             '<span class="tag" style="font-size:11px;color:var(--' + tagColour + ');">' + tagText + '</span> ' +
             (r.hasGoal ? '<span class="tag" style="font-size:11px;color:var(--' + (x.fits ? 'success' : 'warn') + ');">' + (x.fits ? 'might fit goals' : 'may miss goals') + '</span> ' : '') +
             '<div class="mono" style="font-size:12px;margin:3px 0;">' + (f.conf != null ? 'conformation ' + f.conf + (dd.conf != null ? ' (' + sgn(dd.conf, 1) + ')' : '') + ' \u00b7 ' : '') + 'GP ' + (f.gp || '?') + (dd.gp != null ? ' (' + sgn(dd.gp, 0) + ')' : '') + (f.n ? ' \u00b7 ' + f.strong + '/' + f.n + ' traits good+, ' + f.weak + ' weak' : '') + '</div>' +
@@ -2157,7 +2157,7 @@
       '<datalist id="' + id + '-list">' + rows.map(function (r) {
         var tag = r.breed.status === 'pregnant' ? ' \u2665 in foal' : r.breed.status === 'covered' ? ' \u2714 covered' + (r.breed.stallion ? ' by ' + r.breed.stallion : '') : '';
         var acc = r.access ? calcAccessBadges(r.access).map(function (b) { return b.text; }).join(' \u00b7 ') : '';
-        return '<option value="' + L.esc(calcTypeLabel(r)) + '" label="' + L.esc((r.mine ? 'Your horse' : 'Other horse') + (r.young ? ' \u00b7 under 3' : '') + tag + (acc ? ' \u00b7 ' + acc : '') + (r.score != null ? ' \u00b7 fit ' + (Math.round(r.score * 10) / 10) : '')) + '"></option>';
+        return '<option value="' + L.esc(calcTypeLabel(r)) + '" label="' + L.esc((r.mine ? 'Your horse' : 'Other horse') + (r.young ? ' \u00b7 under 3' : '') + (r.forSale ? ' \u00b7 FOR SALE' : '') + tag + (acc ? ' \u00b7 ' + acc : '') + (r.score != null ? ' \u00b7 fit ' + (Math.round(r.score * 10) / 10) : '')) + '"></option>';
       }).join('') + '</datalist>' + (selected ? '<button type="button" class="link-btn" style="font-size:12px;" data-action="calc-clear-' + (sex === 'mare' ? 'mare' : 'stallion') + '">clear</button>' : '');
   }
   // What was typed or chosen: a "(#life)" ending, a bare life number, or a name that only one horse has
@@ -2177,6 +2177,9 @@
   function calcOptionsHtml(sex, selected) {
     return '';
   }
+  // A horse you have listed for sale: marked everywhere in the calculator so you do not breed it by accident
+  function calcForSale(life) { return ((state.horseMeta && state.horseMeta[life]) || {}).status === 'For Sale'; }
+  function calcSaleTagHtml(life) { return calcForSale(life) ? '<span class="tag" style="font-size:11px;margin:0;background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-weight:700;" title="You have this horse listed for sale">FOR SALE</span>' : ''; }
   function calcRows(sex, selected) {
     var mine = {};
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
@@ -2198,7 +2201,7 @@
       return true;
     }).map(function (life) {
       var idea = ideas[life];
-      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' },
+      return { life: life, forSale: calcForSale(life), name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' },
         access: sex === 'stallion' ? L.studAccess(state, life) : null, idea: idea || null, score: idea ? idea.score : null };
     });
     // stallions you cannot book (no fee for you, not yours, not a partner's) go last; then best fit first, then by name
@@ -2247,7 +2250,7 @@
     var body = shown.map(function (r, i) {
       var a = r.access, dim = a && !a.breedable;
       var bg = a && a.privateOffer ? 'background:var(--warn-bg);box-shadow:inset 4px 0 0 var(--warn);' : a && a.partner ? 'background:var(--accent-soft);box-shadow:inset 4px 0 0 var(--accent-strong);' : a && a.breedable && !a.mine ? 'box-shadow:inset 4px 0 0 var(--success);' : '';
-      var badges = calcAccessBadges(a).map(function (b) { return '<span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE[b.cls] + '">' + L.esc(b.text) + '</span>'; }).join(' ');
+      var badges = (r.forSale ? calcSaleTagHtml(r.life) + ' ' : '') + calcAccessBadges(a).map(function (b) { return '<span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE[b.cls] + '">' + L.esc(b.text) + '</span>'; }).join(' ');
       var st = r.breed && r.breed.status ? '<span class="tag" style="font-size:11px;margin:0;">' + (r.breed.status === 'pregnant' ? '\u2665 in foal' : '\u2714 covered') + '</span>' : '';
       var fit = '';
       if (r.idea) {
@@ -2475,6 +2478,14 @@
       '</div>';
   }
 
+  // Under the pickers: a chosen horse that you have listed for sale
+  function calcSaleNoticeHtml() {
+    var names = [];
+    [[calcMare, 'mare'], [calcStallion, 'stallion']].forEach(function (p) { if (p[0] && state.horseInfo[p[0]] && calcForSale(p[0])) names.push((state.horseInfo[p[0]].name || ('#' + p[0])) + ' (' + p[1] + ')'); });
+    if (!names.length) return '';
+    var many = names.length > 1;
+    return '<div style="background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 14px;margin:0 0 16px;font-size:14px;"><strong>\u26A0 For sale: ' + L.esc(names.join(' and ')) + '</strong><div style="margin-top:3px;">You have listed ' + (many ? 'these horses' : 'this horse') + ' for sale. Breed ' + (many ? 'them' : 'it') + ' only if you mean to keep ' + (many ? 'them' : 'it') + ' a while longer.</div></div>';
+  }
   function renderCalculator() {
     var html = topHeaderHtml();
     html += '<div class="section-head"><h2>Foal Calculator</h2><button type="button" class="btn btn-sm" data-action="calc-refresh" title="Reload the saved horses and recalculate. Your mare and stallion stay selected.">Refresh</button></div>';
@@ -2487,7 +2498,7 @@
     html += calcRankedHtml('stallion') + calcRankedHtml('mare');
     html += calcPlanHtml();
     html += calcSuggestionsHtml();
-    html += calcMareNoticeHtml();
+    html += calcMareNoticeHtml() + calcSaleNoticeHtml();
 
     if (!calcMare || !calcStallion || !state.horseInfo[calcMare] || !state.horseInfo[calcStallion]) {
       html += '<div class="empty"><h3>Pick a mare and a stallion</h3>' +

@@ -1270,20 +1270,22 @@
     function suggestionCards(list) {
       var h2 = '';
       list.forEach(function (s, i) {
-      h2 += '<div class="card" style="padding:14px 16px;margin-bottom:10px;">' +
-        '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;justify-content:space-between;">' +
+      h2 += '<details class="card sugg-card" style="padding:12px 16px;margin-bottom:10px;"><summary style="cursor:pointer;">' +
+        '<div style="display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:10px;justify-content:space-between;width:calc(100% - 24px);vertical-align:top;">' +
           '<div><span class="tag mono">#' + (i + 1) + '</span> <button type="button" class="link-btn" style="font-size:17px;font-weight:600;" data-action="open-passport" data-life="' + L.esc(s.life) + '">' + L.esc(s.name) + '</button>' +
             (s.yours ? ' <span class="tag">Your stallion</span>' : s.partner ? ' <span class="tag" title="A stallion of your breeding partner ' + L.esc(s.partner) + '">Partner</span>' + (s.unlisted ? ' <span class="tag" title="No stud fee or semen is saved for him">No fee saved</span>' : '') : s.unlisted ? ' <span class="tag" title="No stud fee or semen is saved for him">No fee saved</span>' : '') + '</div>' +
           '<div class="mono" style="font-size:15px;">' + (s.estBT != null ? 'Foal BT ~<strong>' + s.estBT + '</strong>' : 'Avg GP <strong>' + s.gp + '</strong>') + ' <button type="button" class="btn btn-sm" data-action="calc-open" data-mare="' + L.esc(life) + '" data-stallion="' + L.esc(s.life) + '">Foal Calculator</button></div>' +
-        '</div>' +
-        '<ul style="margin:8px 0 0 18px;padding:0;font-size:13.5px;line-height:1.55;">' + s.reasons.map(function (x) { return '<li>' + L.esc(x) + '</li>'; }).join('') + '</ul>' +
-      '</div>';
+        '</div></summary>' +
+        '<ul style="margin:10px 0 0 18px;padding:0;font-size:13.5px;line-height:1.55;">' + s.reasons.map(function (x) { return '<li>' + L.esc(x) + '</li>'; }).join('') + '</ul>' +
+      '</details>';
     });
       return h2;
     }
+    var toggleBar = '<div style="display:flex;gap:8px;margin:0 0 10px;"><button type="button" class="btn btn-sm" data-action="sugg-expand-all">Expand all</button><button type="button" class="btn btn-sm" data-action="sugg-collapse-all">Close all</button></div>';
+    html += toggleBar;
     if (r.mine && r.mine.length) html += '<h3 style="margin:14px 0 8px;">Your stallions \u2014 top ' + r.mine.length + '</h3>' + suggestionCards(r.mine);
     if (r.others && r.others.length) html += '<h3 style="margin:14px 0 8px;">Other players\u2019 stallions saved in the ledger \u2014 best crosses</h3><p class="notes-line" style="margin:0 0 8px;">Ones marked <em>No fee saved</em> are stallions you have opened but whose stud fee or semen price is not saved, so they may not be at stud.</p>' + suggestionCards(r.others);
-    return html;
+    return html + '<div style="margin-top:14px;">' + toggleBar + '</div>';
   }
 
   function renderMareDetail() {
@@ -3647,6 +3649,7 @@
         state.horseMeta[msl] = Object.assign({}, state.horseMeta[msl], { status: 'For Sale' });
         persist();
       }
+      else if (action === 'sugg-expand-all' || action === 'sugg-collapse-all') { var open = action === 'sugg-expand-all'; document.querySelectorAll('details.sugg-card').forEach(function (e) { e.open = open; }); }
       else if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-pick-stallion') { calcStallion = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-refresh') {

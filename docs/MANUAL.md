@@ -532,6 +532,8 @@ The **Sell ideas** card on the Analytics tab suggests which of your horses to se
 
 Open a mare's page (Mares, or any mare's profile) and click **Breeding suggestions →** to see the 10 best stallions for her, each with the reasons: the foal's estimated Breed Total (from both parents' genetic potential and top conformation), inbreeding, conformation traits where he covers her weak ones (or where you are both weak), his fertility, what he costs (stud fee, transport and semen vial when known), and whether they have been bred together before.
 
+Each suggested stallion is a collapsed row showing its rank, name, tags, estimated foal Breed Total and a Foal Calculator button; click a row (or its arrow) to open the reasons. **Expand all** and **Close all** buttons sit at the top and the bottom of the list.
+
 **Only horses saved in the ledger are considered**: stallions whose pages you have opened on Horse Reality (age 3 and over, not sold or retired, with a genetic potential saved). Open more stallions' pages and they join the list. A mare under 3 gets no suggestions, and a covered or in-foal mare shows a note that the list is for her next breeding.
 
 **Only stallions you can actually use are suggested:** yours that are active, and any stallion with semen vials or an active public or private stud fee saved from his page or Breed page. Retired, sold and deceased stallions, and other players' stallions the ledger has no stud details for, are left out (the page says how many). Suggestions are also limited to the mare's own breed, because Horse Reality has no crossbreeding.

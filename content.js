@@ -1768,14 +1768,15 @@
   // A small "Sort" box above the horse grid orders the cards by a conformation score recorded in the ledger (top, lowest, range),
   // Breed Total, genetic potential or the keep/sell rank. Horses with no value for it go last; ties keep the site's own order.
   var RANCH_SORTS = [
-    ['', 'Site order'], ['conf', 'Top conformation (high to low)'], ['low', 'Lowest conformation (high to low)'], ['range', 'Conformation range (widest first)'],
-    ['ranged', 'Ranged first'], ['bt', 'Breed Total (high to low)'], ['gp', 'Genetic potential (high to low)'], ['rank', 'Keep / sell rank (best first)']
+    ['', 'Site order'], ['conf', 'Conformation score: high to low'], ['conf:asc', 'Conformation score: low to high'],
+    ['bt', 'Breed Total: high to low'], ['bt:asc', 'Breed Total: low to high'], ['gp', 'Genetic potential: high to low'], ['gp:asc', 'Genetic potential: low to high'],
+    ['range', 'Conformation range: widest first'], ['ranged', 'Ranged first'], ['rank', 'Keep / sell rank: best first']
   ];
   function ranchSortValue(key, state, life, advice) {
+    key = String(key).replace(':asc', '');
     var meta = (state.horseMeta && state.horseMeta[life]) || {}, info = (state.horseInfo && state.horseInfo[life]) || {};
     var hi = HRLib.bestConformation(meta).best, lo = Number(meta.confLow) || 0;
     if (key === 'conf') return hi > 0 ? hi : null;
-    if (key === 'low') return lo > 0 ? lo : null;
     if (key === 'range') return hi > 0 && lo > 0 && lo <= hi ? hi - lo : null;
     if (key === 'ranged') { var rs = HRLib.rangeStatus(state, life); return rs ? (rs.ranged ? 1000 : 0) + rs.range : null; }
     if (key === 'gp') { var g = Number(info.geneticPotential); return g > 0 ? g : null; }
@@ -1807,7 +1808,7 @@
     rows.sort(function (a, b) {
       if (!key) return a.pos - b.pos;
       if ((a.v == null) !== (b.v == null)) return a.v == null ? 1 : -1;
-      if (a.v !== b.v) return b.v - a.v;
+      if (a.v !== b.v) return /:asc$/.test(key) ? a.v - b.v : b.v - a.v;
       return a.pos - b.pos;
     });
     var disp = getComputedStyle(grid).display, useOrder = /flex|grid/.test(disp);

@@ -1820,6 +1820,26 @@
         } });
         // the very bottom of the card, so it sits in the same place on every card
         host.appendChild(box);
+        // stars in the top-left corner of the horse's picture (limits are set in the ledger's Settings)
+        var stars = HRLib.starsOf(state, li.getAttribute('data-horse'));
+        if (stars.length) {
+          var img = li.querySelector('img'), pbox = img && img.parentElement;
+          if (pbox) {
+            if (getComputedStyle(pbox).position === 'static') pbox.style.position = 'relative';
+            var sb = document.createElement('span');
+            sb.setAttribute('data-hr-advice', '1');
+            sb.style.cssText = 'position:absolute;top:4px;left:6px;display:flex;gap:1px;z-index:5;pointer-events:auto;';
+            stars.forEach(function (x) {
+              var s = document.createElement('span');
+              s.title = 'HR Ledger: ' + x.title;
+              s.style.cssText = 'position:relative;display:inline-block;width:30px;height:30px;font:30px/30px system-ui,sans-serif;text-align:center;text-shadow:0 1px 2px rgba(0,0,0,.55);color:' + { conf: '#F2B705', gp: '#1A9E9E', bt: '#8E4FD0' }[x.key] + ';';
+              s.textContent = '\u2605';
+              if (x.label) { var b = document.createElement('b'); b.textContent = x.label; b.style.cssText = 'position:absolute;left:0;right:0;top:0;font:800 9px/31px system-ui,sans-serif;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.8);'; s.appendChild(b); }
+              sb.appendChild(s);
+            });
+            pbox.appendChild(sb);
+          }
+        }
       });
       function step() {
         var t0 = Date.now();

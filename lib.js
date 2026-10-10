@@ -3648,6 +3648,30 @@
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     return Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, bestConformation(meta).best));
   }
+  // Stars on a horse's picture, from the limits in Settings (settings.stars = { conf, gp, bt }, 0 or missing = off):
+  //   gold star: nothing lower than the conformation limit (judged on the lowest conformation score the ledger knows)
+  //   teal "GP" star: genetic potential at or above its limit; violet "BT" star: Breed Total at or above its limit
+  function lowestKnownConf(meta) {
+    var v = [];
+    if (Number(meta && meta.confLow) > 0) v.push(Number(meta.confLow));
+    if (meta && Array.isArray(meta.showLog)) meta.showLog.forEach(function (e) { if (Number(e && e.score) > 0) v.push(Number(e.score)); });
+    var best = bestConformation(meta || {}).best;
+    if (best > 0) v.push(best);
+    return v.length ? Math.min.apply(null, v) : 0;
+  }
+  function starsOf(state, life) {
+    var cfg = (state && state.settings && state.settings.stars) || {}, out = [];
+    var info = (state.horseInfo && state.horseInfo[life]) || null, meta = (state.horseMeta && state.horseMeta[life]) || {};
+    if (!info) return out;
+    var rnd = function (n) { return Math.round(n * 1000) / 1000; };
+    var c = Number(cfg.conf) || 0;
+    if (c > 0) { var low = lowestKnownConf(meta); if (low > 0 && low >= c) out.push({ key: 'conf', label: '', title: 'Conformation: nothing lower than ' + c + ' (lowest score known ' + rnd(low) + ')' }); }
+    var g = Number(cfg.gp) || 0, gp = Number(info.geneticPotential);
+    if (g > 0 && gp >= g) out.push({ key: 'gp', label: 'GP', title: 'Genetic potential ' + gp + ' (your limit ' + g + ')' });
+    var b = Number(cfg.bt) || 0;
+    if (b > 0) { var bt = horseBT(state, life); if (bt >= b) out.push({ key: 'bt', label: 'BT', title: 'Breed Total ' + rnd(bt) + ' (your limit ' + b + ')' }); }
+    return out;
+  }
   // The price to ask for one horse: { suggested, low, high, basis, comps, floor, belowCost }
   function priceIdea(state, life, pace, soldComps) {
     var bt = horseBT(state, life);
@@ -4043,6 +4067,7 @@
     marketRowInfo: marketRowInfo,
     recordCompScore: recordCompScore,
     compSummary: compSummary,
+    starsOf: starsOf,
     studAccess: studAccess,
     compScoreOf: compScoreOf,
     disciplineNameOf: disciplineNameOf,

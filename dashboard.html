@@ -231,7 +231,19 @@
   .herd-row .name-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
   .herd-row .name-tags .tag{ white-space:normal; line-height:1.35; border-radius:12px; font-weight:400; }
   .herd-row .name{ font-weight:600; }
-  .herd-pic{ width:200px; height:200px; }
+  .herd-pic{ width:200px; height:200px; position:relative; }
+  /* stars on a picture: gold = nothing lower than the conformation limit, teal GP, violet BT (limits are set in Settings) */
+  .pic-wrap{ position:relative; display:block; }
+  .pic-wrap img{ display:block; }
+  .detail-head .pic-wrap{ flex-shrink:0; width:96px; height:96px; }
+  .pic-stars{ position:absolute; top:4px; left:6px; display:flex; gap:1px; z-index:3; pointer-events:auto; }
+  .pic-star{ position:relative; display:inline-block; width:30px; height:30px; font-size:30px; line-height:30px; text-align:center; text-shadow:0 1px 2px rgba(0,0,0,.55); }
+  .pic-star b{ position:absolute; left:0; right:0; top:0; font-size:9px; line-height:31px; font-weight:800; color:#fff; text-shadow:0 0 2px rgba(0,0,0,.8); letter-spacing:0; }
+  .pic-star.conf{ color:#F2B705; }
+  .pic-star.gp{ color:#1A9E9E; }
+  .pic-star.bt{ color:#8E4FD0; }
+  .detail-head .pic-star{ width:24px; height:24px; font-size:24px; line-height:24px; }
+  .detail-head .pic-star b{ font-size:7px; line-height:25px; }
   .herd-pic img, .herd-pic .nopic{ width:200px; height:200px; object-fit:contain; border-radius:10px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:12px; }
   .herd-row .sub{ font-size:11.5px; font-weight:400; color:var(--text-muted); }
   .herd-row input, .herd-row select.role-select, .herd-filters select{ background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:5px 9px; font-size:12.5px; color:var(--text); font-family:inherit; width:100%; min-width:0; }

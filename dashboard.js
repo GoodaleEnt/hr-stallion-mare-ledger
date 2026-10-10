@@ -295,6 +295,31 @@
   // Everything you set up in one place, instead of panels above every list: who you are, backups, highlight goals, notes and
   // preferences (breeder focus, partners, genes, switches), and purchase criteria.
   var settingsSeen = false;
+  // Stars on a horse's picture (limits are set in Settings)
+  function picStarsHtml(life) {
+    if (!life) return '';
+    var st = L.starsOf(state, life);
+    if (!st.length) return '';
+    return '<span class="pic-stars">' + st.map(function (x) { return '<span class="pic-star ' + x.key + '" title="' + L.esc(x.title) + '">\u2605' + (x.label ? '<b>' + x.label + '</b>' : '') + '</span>'; }).join('') + '</span>';
+  }
+  function picWrap(imgHtml, life) { return '<span class="pic-wrap">' + imgHtml + picStarsHtml(life) + '</span>'; }
+  var STAR_OPTIONS = {
+    conf: { label: 'Conformation has nothing lower than', note: 'gold star', values: (function () { var a = []; for (var v = 55; v <= 75; v++) a.push(v); return a; })() },
+    gp: { label: 'Genetic potential at least', note: 'teal GP star', values: (function () { var a = []; for (var v = 500; v <= 640; v += 5) a.push(v); return a; })() },
+    bt: { label: 'Breed Total at least', note: 'violet BT star', values: (function () { var a = []; for (var v = 60; v <= 76; v += 0.5) a.push(v); return a; })() }
+  };
+  function starsPanelHtml() {
+    var cfg = (state.settings && state.settings.stars) || {};
+    function pick(key) {
+      var o = STAR_OPTIONS[key];
+      return '<div class="field" style="min-width:210px;"><label for="star-' + key + '">' + o.label + ' <span class="sub">(' + o.note + ')</span></label><select id="star-' + key + '" data-action="update-star" data-star="' + key + '"><option value="">Off</option>' +
+        o.values.map(function (v) { return '<option value="' + v + '"' + (Number(cfg[key]) === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></div>';
+    }
+    return '<div class="card" style="padding:14px 16px;margin-bottom:14px;"><strong>Stars on pictures</strong>' +
+      '<p class="notes-line" style="margin:6px 0 10px;">A star in the top-left corner of a horse\'s picture (on the cards here and the profile, and on your ranch page) shows it clears a limit you choose. <span class="pic-star conf" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> gold: none of its conformation scores is lower than the limit; <span class="pic-star gp" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> teal \u201cGP\u201d: genetic potential at or above its limit; <span class="pic-star bt" style="width:auto;height:auto;font-size:15px;line-height:1;">\u2605</span> violet \u201cBT\u201d: Breed Total at or above its limit. Leave a limit Off for no star.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:14px;">' + pick('conf') + pick('gp') + pick('bt') + '</div>' +
+      '<p class="notes-line" style="margin:8px 0 0;">The conformation star uses the lowest score the ledger knows for the horse (the lowest recorded, any saved show score, and the highest), so a horse with no low recorded yet is judged on the scores it has.</p></div>';
+  }
   function renderSettings() {
     // the panels start open the first time this page is shown
     if (!settingsSeen) { settingsSeen = true; goalsOpen = true; notesOpen = true; buyOpen = true; }
@@ -315,6 +340,7 @@
         '<input type="file" id="restore-file-input" accept="application/json" style="display:none;">' +
       '</div></div>';
     html += breedCleanupHtml();
+    html += starsPanelHtml();
     html += goalsPanelHtml();
     html += notesPanelHtml();
     html += purchasePanelHtml();
@@ -609,7 +635,7 @@
     html += suggestionsLinkHtml(selectedPassportLife);
     html += goalStripHtml(selectedPassportLife);
     html += '<div class="detail-head profile-goal' + goalClass(selectedPassportLife) + '"><div class="name-row">' +
-      (info.imageUrl ? '<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">' : '') +
+      (info.imageUrl ? picWrap('<img class="portrait" src="' + L.esc(info.imageUrl) + '" alt="">', selectedPassportLife) : '') +
       '<div><h1>' + L.esc(info.name || 'Unnamed horse') + '</h1>' +
       '<div class="tags">' +
         '<span class="tag mono">#' + L.esc(selectedPassportLife) + '</span>' +
@@ -833,7 +859,7 @@
         html += '<div class="card stallion-card' + goalClass(s.lifeNumber) + '" data-action="open-stallion" data-id="' + s.id + '">' +
           goalStripHtml(s.lifeNumber) + preferredGeneTagHtml(s.lifeNumber) +
           (s.status && s.status !== 'Active' ? '<span class="pill corner-badge ' + L.stallionStatusClass(s.status) + '">' + L.esc(s.status) + '</span>' : '') +
-          (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
+          (s.imageUrl ? picWrap('<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">', s.lifeNumber) : '') +
           '<h3>' + L.esc(s.name) + '</h3>' +
           (s.lifeNumber ? '<div class="lifenum mono">#' + L.esc(s.lifeNumber) + '</div>' : '') +
           '<div class="meta">' + L.esc([s.breed, s.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
@@ -1056,7 +1082,7 @@
         html += '<div class="card stallion-card' + goalClass(m.mareLifeNumber) + (breedSt.status ? ' mare-' + breedSt.status : '') + (breedMisses.length ? ' mare-below' : '') + '" data-action="open-mare" data-key="' + L.esc(m.key) + '">' +
           mareBreedBadgeHtml(breedSt, breedMisses) +
           goalStripHtml(m.mareLifeNumber) + improverTagHtml(m.mareLifeNumber) + preferredGeneTagHtml(m.mareLifeNumber) +
-          (mareInfo && mareInfo.imageUrl ? '<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">' : '') +
+          (mareInfo && mareInfo.imageUrl ? picWrap('<img class="portrait" src="' + L.esc(mareInfo.imageUrl) + '" alt="">', m.mareLifeNumber) : '') +
           '<h3>' + L.esc(m.mareName) + '</h3>' +
           (m.mareLifeNumber ? '<div class="lifenum mono">#' + L.esc(m.mareLifeNumber) + '</div>' : '') +
           '<div class="row"><span>Breedings</span><span class="v mono">' + m.records.length + '</span></div>' +
@@ -1107,7 +1133,7 @@
       list.forEach(function (h) {
         out += '<div class="card stallion-card' + goalClass(h.lifeNumber) + '" data-action="open-passport" data-life="' + L.esc(h.lifeNumber) + '">' +
           goalStripHtml(h.lifeNumber) +
-          (h.imageUrl ? '<img class="portrait" src="' + L.esc(h.imageUrl) + '" alt="">' : '') +
+          (h.imageUrl ? picWrap('<img class="portrait" src="' + L.esc(h.imageUrl) + '" alt="">', h.lifeNumber) : '') +
           '<h3>' + L.esc(h.name || 'Unnamed horse') + '</h3>' +
           '<div class="lifenum mono">#' + L.esc(h.lifeNumber) + '</div>' +
           '<div class="meta">' + L.esc([h.breed, h.color].filter(Boolean).join(' · ') || 'No breed set') + '</div>' +
@@ -1346,7 +1372,7 @@
     var life = L.esc(h.lifeNumber);
     var pic = horsePictureUrl(h.lifeNumber);
     return '<div class="herd-row' + goalClass(h.lifeNumber) + '">' +
-      goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+      goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + picStarsHtml(h.lifeNumber) + '</div>' +
       '<div class="name" data-label="Horse"><span>' + (bulkMode ? '<input type="checkbox" data-action="bulk-pick" data-life="' + life + '" aria-label="Select ' + L.esc(info.name || 'horse') + '"' + (bulkSel[h.lifeNumber] ? ' checked' : '') + ' style="margin-right:6px;"> ' : '') + '<button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span>' + (L.tagsOf(state, h.lifeNumber).length ? '<div style="margin-top:2px;">' + tagChipsHtml(h.lifeNumber, false) + '</div>' : '') + '</div>' +
       '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
@@ -2014,7 +2040,7 @@
       var pic = horsePictureUrl(info.lifeNumber);
       var detail = [info.breed, info.sex ? info.sex.charAt(0).toUpperCase() + info.sex.slice(1) : '', info.ownerName ? 'Owner: ' + info.ownerName : ''].filter(Boolean).join(' · ');
       html += '<div class="herd-row other-row' + goalClass(info.lifeNumber) + '">' +
-        goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + '</div>' +
+        goalStripHtml(info.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + picStarsHtml(info.lifeNumber) + '</div>' +
         '<div class="name" data-label="Horse"><span><button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span></span>' + (info.sold ? '<div class="name-tags"><span class="tag">Sold</span>' + saleTagsHtml(info.lifeNumber) + '</div>' : '') + '</div>' +
         '<div data-label="Details"><span>' + L.esc(detail || '—') + '</span>' + (info.sex === 'stallion' ? studFeeCompactHtml(info.lifeNumber) : '') + '</div>' +
         '<div>' + (info.sold ? '<button class="btn btn-sm" data-action="restore-horse" data-life="' + life + '" title="Set back to Active and return it to your lists">Restore</button>' : '<button class="btn btn-sm" data-action="untrack-horse" data-life="' + life + '">Remove</button>') + '</div>' +
@@ -3467,7 +3493,7 @@
     } else {
       html += goalStripHtml(s.lifeNumber);
       html += '<div class="detail-head profile-goal' + goalClass(s.lifeNumber) + '"><div class="name-row">' +
-        (s.imageUrl ? '<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">' : '') +
+        (s.imageUrl ? picWrap('<img class="portrait" src="' + L.esc(s.imageUrl) + '" alt="">', s.lifeNumber) : '') +
         '<div><h1>' + L.esc(s.name) + '</h1>' +
         '<div class="tags">' +
           (s.owned === false ? '<span class="tag">Not your stud — tracked for a mare\'s breeding history</span>' : '') +
@@ -4001,6 +4027,7 @@
         persist();
       }
       else if (action === 'update-focus') { var bf = Object.assign({}, state.settings.breederFocus); if (t.checked) bf[t.getAttribute('data-focus')] = true; else delete bf[t.getAttribute('data-focus')]; state.settings.breederFocus = bf; notesOpen = true; persist(); }
+      else if (action === 'update-star') { var stars = Object.assign({}, state.settings.stars); var sk = t.getAttribute('data-star'); if (t.value) stars[sk] = Number(t.value); else delete stars[sk]; state.settings.stars = stars; persist(); }
       else if (action === 'update-focus-discipline') { state.settings.focusDiscipline = t.value; notesOpen = true; persist(); }
       else if (action === 'update-save-studs') { state.settings.saveMarketStuds = !!t.checked; notesOpen = true; persist(); }
       else if (action === 'update-ranch-advice') { state.settings.ranchAdvice = !!t.checked; notesOpen = true; persist(); }

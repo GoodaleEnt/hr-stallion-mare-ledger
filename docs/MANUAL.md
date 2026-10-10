@@ -221,6 +221,8 @@ The **Purchase criteria** panel (on the Settings tab, under My notes) is where y
 
 On your **ranch (estate) page** on Horse Reality, each horse card of yours that is saved in the ledger gets a badge **at the bottom of the card** showing where the horse sits between keeping and selling, compared with the rest of your herd:
 
+**Breeding suggestions are collapsed.** On a free mare's card the *→ Yours* and *→ Other* stallion suggestions sit behind a **▸ Breeding suggestions** button; click it to open or close that card's suggestions. **Expand all suggestions** and **Close all suggestions** buttons are above and below the horses on the page.
+
 **Sorting the ranch page.** A small **HR Ledger sort** box appears above the horses on your ranch page. Choose *Conformation score*, *Conformation stats* (the trait ratings, better first or weaker first), *Breed Total* or *Genetic potential* (each high to low or low to high), *Conformation range*, *Ranged first* or *Keep / sell rank* and the cards reorder using what the ledger has recorded; horses with no value for it go last, and *Site order* puts them back. Your choice is remembered in this browser.
 
 - **Level tag and five pips:** **Top keeper** (dark green, 5 pips), **Keep** (green), **Middle of the herd** (olive), **Consider selling** (amber) or **Sell** (red, 1 pip), with the horse's **rank** in its group (for example 12/60). A selling level also shows the asking price the ledger would use; a mare also shows **in foal** or **covered**; a listed horse shows **For sale**.

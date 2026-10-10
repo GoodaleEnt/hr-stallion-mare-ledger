@@ -1764,6 +1764,34 @@
     });
   }
   var ranchTimers = [], ranchObserver = null, ranchDebounce = null;
+  // ---- breeding suggestions on the ranch cards are collapsed until you open them ----
+  // Each free mare's card has a "Breeding suggestions" toggle; Expand all / Close all buttons sit above and below the horses.
+  var ranchSuggOpen = {};
+  function syncRanchSugg() {
+    document.querySelectorAll('li.horse-item[data-horse]').forEach(function (li) {
+      var sub = li.querySelector('[data-hr-sugg]'), tg = li.querySelector('[data-hr-sugg-toggle]');
+      if (!sub || !tg) return;
+      var open = !!ranchSuggOpen[li.getAttribute('data-horse')];
+      sub.style.display = open ? 'flex' : 'none';
+      tg.textContent = (open ? '\u25BE ' : '\u25B8 ') + 'Breeding suggestions';
+    });
+  }
+  function setAllRanchSugg(open) {
+    document.querySelectorAll('li.horse-item[data-horse]').forEach(function (li) { ranchSuggOpen[li.getAttribute('data-horse')] = open; });
+    syncRanchSugg();
+  }
+  function ranchSuggBar(id) {
+    var bar = document.createElement('div');
+    bar.id = id;
+    bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin:6px 0 10px;font:600 13px system-ui,sans-serif;';
+    [['Expand all suggestions', true], ['Close all suggestions', false]].forEach(function (b) {
+      var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0];
+      btn.style.cssText = 'padding:3px 10px;font:inherit;cursor:pointer;border:1px solid #888;border-radius:6px;background:#fff;color:#222;';
+      btn.addEventListener('click', function (e) { e.preventDefault(); setAllRanchSugg(b[1]); });
+      bar.appendChild(btn);
+    });
+    return bar;
+  }
   // ---- sorting the ranch page by what the ledger knows ----
   // A small "Sort" box above the horse grid orders the cards by a conformation score recorded in the ledger (top, lowest, range),
   // Breed Total, genetic potential or the keep/sell rank. Horses with no value for it go last; ties keep the site's own order.
@@ -1807,6 +1835,8 @@
       bar.appendChild(lab); bar.appendChild(sel);
       grid.parentNode.insertBefore(bar, grid);
     }
+    if (!document.getElementById('hr-ranch-sugg-top')) bar.parentNode.insertBefore(ranchSuggBar('hr-ranch-sugg-top'), grid);
+    if (!document.getElementById('hr-ranch-sugg-bottom')) grid.parentNode.insertBefore(ranchSuggBar('hr-ranch-sugg-bottom'), grid.nextSibling);
     var selEl = document.getElementById('hr-ranch-sort-sel');
     if (selEl && selEl.value !== key) selEl.value = key;
     var items = Array.prototype.slice.call(grid.querySelectorAll(':scope > li.horse-item[data-horse]'));
@@ -1848,11 +1878,11 @@
         box.setAttribute('data-hr-advice', '1');
         box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:6px 6px 8px;margin:0;position:relative;z-index:2;clear:both;flex:0 0 auto;font:700 12px/1.4 system-ui,sans-serif;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
-        function pill(text, bg) {
+        function pill(text, bg, into) {
           var d = document.createElement('span');
           d.textContent = text;
           d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;background:' + bg + ';white-space:normal;text-align:center;max-width:100%;';
-          box.appendChild(d);
+          (into || box).appendChild(d);
           return d;
         }
         pill((a.protectedHorse ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
@@ -1871,9 +1901,23 @@
         }
         function stud(b) { return b.name + (b.estBT != null ? ' \u00b7 BT ' + b.estBT : ''); }
         // the best stallion for a free mare is worked out afterwards, a few at a time while the browser is idle
+        if (a.freeMare) {
+          // a toggle, and the suggestions inside a box that is closed until you open it
+          var tg = document.createElement('button');
+          tg.type = 'button'; tg.setAttribute('data-hr-sugg-toggle', '1');
+          tg.style.cssText = 'flex:0 0 100%;max-width:100%;padding:2px 10px;font:700 12px system-ui,sans-serif;cursor:pointer;border:1px solid #5B3E8A;border-radius:10px;background:#fff;color:#5B3E8A;';
+          var subBox = document.createElement('div');
+          subBox.setAttribute('data-hr-sugg', '1');
+          subBox.style.cssText = 'display:none;flex:0 0 100%;flex-wrap:wrap;justify-content:center;gap:4px 6px;';
+          tg.addEventListener('click', function (e) { e.preventDefault(); var l = li.getAttribute('data-horse'); ranchSuggOpen[l] = !ranchSuggOpen[l]; syncRanchSugg(); });
+          box.appendChild(tg); box.appendChild(subBox);
+        }
         if (a.freeMare) queue.push({ life: li.getAttribute('data-horse'), show: function (pa) {
-          if (pa.bestOwn) pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F');
-          if (pa.best && !pa.best.yours) pill('\u2192 Other: ' + stud(pa.best) + (pa.best.partner ? ' (partner)' : '') + (pa.best.unlisted ? ' (no fee saved)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), '#5B3E8A');
+          var subBox2 = box.querySelector('[data-hr-sugg]');
+          if (pa.bestOwn) pill('\u2192 Yours: ' + stud(pa.bestOwn), '#2E3B1F', subBox2);
+          if (pa.best && !pa.best.yours) pill('\u2192 Other: ' + stud(pa.best) + (pa.best.partner ? ' (partner)' : '') + (pa.best.unlisted ? ' (no fee saved)' : (pa.best.cost ? ' \u00b7 ' + pa.best.cost : '')), '#5B3E8A', subBox2);
+          if (!pa.bestOwn && !(pa.best && !pa.best.yours)) { var none = box.querySelector('[data-hr-sugg-toggle]'); if (none) none.style.display = 'none'; }
+          syncRanchSugg();
           if (pa.reasons.length) box.title = box.title + '\n\n' + pa.reasons.join('\n');
         } });
         // the very bottom of the card, so it sits in the same place on every card

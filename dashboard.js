@@ -2156,7 +2156,8 @@
     return '<input id="' + id + '" type="text" list="' + id + '-list" autocomplete="off" data-action="' + id + '-text" placeholder="Type a name or life number\u2026" value="' + L.esc(cur ? calcTypeLabel(cur) : '') + '" style="width:100%;">' +
       '<datalist id="' + id + '-list">' + rows.map(function (r) {
         var tag = r.breed.status === 'pregnant' ? ' \u2665 in foal' : r.breed.status === 'covered' ? ' \u2714 covered' + (r.breed.stallion ? ' by ' + r.breed.stallion : '') : '';
-        return '<option value="' + L.esc(calcTypeLabel(r)) + '" label="' + L.esc((r.mine ? 'Your horse' : 'Other horse') + (r.young ? ' \u00b7 under 3' : '') + tag) + '"></option>';
+        var acc = r.access ? calcAccessBadges(r.access).map(function (b) { return b.text; }).join(' \u00b7 ') : '';
+        return '<option value="' + L.esc(calcTypeLabel(r)) + '" label="' + L.esc((r.mine ? 'Your horse' : 'Other horse') + (r.young ? ' \u00b7 under 3' : '') + tag + (acc ? ' \u00b7 ' + acc : '') + (r.score != null ? ' \u00b7 fit ' + (Math.round(r.score * 10) / 10) : '')) + '"></option>';
       }).join('') + '</datalist>' + (selected ? '<button type="button" class="link-btn" style="font-size:12px;" data-action="calc-clear-' + (sex === 'mare' ? 'mare' : 'stallion') + '">clear</button>' : '');
   }
   // What was typed or chosen: a "(#life)" ending, a bare life number, or a name that only one horse has
@@ -2181,6 +2182,9 @@
     L.ownedHorses(state).forEach(function (h) { mine[h.lifeNumber] = true; });
     var f = calcFilter[sex], sugg = f.sugg ? calcSuggestedSet(sex) : null;
     var calcBreedKey = breedInForce(calcBreed, sex === 'mare' ? calcStallion : calcMare);
+    // best fit for the horse picked on the other side: the ledger's own partner ranking (a higher score is a better fit)
+    var other = sex === 'mare' ? calcStallion : calcMare, ideas = {};
+    if (other && state.horseInfo[other]) { try { var pr = L.pairIdeas(state, other, 3000); pr.mine.concat(pr.other).forEach(function (x) { ideas[x.life] = x; }); } catch (e) { /* no ranking */ } }
     var rows = Object.keys(state.horseInfo || {}).filter(function (life) { return state.horseInfo[life].sex === sex; }).filter(function (life) {
       if (life === selected) return true;
       var young = L.isYoungInfo(state.horseInfo[life]);
@@ -2190,9 +2194,73 @@
       if (!breedAllowed(life, calcBreedKey)) return false;
       return true;
     }).map(function (life) {
-      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' } };
-    }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      var idea = ideas[life];
+      return { life: life, name: state.horseInfo[life].name || ('#' + life), mine: !!mine[life], young: L.isYoungInfo(state.horseInfo[life]), breed: sex === 'mare' ? L.mareBreedStatus(state, life) : { status: '' },
+        access: sex === 'stallion' ? L.studAccess(state, life) : null, idea: idea || null, score: idea ? idea.score : null };
+    });
+    // stallions you cannot book (no fee for you, not yours, not a partner's) go last; then best fit first, then by name
+    rows.sort(function (a, b) {
+      var ba = a.access ? (a.access.breedable ? 0 : 1) : 0, bb = b.access ? (b.access.breedable ? 0 : 1) : 0;
+      if (ba !== bb) return ba - bb;
+      if (a.young !== b.young) return a.young ? 1 : -1;
+      var sa = a.score == null ? -1e9 : a.score, sb = b.score == null ? -1e9 : b.score;
+      if (sa !== sb) return sb - sa;
+      return a.name.localeCompare(b.name);
+    });
     return rows;
+  }
+  // The coloured badges for a stallion: what you can book him on
+  function calcAccessBadges(a) {
+    var out = [];
+    if (!a) return out;
+    if (a.mine) out.push({ text: 'Yours', cls: 'mine' });
+    if (a.partner) out.push({ text: 'Breeding partner (' + a.partner + ')', cls: 'partner' });
+    if (a.privateOffer) out.push({ text: 'Private offer to you: ' + a.privateOffer, cls: 'private' });
+    if (a.publicFee) out.push({ text: 'Stud fee ' + a.publicFee, cls: 'fee' });
+    if (a.semen) out.push({ text: 'Semen ' + a.semen, cls: 'fee' });
+    if (!a.breedable) out.push({ text: a.lastFee ? 'No fee listed for you (last paid ' + a.lastFee + ')' : 'No stud fee for you', cls: 'none' });
+    return out;
+  }
+  var CALC_BADGE_STYLE = {
+    mine: 'background:var(--accent-soft);color:var(--accent-strong);border-color:var(--accent-strong);',
+    partner: 'background:var(--accent-soft);color:var(--accent-strong);border-color:var(--accent-strong);font-weight:700;',
+    private: 'background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-weight:700;',
+    fee: 'background:var(--success-bg);color:var(--success);border-color:var(--success);',
+    none: 'color:var(--text-muted);'
+  };
+  // The ranked list under a picker: best fit for the horse on the other side first, with the stallions you can book
+  // highlighted (partner, private offer, fee) and the ones with no fee for you dimmed at the bottom.
+  function calcRankedHtml(sex) {
+    var other = sex === 'mare' ? calcStallion : calcMare, selected = sex === 'mare' ? calcMare : calcStallion;
+    var rows = calcRows(sex, selected);
+    if (!rows.length) return '';
+    var otherName = other && state.horseInfo[other] ? (state.horseInfo[other].name || ('#' + other)) : '';
+    var nBook = sex === 'stallion' ? rows.filter(function (r) { return r.access && r.access.breedable; }).length : rows.length;
+    var shown = rows.slice(0, 30);
+    var pickAction = sex === 'mare' ? 'calc-pick-mare' : 'calc-pick-stallion';
+    var title = (sex === 'stallion' ? 'Stallions' : 'Mares') + (otherName ? ' \u2014 best fit for ' + L.esc(otherName) + ' first' : ' \u2014 pick a ' + (sex === 'stallion' ? 'mare' : 'stallion') + ' to order by fit');
+    var sum = sex === 'stallion' ? nBook + ' you can book of ' + rows.length : rows.length + ' listed';
+    var body = shown.map(function (r, i) {
+      var a = r.access, dim = a && !a.breedable;
+      var bg = a && a.privateOffer ? 'background:var(--warn-bg);box-shadow:inset 4px 0 0 var(--warn);' : a && a.partner ? 'background:var(--accent-soft);box-shadow:inset 4px 0 0 var(--accent-strong);' : a && a.breedable && !a.mine ? 'box-shadow:inset 4px 0 0 var(--success);' : '';
+      var badges = calcAccessBadges(a).map(function (b) { return '<span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE[b.cls] + '">' + L.esc(b.text) + '</span>'; }).join(' ');
+      var st = r.breed && r.breed.status ? '<span class="tag" style="font-size:11px;margin:0;">' + (r.breed.status === 'pregnant' ? '\u2665 in foal' : '\u2714 covered') + '</span>' : '';
+      var fit = '';
+      if (r.idea) {
+        var x = r.idea, f = x.foal || {};
+        fit = '<span class="tag" style="font-size:11px;margin:0;color:var(--' + (x.better === 'better' ? 'success' : x.better === 'worse' ? 'danger' : 'text-muted') + ');">' + (x.better === 'better' ? 'better foal' : x.better === 'worse' ? 'foal falls short' : 'about the same') + '</span>' +
+          (f.conf != null || f.gp ? ' <span class="mono sub" style="font-size:12px;">' + (f.conf != null ? 'conf ' + f.conf + ' \u00b7 ' : '') + 'GP ' + (f.gp || '?') + '</span>' : '');
+      } else if (r.young) fit = '<span class="sub" style="font-size:12px;">under 3, not bred yet</span>';
+      else if (otherName) fit = '<span class="sub" style="font-size:12px;">not ranked (' + (sex === 'mare' ? 'over your fee limit, too related or no data' : 'covered, too related or no data') + ')</span>';
+      return '<div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:7px 10px;border-top:1px solid var(--border);' + bg + (dim ? 'opacity:.55;' : '') + '">' +
+        '<span class="mono sub" style="width:22px;">' + (i + 1) + '</span>' +
+        '<strong style="flex:1 1 180px;">' + L.esc(r.name) + (r.mine ? ' <span class="sub" style="font-weight:400;">yours</span>' : '') + '</strong>' +
+        '<span style="display:flex;flex-wrap:wrap;gap:4px;flex:2 1 260px;">' + badges + ' ' + st + ' ' + fit + '</span>' +
+        '<button type="button" class="btn btn-sm" data-action="' + pickAction + '" data-life="' + L.esc(r.life) + '">Use</button></div>';
+    }).join('');
+    return '<details class="calc-rank card" data-rank="' + sex + '" style="padding:8px 0;margin:0 0 14px;"><summary style="cursor:pointer;padding:2px 14px;"><strong>' + title + '</strong> <span class="sub" style="font-size:12.5px;">(' + sum + ')</span></summary>' +
+      (sex === 'stallion' ? '<p class="notes-line" style="margin:8px 14px;">Highlighted: <span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE.partner + '">breeding partner</span> <span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE.private + '">private offer to you</span> <span class="tag" style="font-size:11px;margin:0;' + CALC_BADGE_STYLE.fee + '">has a stud fee</span>. Stallions with no fee for you, that are not yours or a partner\'s, can\'t be booked: they are dimmed and last. Fees are as last seen on the Studs &amp; Semen market or the stallion\'s page.</p>' : '<p class="notes-line" style="margin:8px 14px;">Ordered by how well each mare suits the stallion. Mares that are covered or in foal are not ranked and come last.</p>') +
+      '<div style="margin-top:6px;">' + body + '</div>' + (rows.length > shown.length ? '<p class="notes-line" style="margin:8px 14px 0;">Showing the top ' + shown.length + ' of ' + rows.length + '. Type in the box above to find the rest.</p>' : '') + '</details>';
   }
   function ancestorLabel(life) {
     var name = L.ancestorName(state, life);
@@ -2412,6 +2480,7 @@
       '<div class="field"><label for="calc-mare">Mare</label>' + calcFilterHtml('mare') + calcTypeaheadHtml('mare', calcMare) + '</div>' +
       '<div class="field"><label for="calc-stallion">Stallion</label>' + calcFilterHtml('stallion') + calcTypeaheadHtml('stallion', calcStallion) + '</div>' +
       '</div>';
+    html += calcRankedHtml('stallion') + calcRankedHtml('mare');
     html += calcPlanHtml();
     html += calcSuggestionsHtml();
     html += calcMareNoticeHtml();

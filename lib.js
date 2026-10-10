@@ -1051,6 +1051,20 @@
     }
     return null;
   }
+  // Can you book a stallion, and how? yours; a partner's stallion; a private fee offered to you; a public stud fee; semen; or no
+  // fee known for you (then you cannot breed to him). { mine, partner, privateOffer, publicFee, semen, lastFee, breedable }
+  function studAccess(state, life) {
+    var info = (state.horseInfo && state.horseInfo[life]) || {}, meta = (state.horseMeta && state.horseMeta[life]) || {}, t = meta.studTerms || {};
+    var me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
+    var mine = !!me && String(info.ownerName || '').trim().toLowerCase() === me;
+    var partner = mine ? '' : partnerOwnerOf(state, info);
+    var pub = (t.public && priceList(t.public)) || (t.cheapest && !t.private && !t.semen && priceList(t.cheapest)) || '';
+    var priv = (t.private && priceList(t.private)) || '', sem = (t.semen && priceList(t.semen)) || '';
+    if (mine) { pub = ''; priv = ''; sem = ''; } // the fees on your own stallion are what you charge, not what you pay
+    var rec = (state.stallions || []).find(function (s) { return s.lifeNumber && String(s.lifeNumber) === String(life); });
+    var last = rec && rec.lastFee && Number(rec.lastFee.fee) > 0 ? fmtMoney(rec.lastFee.fee) + ' ' + (rec.lastFee.currency || 'HRC') : '';
+    return { mine: mine, partner: partner, privateOffer: priv, publicFee: pub, semen: sem, lastFee: last, seen: t.seenAt || '', breedable: mine || !!partner || !!(pub || priv || sem) };
+  }
   // ---------- learning from the ledger ----------
   // Nothing is stored and nothing is guessed from outside: every time it is needed the ledger looks again at what has
   // happened in your own records and adjusts its suggestions. Settings: state.settings.learn (false turns it off).
@@ -4028,6 +4042,7 @@
     marketRowInfo: marketRowInfo,
     recordCompScore: recordCompScore,
     compSummary: compSummary,
+    studAccess: studAccess,
     compScoreOf: compScoreOf,
     disciplineNameOf: disciplineNameOf,
     COMP_DISCIPLINES: COMP_DISCIPLINES,

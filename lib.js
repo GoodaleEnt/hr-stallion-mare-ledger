@@ -3738,7 +3738,9 @@
   }
   // One number for the conformation stats, higher is better: the average rating (Below average 0, Average 1, Good 2, Good+ 3, Very good 4)
   function confStatScore(info) {
-    var tc = traitCounts(info), n = tc ? tc.VG + tc.GP + tc.G + tc.A + tc.BA : 0;
+    var tc = traitCounts(info);
+    if (!tc && info && info.conformation) { var pc = parseConformation(info.conformation); if (pc.ok) tc = { VG: 0, GP: 0, G: pc.G, A: pc.A, BA: pc.BA }; }
+    var n = tc ? tc.VG + tc.GP + tc.G + tc.A + tc.BA : 0;
     return n > 0 ? (4 * tc.VG + 3 * tc.GP + 2 * tc.G + tc.A) / n : null;
   }
   // Stars on a horse's picture, from the limits in Settings (settings.stars = { conf, gp, bt }, empty = off):

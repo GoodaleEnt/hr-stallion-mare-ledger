@@ -1895,6 +1895,37 @@
   // One "Foal Born" row per foal: when the same foal turns up more than once (under one or several
   // stallions), keep the best copy (under a stallion you own, with a score and picture) and fold
   // the missing details of the others into it. Returns how many copies were removed.
+  // A covering saved the wrong way round (the stallion as the mare and the mare as the stallion): found by the saved horses'
+  // sexes and put right, moving the record to the real stallion. Returns the number fixed.
+  function repairSwappedBreedings(state) {
+    var fixed = 0;
+    if (!state.stallions || !state.breedings || !state.horseInfo) return 0;
+    state.stallions.slice().forEach(function (s) {
+      var sl = s.lifeNumber ? String(s.lifeNumber) : '', si = sl && state.horseInfo[sl];
+      if (!si || si.sex !== 'mare') return;
+      var keep = [];
+      (state.breedings[s.id] || []).forEach(function (b) {
+        var ml = String(b.mareLifeNumber || ''), mi = ml && state.horseInfo[ml];
+        if (!mi || mi.sex !== 'stallion') { keep.push(b); return; }
+        var sid = findStallionMatch(state.stallions, { stallionLifeNumber: ml, stallionName: mi.name });
+        if (!sid) {
+          sid = uid();
+          state.stallions.push({ id: sid, createdAt: Date.now(), status: 'Active', name: mi.name || '', lifeNumber: ml, breed: mi.breed || '', owned: false });
+          state.breedings[sid] = [];
+        }
+        b.mareLifeNumber = sl; b.mareName = si.name || s.name || ''; b.mareUrl = 'https://www.horsereality.com/horses/' + sl + '/';
+        (state.breedings[sid] = state.breedings[sid] || []).push(b);
+        fixed++;
+      });
+      state.breedings[s.id] = keep;
+      // the mare was filed as a stallion only because of this record: take that entry away again
+      if (!keep.length && s.owned === false) {
+        state.stallions = state.stallions.filter(function (x) { return x.id !== s.id; });
+        delete state.breedings[s.id];
+      }
+    });
+    return fixed;
+  }
   function dedupeFoals(state) {
     var byLife = {};
     Object.keys(state.breedings || {}).forEach(function (sid) {
@@ -4164,6 +4195,7 @@
     priceList: priceList,
     recordCoveringFromPage: recordCoveringFromPage,
     dedupeFoals: dedupeFoals,
+    repairSwappedBreedings: repairSwappedBreedings,
     mareBreedStatus: mareBreedStatus,
     goalMisses: goalMisses,
     recordFoalsFromList: recordFoalsFromList,

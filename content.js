@@ -2706,8 +2706,14 @@
   function recordCovering(c) {
     HRStorage.getState(function (state) {
       // never record a stallion as the mare, or a horse as bred to itself
-      var mi = state.horseInfo && state.horseInfo[c.mareLife];
-      if ((mi && mi.sex === 'stallion') || String(c.mareLife) === String(c.stallionLife)) return;
+      var mi = state.horseInfo && state.horseInfo[c.mareLife], si = state.horseInfo && state.horseInfo[c.stallionLife];
+      if (String(c.mareLife) === String(c.stallionLife)) return;
+      // the Breed page was opened from the mare's side: the "mare" chosen is really the stallion, so turn the pair round
+      if (mi && mi.sex === 'stallion' && (!si || si.sex === 'mare')) {
+        c = Object.assign({}, c, { mareLife: c.stallionLife, mareName: c.stallionName, stallionLife: c.mareLife, stallionName: c.mareName });
+        mi = si;
+      }
+      if (mi && mi.sex === 'stallion') return;
       var sid = HRLib.findStallionMatch(state.stallions, { stallionLifeNumber: c.stallionLife, stallionName: c.stallionName });
       if (!sid) sid = HRStorage.upsertStallionByMatch(state, { name: c.stallionName, lifeNumber: c.stallionLife, owned: false }).id;
       HRStorage.upsertBreeding(state, sid, {

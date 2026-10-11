@@ -2228,13 +2228,15 @@
     var sig = rows.length + '|' + document.querySelectorAll('.hr-range-badge').length;
     if (sig === entrySig && document.getElementById('hr-range-bar')) return;
     HRStorage.peekState(function (state) {
-      var L = HRLib, counts = { ranged: 0, open: 0, unknown: 0 }, todo = [];
+      var L = HRLib, counts = { ranged: 0, open: 0, unknown: 0 }, todo = [], tagRows = [];
       rows.forEach(function (row) {
         var a = row.querySelector('a[href*="/horses/"]');
         var m = a && /\/horses\/(\d+)/.exec(a.getAttribute('href') || '');
         var tag = row.querySelector('.horse-tagline');
         if (!m || !tag) return;
         var life = m[1], meta = (state.horseMeta && state.horseMeta[life]) || {}, info = (state.horseInfo && state.horseInfo[life]) || {};
+        var tl = L.parseToolkitTagline(tag.textContent);
+        if (tl && state.horseInfo && state.horseInfo[life]) tagRows.push({ life: life, tagline: tl });
         var stats = 0;
         (tag.textContent.match(/\d+(?:\+\d+)?(?:VG|GP|G|BA|A)\b/g) || []).forEach(function (t) { (t.match(/\d+/g) || []).forEach(function (n) { stats += Number(n); }); });
         var full = L.fullScoreRange(info) || L.fullScoreRange({ tagCounts: { G: stats } });
@@ -2289,6 +2291,12 @@
       });
       bar.appendChild(btn);
       entrySig = rows.length + '|' + document.querySelectorAll('.hr-range-badge').length;
+      // the tag's Good/Good+ split for horses the ledger knows (kept apart so the badges above never wait on it)
+      if (tagRows.length) HRStorage.getState(function (st2) {
+        var did = false;
+        tagRows.forEach(function (r) { if (HRLib.applyToolkitTags(st2, r.life, r.tagline, null)) did = true; });
+        if (did) HRStorage.setState(st2);
+      });
     });
   }
   function scrapeShowResults(force) {

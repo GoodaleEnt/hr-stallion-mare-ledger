@@ -2569,6 +2569,8 @@
     if (Math.abs(Math.round((gp / 10 + conf) / 2) - bt) > 1) return null;
     var counts = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, n = 0;
     for (var i = 0; i < parts.length - 3; i++) {
+      var gpm = /^(\d+)\+(\d*)G$/i.exec(parts[i]);
+      if (gpm) { counts.GP += parseInt(gpm[1], 10); counts.G += gpm[2] ? parseInt(gpm[2], 10) : 0; n++; continue; }
       var m = /^(\d+)(VG|G\+|G|A|BA)$/i.exec(parts[i]);
       if (!m) return null;
       var k = m[2].toUpperCase() === 'G+' ? 'GP' : m[2].toUpperCase();
@@ -2596,7 +2598,7 @@
     if (tagline) {
       if (!(Number(info.geneticPotential) > 0)) { info.geneticPotential = tagline.gp; changed = true; }
       if (tagline.conf > (Number(meta.confBest) || 0)) { meta.confBest = tagline.conf; meta.confBestAt = Date.now(); meta.confBestEvent = 'HRToolkit tag'; meta.confBestDate = ''; changed = true; }
-      if (tagline.counts && !info.confTraits) {
+      if (tagline.counts) {
         var same = info.tagCounts && JSON.stringify(info.tagCounts) === JSON.stringify(tagline.counts);
         if (!same) { info.tagCounts = tagline.counts; changed = true; }
       }

@@ -816,7 +816,8 @@
   }
   function traitCounts(info) {
     var t = info && info.confTraits;
-    if (!t) return info && info.tagCounts ? Object.assign({ VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, info.tagCounts) : null;
+    var tag = info && info.tagCounts ? Object.assign({ VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, info.tagCounts) : null;
+    if (!t) return tag;
     // Ratings: Very good (VG), Good+ (G+), Good (G), Average (A), Below average (BA).
     var c = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 };
     Object.keys(t).forEach(function (k) {
@@ -827,6 +828,10 @@
       else if (r.indexOf('good') === 0 || r === 'g') c.G++;
       else if (r.indexOf('average') === 0 || r === 'a') c.A++;
     });
+    // The page only says "Good" for 70 to 84; HRToolkit's tag (the 1+G in 1+G|9A|2BA) separates Good+ (about 80 to 84, the top of
+    // Good) from Good. When the tag describes the same traits, its split is used.
+    var cTotal = c.VG + c.GP + c.G + c.A + c.BA;
+    if (tag && tag.VG + tag.GP + tag.G + tag.A + tag.BA === cTotal && tag.VG + tag.GP + tag.G === c.VG + c.GP + c.G) return tag;
     return c;
   }
   function goalSections(state, life) {
@@ -2695,6 +2700,8 @@
     if (peacockOf(state, life)) tags = tags.concat(['peacock']);
     var rs = rangeStatus(state, life);
     if (rs && rs.ranged) tags = tags.concat(['ranged']);
+    var tcg = traitCounts(state.horseInfo && state.horseInfo[life]);
+    if (tcg && tcg.GP > 0) tags = tags.concat(['gplus']);
     return terms.every(function (q) { return tags.some(function (t) { return t.indexOf(q) > -1; }); });
   }
 
@@ -3473,6 +3480,7 @@
   function labelRangeText(kind, label) {
     var key = String(label || '').toLowerCase().trim();
     var short = { 'g+': 'good', 'g': 'good', 'good+': 'good', 'good +': 'good', 'vg': 'very good', 'a': 'average', 'ba': 'below average' };
+    if (kind !== 'health' && (key === 'g+' || key === 'good+' || key === 'good +')) return label + ': Good+ is our estimate of the top of Good, a hidden number of about 80\u201384 (the page itself only says Good, 70\u201384)';
     if (short[key]) key = short[key];
     var table = kind === 'health' ? HEALTH_RANGES : CONF_RANGES;
     var r = table[key];

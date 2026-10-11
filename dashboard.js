@@ -2657,7 +2657,9 @@
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     var info = (state.horseInfo && state.horseInfo[life]) || {};
     var conf = L.bestConformation(meta).best;
-    var out = { conf: null, bt: null, low: null, comp: null };
+    var out = { conf: null, bt: null, low: null, comp: null, gplus: 0 };
+    var tcg = L.traitCounts(info);
+    if (tcg && tcg.GP > 0) out.gplus = tcg.GP;
     // competition: the best score in the discipline you breed for (or in any when none is chosen), with the discipline and when
     var cs = L.compSummary(state, life);
     if (cs) {
@@ -2696,6 +2698,7 @@
       if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + (h.low.full ? ' of ' + L.esc(h.low.full) : '') + ')</span></span></div>' + '<div style="' + sub + '">' + L.esc([h.low.when, h.low.event].filter(Boolean).join(' · ')) + '</div>' + (h.low.ranged ? '<div style="' + sub + 'color:var(--near);font-weight:600;">\u25C6 Ranged: high and low span the full range</div>' : '');
     }
     if (!compFirst) out += compRow;
+    if (h.gplus) out += '<div class="row"><span title="Good+ is our estimate of the top of Good, about 80 to 84">Good+ traits</span><span class="v mono" style="color:#B8860B;">' + h.gplus + ' G+</span></div>';
     if (h.bt) {
       out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.bt.when, h.bt.formula].filter(Boolean).join(' · ')) + '</div>';
@@ -2712,6 +2715,7 @@
     if (h.low) out += '<span class="tag mono" title="' + L.esc(['Lowest conformation show score', h.low.event].filter(Boolean).join(' — ')) + '">Low confo ' + L.esc(h.low.value) + (h.low.when ? ' · ' + L.esc(h.low.when) : '') + '</span>';
     if (h.low && h.low.ranged) out += '<span class="tag mono" style="color:var(--near);border-color:var(--near);" title="Highest minus lowest conformation score has reached the full range of ' + L.esc(h.low.full) + ' for this breed, so no later show can widen it">\u25C6 Ranged</span>';
     if (!(fxt.comp && !fxt.conf)) out += compTag;
+    if (h.gplus) out += '<span class="tag mono" style="color:#B8860B;border-color:#B8860B;" title="' + h.gplus + ' conformation trait' + (h.gplus === 1 ? '' : 's') + ' at Good+ (our estimate: the top of Good, about 80 to 84). Find them with #gplus.">G+ \u00d7' + h.gplus + '</span>';
     if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
     return out;
   }

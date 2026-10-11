@@ -1,6 +1,12 @@
 (function () {
   'use strict';
 
+  // "Extension context invalidated": after the extension is updated or reloaded, a Horse Reality tab that was already open keeps
+  // the old script, which can no longer reach the extension. That is harmless (reload the page), so it must not fill the
+  // extension's error list.
+  window.addEventListener('error', function (e) { if (/Extension context invalidated/i.test(String((e && e.message) || ''))) e.preventDefault(); });
+  window.addEventListener('unhandledrejection', function (e) { if (/Extension context invalidated/i.test(String((e && e.reason && e.reason.message) || (e && e.reason) || ''))) e.preventDefault(); });
+
   // --- Horse Reality's own JSON API, fetched directly — same technique
   // HRToolkit (a well-established community extension) uses instead of
   // scraping the rendered page: read the CSRF token HR already exposes to
@@ -529,10 +535,13 @@
   function fetchImageAsDataUrl(url) {
     if (!url) return Promise.resolve('');
     return new Promise(function (resolve) {
-      chrome.runtime.sendMessage({ type: 'HR_FETCH_IMAGE', url: url }, function (response) {
-        void chrome.runtime.lastError; // acknowledge to avoid an unchecked-error warning
-        resolve((response && response.dataUrl) || '');
-      });
+      // an out-of-date page (the extension was updated) cannot reach the extension any more: give up quietly
+      try {
+        chrome.runtime.sendMessage({ type: 'HR_FETCH_IMAGE', url: url }, function (response) {
+          void chrome.runtime.lastError; // acknowledge to avoid an unchecked-error warning
+          resolve((response && response.dataUrl) || '');
+        });
+      } catch (e) { resolve(''); }
     });
   }
 
@@ -1670,7 +1679,7 @@
   }
   function observerDebounce(fn) {
     var t = null;
-    return function () { if (t) return; t = setTimeout(function () { t = null; fn(); }, 300); };
+    return function () { if (t) return; t = setTimeout(function () { t = null; if (!storageAlive()) return; try { fn(); } catch (e) { if (storageAlive()) throw e; } }, 300); };
   }
   // ---- stallions on the Studs & Semen market are saved for you ----
   // Opening the market lists many studs the ledger has never seen. A few at a time (5 per pass, a pause between each, only
@@ -1899,6 +1908,8 @@
         }
         pill((a.protectedHorse ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
         if (a.ranged) pill('\u25C6 Ranged', '#3A78C2');
+        var tcg = HRLib.traitCounts(state.horseInfo && state.horseInfo[li.getAttribute('data-horse')]);
+        if (tcg && tcg.GP > 0) pill('G+ \u00d7' + tcg.GP, '#B8860B');
         // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
         if (a.pips) {
           var bar = document.createElement('span');

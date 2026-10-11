@@ -3484,6 +3484,17 @@
   // The hidden number behind each label (wiki: Conformation, Health).
   var CONF_RANGES = { 'poor': '0\u201339', 'below average': '40\u201359', 'average': '60\u201369', 'good': '70\u201384', 'very good': '85\u2013100' };
   var HEALTH_RANGES = { 'poor': '0\u201320', 'fair': '21\u201340', 'average': '41\u201360', 'good': '61\u201380', 'excellent': '81\u2013100' };
+  // "70-84" for a conformation rating; Good+ is our estimate of the top of Good
+  function confRangeShort(label) {
+    var k = String(label || '').toLowerCase().replace(/\s+/g, '');
+    if (k === 'good+' || k === 'g+') return '\u224880\u201384';
+    var map = { poor: '0\u201339', belowaverage: '40\u201359', average: '60\u201369', good: '70\u201384', verygood: '85\u2013100' };
+    return map[k] || '';
+  }
+  function confGradeLetter(label) {
+    var k = String(label || '').toLowerCase().replace(/\s+/g, '');
+    return { poor: 'P', belowaverage: 'BA', average: 'A', good: 'G', 'good+': 'G+', verygood: 'VG' }[k] || '';
+  }
   function labelRangeText(kind, label) {
     var key = String(label || '').toLowerCase().trim();
     var short = { 'g+': 'good', 'g': 'good', 'good+': 'good', 'good +': 'good', 'vg': 'very good', 'a': 'average', 'ba': 'below average' };
@@ -4292,6 +4303,8 @@
     goalCheck: goalCheck,
     traitCounts: traitCounts,
     confStatText: confStatText,
+    confRangeShort: confRangeShort,
+    confGradeLetter: confGradeLetter,
     goodPlusTraits: goodPlusTraits,
     confStatScore: confStatScore,
     refreshBreedTotals: refreshBreedTotals,

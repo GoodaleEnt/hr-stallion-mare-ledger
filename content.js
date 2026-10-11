@@ -2385,20 +2385,54 @@
     try { visit(document); } catch (e) { return null; }
     return Object.keys(out).length >= 8 ? out : null;
   }
+  // The genetic potential panel (a stat name, then its number: Acceleration | 49 ...), whatever its markup. Saved as
+  // horseInfo[id].geneStats = { Acceleration: 49, ... } and shown on the horse's profile in the ledger.
+  var GENE_STAT_NAMES = ['Acceleration', 'Agility', 'Balance', 'Bascule', 'Pulling Power', 'Speed', 'Sprint', 'Stamina', 'Strength', 'Surefootedness'];
+  var lastGeneScan = 0;
+  function readGeneStats() {
+    var now = Date.now();
+    if (now - lastGeneScan < 1500) return null;
+    lastGeneScan = now;
+    var out = {};
+    function canon(t) {
+      var low = t.toLowerCase().replace(/\s+/g, ' ').trim();
+      for (var i = 0; i < GENE_STAT_NAMES.length; i++) if (GENE_STAT_NAMES[i].toLowerCase() === low) return GENE_STAT_NAMES[i];
+      return '';
+    }
+    function visit(root) {
+      var all = root.querySelectorAll('*');
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (el.shadowRoot) visit(el.shadowRoot);
+        if (el.children.length) continue;
+        var name = canon(el.textContent || '');
+        if (!name || out[name] != null) continue;
+        var cand = el.nextElementSibling || (el.parentElement && el.parentElement.nextElementSibling);
+        var m = cand && /^\s*(\d+(?:\.\d+)?)/.exec(cand.textContent || '');
+        if (m && parseFloat(m[1]) <= 100) out[name] = parseFloat(m[1]);
+      }
+    }
+    try { visit(document); } catch (e) { return null; }
+    return Object.keys(out).length >= 8 ? out : null;
+  }
   function scrapeConformationTraits() {
     var id = parseHorseIdFromUrl();
     if (!id) return;
+    var savedGenes = false;
     function tryCapture() {
       var traits = readConfTraits();
-      if (!traits) return false;
+      var genes = savedGenes ? null : readGeneStats();
+      if (!traits && !genes) return false;
       HRStorage.getState(function (state) {
         var info = state.horseInfo[id];
         if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
-        if (JSON.stringify(info.confTraits || null) === JSON.stringify(traits)) return;
-        info.confTraits = traits;
-        HRStorage.setState(state);
+        var changed = false;
+        if (traits && JSON.stringify(info.confTraits || null) !== JSON.stringify(traits)) { info.confTraits = traits; changed = true; }
+        if (genes && JSON.stringify(info.geneStats || null) !== JSON.stringify(genes)) { info.geneStats = genes; changed = true; }
+        if (changed) HRStorage.setState(state);
       });
-      return true;
+      if (genes) savedGenes = true;
+      return !!traits && savedGenes;
     }
     if (tryCapture()) return;
     var observer = new MutationObserver(observerDebounce(function () {

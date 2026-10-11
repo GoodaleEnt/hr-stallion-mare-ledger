@@ -367,6 +367,10 @@ Everything you set up is on one tab, **⚙ Settings**, at the end of the tab bar
 
 **Stars on pictures.** In Settings, *Stars on pictures* has three limits, each chosen from a list (or Off). A **gold star** appears in the top-left corner of a horse's picture when its conformation stats (the trait ratings, like the 2G 8A 2BA on its card) have nothing lower than the rating you choose: *Average* (no Below average trait), *Good*, *Good+* or *Very good*. A **teal star marked GP** appears when its genetic potential is at or above the *Genetic potential at least* limit, and a **violet star marked BT** when its Breed Total reaches *Breed Total at least*. Stars show on the cards and profile in the ledger and on the cards of your ranch page; hover one for the numbers.
 
+## Conformation stats and genetic potential on a profile
+
+Each horse's profile has a **Conformation stats & genetic potential** box. On the left, each of the 12 conformation stats with its grade (Poor, Below average, Average, Good, Good+, Very good), the grade letter and the number range behind it (Poor 0–39, Below average 40–59, Average 60–69, Good 70–84 with Good+ the top at about 80–84, Very good 85–100). On the right, the ten genetic potential stats (Acceleration, Agility, Balance, Bascule, Pulling Power, Speed, Sprint, Stamina, Strength, Surefootedness) with their numbers, and their total. Both are read when you open the horse's Stats tab on Horse Reality; until then the box says so.
+
 ## Good+ (G+) traits
 
 The game's page only says **Good** for a trait whose hidden number is 70 to 84. HRToolkit's tag splits that band: the **+G** in `1+G|9A|2BA` (and `1+1G` for one Good+ and one Good) counts traits at **Good+**, which we take to be the top of Good, a hidden number of about **80 to 84** (a Good trait scores 70 to 79; Very good starts at 85). The spreadsheet's herd tracker uses the same split, with the middle of each band as its score: Average 64.5, Good- 74.5, Good 76.5, Good+ 82, Very good 92.5.

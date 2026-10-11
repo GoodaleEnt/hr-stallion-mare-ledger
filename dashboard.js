@@ -651,7 +651,7 @@
     '</div>';
     html += herdControlsPanelHtml(selectedPassportLife);
     html += geneDetailsHtml(selectedPassportLife);
-    html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
+    html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + statsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
     html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + compPanelHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
@@ -1320,7 +1320,7 @@
 
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
-    html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
+    html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + statsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
     html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + compPanelHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
@@ -2712,7 +2712,7 @@
   }
   // tags for a horse's own page header
   function highScoreTagsHtml(life) {
-    var h = highScoreInfo(life);
+    var h = highScoreInfo(life), info = (state.horseInfo && state.horseInfo[life]) || {};
     var out = '';
     var fxt = (state.settings && state.settings.breederFocus) || {}, compTag = h.comp ? '<span class="tag mono" title="Highest competition score in ' + L.esc(h.comp.discipline) + (h.comp.low ? ' (lowest ' + L.esc(h.comp.low) + ')' : '') + '">Top comp ' + L.esc(h.comp.value) + ' \u00b7 ' + L.esc(h.comp.discipline) + '</span>' : '';
     if (fxt.comp && !fxt.conf) out += compTag;
@@ -2998,6 +2998,33 @@
     L.MANUAL_LOCI.forEach(function (l) { if (sus[l.id]) out += '<span class="tag" style="margin:0;white-space:nowrap;font-style:italic;" title="Suspected, not confirmed">' + L.esc((l.label || l.name.replace(/ \(.*\)$/, ''))) + ' ' + L.esc(sus[l.id].join(' / ')) + '</span>'; });
     if (pk) out += '<span class="tag" style="margin:0;white-space:nowrap;" title="Peacock expressed' + (pk.strength != null ? ', line strength estimate ' + pk.strength + '%' : '') + '">Peacock' + (pk.strength != null ? ' ' + L.esc(pk.strength) + '%' : '') + '</span>';
     return out;
+  }
+  // The conformation stats (each trait's grade and the number range behind it) and the genetic potential stats (each stat's
+  // number), as read from the horse's Stats tab.
+  var TRAIT_ORDER = ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters', 'Socks'];
+  function statsPanelHtml(life) {
+    var info = state.horseInfo && state.horseInfo[life];
+    if (!info) return '';
+    var traits = info.confTraits || null, genes = info.geneStats || null, tc = L.traitCounts(info);
+    if (!traits && !genes && !tc) return '';
+    var names = traits ? TRAIT_ORDER.filter(function (n) { return traits[n]; }).concat(Object.keys(traits).filter(function (n) { return TRAIT_ORDER.indexOf(n) < 0; })) : [];
+    var confRows = names.map(function (n) {
+      var v = traits[n], g = L.confGradeLetter(v);
+      return '<tr><td>' + L.esc(n) + '</td><td>' + ratingChipHtml(v) + '</td><td class="num mono">' + L.esc(g) + '</td><td class="num mono">' + L.esc(L.confRangeShort(v)) + '</td></tr>';
+    }).join('');
+    var confHtml = '<div><strong>Conformation stats</strong> <span class="tag mono">' + L.esc(L.confStatText(info) || '?') + '</span>' +
+      (confRows ? '<table class="an-table" style="margin-top:6px;"><thead><tr><th>Stat</th><th>Grade</th><th class="num"></th><th class="num">Number</th></tr></thead><tbody>' + confRows + '</tbody></table>'
+        : '<p class="notes-line" style="margin:6px 0 0;">The grade of each stat is read when you open this horse\'s Stats tab on Horse Reality.</p>') +
+      '<p class="notes-line" style="margin:6px 0 0;">The number is the hidden value behind the grade: Poor 0\u201339, Below average 40\u201359, Average 60\u201369, Good 70\u201384, Very good 85\u2013100. Good+ (\u224880\u201384) is the top of Good.</p></div>';
+    var gKeys = genes ? Object.keys(genes) : [];
+    var gSum = gKeys.reduce(function (t, k) { return t + genes[k]; }, 0);
+    var genHtml = '<div><strong>Genetic potential</strong> <span class="tag mono">' + L.esc(info.geneticPotential != null ? info.geneticPotential : (gKeys.length ? gSum : '?')) + '</span>' +
+      (gKeys.length ? '<table class="an-table" style="margin-top:6px;"><thead><tr><th>Stat</th><th class="num">Number</th><th></th></tr></thead><tbody>' + gKeys.map(function (k) {
+        return '<tr><td>' + L.esc(k) + '</td><td class="num mono">' + L.esc(genes[k]) + '</td><td style="width:40%;"><div style="height:7px;border-radius:4px;background:var(--surface-2);"><div style="height:7px;border-radius:4px;background:#1A9E9E;width:' + Math.max(0, Math.min(100, genes[k])) + '%;"></div></div></td></tr>';
+      }).join('') + '</tbody></table><p class="notes-line" style="margin:6px 0 0;">The ten stats add up to ' + L.esc(gSum) + (info.geneticPotential != null && Number(info.geneticPotential) !== gSum ? ' (the horse\'s genetic potential says ' + L.esc(info.geneticPotential) + ')' : ', the genetic potential') + '.</p>'
+        : '<p class="notes-line" style="margin:6px 0 0;">The ten genetic potential stats are read when you open this horse\'s Stats tab on Horse Reality.</p>') + '</div>';
+    return '<details class="card profile-block" open style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;font-weight:600;">Conformation stats &amp; genetic potential</summary>' +
+      '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:10px;">' + confHtml + genHtml + '</div></details>';
   }
   function geneticsPanelHtml(life) {
     var info = state.horseInfo[life];
@@ -3534,7 +3561,7 @@
     }
 
     html += geneDetailsHtml(s.lifeNumber);
-    html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
+    html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + statsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
     html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + compPanelHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);

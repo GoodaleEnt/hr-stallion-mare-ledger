@@ -3657,7 +3657,7 @@
     lines.push((info.name || ('#' + life)) + ' \u2014 ' + [info.breed, info.sex === 'stallion' ? 'stallion' : info.sex === 'mare' ? 'mare' : '', info.ageText || formatAgeMonths(effectiveAgeMonths(info))].filter(Boolean).join(', '));
     var stats = [];
     if (info.geneticPotential != null) stats.push('Genetic potential ' + info.geneticPotential);
-    if (info.conformation) stats.push('Conformation ' + info.conformation);
+    if (info.conformation) stats.push('Conformation ' + confStatText(info));
     if (conf > 0) stats.push('Top conformation score ' + (Math.round(conf * 1000) / 1000));
     if (bt > 0) stats.push('Breed Total ' + (Math.round(bt * 10) / 10));
     if (stats.length) lines.push(stats.join(' | '));
@@ -3728,6 +3728,18 @@
     var info = (state.horseInfo && state.horseInfo[life]) || {};
     var meta = (state.horseMeta && state.horseMeta[life]) || {};
     return Math.max(Number(meta.btBest) || 0, breedTotal(info.geneticPotential, bestConformation(meta).best));
+  }
+  // The conformation stats of a horse as one short line, G+ counted as its own rating: "1VG 1G+ 2G 7A 1BA" (zeros left out).
+  // Falls back to the plain text from Horse Reality ("2G 8A 2BA") when the ratings are not known.
+  function confStatText(info) {
+    var tc = traitCounts(info);
+    if (!tc || !(tc.VG + tc.GP + tc.G + tc.A + tc.BA)) return info && info.conformation ? String(info.conformation) : '';
+    return [tc.VG ? tc.VG + 'VG' : '', tc.GP ? tc.GP + 'G+' : '', tc.G ? tc.G + 'G' : '', tc.A ? tc.A + 'A' : '', tc.BA ? tc.BA + 'BA' : ''].filter(Boolean).join(' ');
+  }
+  // One number for the conformation stats, higher is better: the average rating (Below average 0, Average 1, Good 2, Good+ 3, Very good 4)
+  function confStatScore(info) {
+    var tc = traitCounts(info), n = tc ? tc.VG + tc.GP + tc.G + tc.A + tc.BA : 0;
+    return n > 0 ? (4 * tc.VG + 3 * tc.GP + 2 * tc.G + tc.A) / n : null;
   }
   // Stars on a horse's picture, from the limits in Settings (settings.stars = { conf, gp, bt }, empty = off):
   //   gold star: the conformation STATS (the trait ratings) have nothing lower than the chosen rating: conf is 'A' (no Below
@@ -4265,6 +4277,8 @@
     goalSections: goalSections,
     goalCheck: goalCheck,
     traitCounts: traitCounts,
+    confStatText: confStatText,
+    confStatScore: confStatScore,
     refreshBreedTotals: refreshBreedTotals,
     parseConformation: parseConformation,
     pedigreeTreeOf: pedigreeTreeOf,

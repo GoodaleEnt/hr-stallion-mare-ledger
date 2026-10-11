@@ -1376,7 +1376,7 @@
     return '<div class="herd-row' + goalClass(h.lifeNumber) + '">' +
       goalStripHtml(h.lifeNumber) + '<div class="herd-pic">' + (pic ? '<img src="' + L.esc(pic) + '" alt="" width="200" height="200" loading="lazy" referrerpolicy="no-referrer">' : '<div class="nopic">No picture yet</div>') + picStarsHtml(h.lifeNumber) + '</div>' +
       '<div class="name" data-label="Horse"><span>' + (bulkMode ? '<input type="checkbox" data-action="bulk-pick" data-life="' + life + '" aria-label="Select ' + L.esc(info.name || 'horse') + '"' + (bulkSel[h.lifeNumber] ? ' checked' : '') + ' style="margin-right:6px;"> ' : '') + '<button type="button" class="link-btn" data-action="open-passport" data-life="' + life + '">' + L.esc(info.name || 'Unnamed horse') + '</button> <span class="mono sub">#' + life + '</span>' + purchaseSubHtml(h.lifeNumber) + '</span>' + (L.tagsOf(state, h.lifeNumber).length ? '<div style="margin-top:2px;">' + tagChipsHtml(h.lifeNumber, false) + '</div>' : '') + '</div>' +
-      '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(info.conformation) + '</span>' : '') + '</span></div>' +
+      '<div data-label="Details"><span>' + L.esc(detail || '—') + (info.geneticPotential != null ? ' <span class="mono sub">GP ' + L.esc(info.geneticPotential) + '</span>' : '') + (info.conformation ? '<br><span class="mono sub">Conformation ' + L.esc(L.confStatText(info)) + '</span>' : '') + '</span></div>' +
       '<div data-label="Role"><select class="role-select" data-action="herd-role" data-life="' + life + '">' + optionsHtml(L.HERD_ROLES, meta.role, '—') + '</select></div>' +
       '<div data-label="Status"><select class="pill-select ' + L.herdStatusClass(meta.status) + '" data-action="herd-status" data-life="' + life + '">' + optionsHtml(L.HERD_STATUSES, meta.status) + '</select></div>' +
       '<div data-label="Project"><input type="text" data-action="herd-project" data-life="' + life + '" value="' + L.esc(meta.project) + '" placeholder="e.g. Leopard line"></div>' +
@@ -2315,7 +2315,7 @@
     var facts = [];
     if (info.breed) facts.push(L.esc(info.breed));
     if (info.geneticPotential != null) facts.push('GP ' + L.esc(info.geneticPotential));
-    if (info.conformation) facts.push(L.esc(info.conformation));
+    if (info.conformation) facts.push(L.esc(L.confStatText(info)));
     var genes = savedGenesText(life);
     return '<div class="card" style="padding:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
       (pic ? '<img src="' + L.esc(pic) + '" alt="" referrerpolicy="no-referrer" style="width:150px;max-width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:9px;background:var(--surface-2);flex-shrink:0;">'
@@ -2340,15 +2340,19 @@
   function statsCompareHtml(mareLife, studLife) {
     var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
     var mareConf = L.parseConformation(mare.conformation), studConf = L.parseConformation(stud.conformation);
-    function confText(c, raw) {
-      return c.ok ? L.esc(raw) + '<div class="sub" style="color:var(--text-muted);font-size:12px;">' + c.G + ' good \u00b7 ' + c.A + ' average \u00b7 ' + c.BA + ' below average</div>' : '';
+    // the stats with Good+ counted as its own rating when HRToolkit's tag gives it
+    function confText(c, info) {
+      var tc = L.traitCounts(info);
+      if (!c.ok && !tc) return '';
+      var parts = tc ? [tc.VG ? tc.VG + ' very good' : '', tc.GP ? '<strong>' + tc.GP + ' G+</strong>' : '', tc.G ? tc.G + ' good' : '', tc.A ? tc.A + ' average' : '', tc.BA ? tc.BA + ' below average' : ''] : [c.G + ' good', c.A + ' average', c.BA + ' below average'];
+      return L.esc(L.confStatText(info)) + '<div class="sub" style="color:var(--text-muted);font-size:12px;">' + parts.filter(Boolean).join(' \u00b7 ') + '</div>';
     }
     function age(info) { var m = L.effectiveAgeMonths(info); return m == null ? null : m; }
     var rows = [
       { label: 'Genetic potential', a: mare.geneticPotential, b: stud.geneticPotential, num: true, better: 'high' },
-      { label: 'Conformation', aHtml: confText(mareConf, mare.conformation), bHtml: confText(studConf, stud.conformation),
-        aKey: mareConf.ok ? mare.conformation : null, bKey: studConf.ok ? stud.conformation : null,
-        aScore: mareConf.G - mareConf.BA, bScore: studConf.G - studConf.BA, better: 'high' },
+      { label: 'Conformation', aHtml: confText(mareConf, mare), bHtml: confText(studConf, stud),
+        aKey: L.confStatText(mare) || null, bKey: L.confStatText(stud) || null,
+        aScore: L.confStatScore(mare), bScore: L.confStatScore(stud), better: 'high' },
       { label: 'Best conformation show score', a: L.bestConformation(L.herdMeta(state, mareLife)).best || null, b: L.bestConformation(L.herdMeta(state, studLife)).best || null, num: true, better: 'high' },
       { label: 'Inbreeding (COI)', a: mare.coi, b: stud.coi, num: true, better: 'low', fmt: function (v, info) { return info.coiRaw || (v + '%'); } },
       { label: 'Height', a: statNumber(mare.height), b: statNumber(stud.height), num: true, fmt: function (v, info) { return info.height || (v + ' cm'); } },
@@ -3405,7 +3409,7 @@
     if (!info) return '';
     var tags = [];
     if (info.geneticPotential != null) tags.push('<span class="tag mono">GP ' + L.esc(info.geneticPotential) + '</span>');
-    if (info.conformation) tags.push('<span class="tag mono">' + L.esc(info.conformation) + '</span>');
+    if (info.conformation) tags.push('<span class="tag mono" title="Conformation stats: VG very good, G+ Good+ (about 80 to 84), G good, A average, BA below average">' + L.esc(L.confStatText(info)) + '</span>');
     if (info.testedColours) tags.push('<span class="tag mono">' + L.esc(info.testedColours) + '</span>');
     var extraGenes = info.lifeNumber ? savedGenesText(info.lifeNumber) : '';
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');

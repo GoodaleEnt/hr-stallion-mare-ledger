@@ -371,6 +371,8 @@ Everything you set up is on one tab, **⚙ Settings**, at the end of the tab bar
 
 Each horse's profile has a **Conformation stats & genetic potential** box. On the left, each of the 12 conformation stats with its grade (Poor, Below average, Average, Good, Good+, Very good), the grade letter and the number range behind it (Poor 0–39, Below average 40–59, Average 60–69, Good 70–84 with Good+ the top at about 80–84, Very good 85–100). On the right, the ten genetic potential stats (Acceleration, Agility, Balance, Bascule, Pulling Power, Speed, Sprint, Stamina, Strength, Surefootedness) with their numbers, and their total. Both are read when you open the horse's Stats tab on Horse Reality; until then the box says so.
 
+**Grade colours.** Grades run from the top down in colour: **Very good gold** (with a star), **Good+ green**, **Good light green**, **Average yellow**, **Below average orange**, **Poor red**. The same colours are used on the stat chips in the profile box and the Foal Calculator's trait comparison, in the stats line (`1VG 1G+ 2G 7A 1BA`), and on the Good+ and Very good pills on ranch cards.
+
 ## Good+ (G+) traits
 
 The game's page only says **Good** for a trait whose hidden number is 70 to 84. HRToolkit's tag splits that band: the **+G** in `1+G|9A|2BA` (and `1+1G` for one Good+ and one Good) counts traits at **Good+**, which we take to be the top of Good, a hidden number of about **80 to 84** (a Good trait scores 70 to 79; Very good starts at 85). The spreadsheet's herd tracker uses the same split, with the middle of each band as its score: Average 64.5, Good- 74.5, Good 76.5, Good+ 82, Very good 92.5.

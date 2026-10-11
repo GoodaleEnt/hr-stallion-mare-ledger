@@ -1899,17 +1899,18 @@
         box.setAttribute('data-hr-advice', '1');
         box.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 6px;padding:6px 6px 8px;margin:0;position:relative;z-index:2;clear:both;flex:0 0 auto;font:700 12px/1.4 system-ui,sans-serif;';
         box.title = 'HR Ledger\n' + a.reasons.join('\n');
-        function pill(text, bg, into) {
+        function pill(text, bg, into, fg) {
           var d = document.createElement('span');
           d.textContent = text;
-          d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:#fff;background:' + bg + ';white-space:normal;text-align:center;max-width:100%;';
+          d.style.cssText = 'display:inline-block;padding:1px 9px;border-radius:10px;color:' + (fg || '#fff') + ';background:' + bg + ';white-space:normal;text-align:center;max-width:100%;';
           (into || box).appendChild(d);
           return d;
         }
         pill((a.protectedHorse ? '\u2605 ' : '') + a.label + (a.price ? ' \u00b7 ~' + a.price.toLocaleString('en-US') : '') + (a.infoal ? ' \u00b7 ' + a.infoal : ''), COL[a.action] || COL.nodata);
         if (a.ranged) pill('\u25C6 Ranged', '#3A78C2');
         var tcg = HRLib.traitCounts(state.horseInfo && state.horseInfo[li.getAttribute('data-horse')]);
-        if (tcg && tcg.GP > 0) pill('G+ \u00d7' + tcg.GP, '#B8860B');
+        if (tcg && tcg.GP > 0) pill('G+ \u00d7' + tcg.GP, HRLib.gradeColour('G+'), null, '#1b1b1b');
+        if (tcg && tcg.VG > 0) pill('VG \u00d7' + tcg.VG, HRLib.gradeColour('VG'), null, '#1b1b1b');
         // five pips: how far up the herd the horse really sits by rank (all filled = top of the herd, one = bottom)
         if (a.pips) {
           var bar = document.createElement('span');

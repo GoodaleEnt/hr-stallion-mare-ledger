@@ -3491,6 +3491,14 @@
     var map = { poor: '0\u201339', belowaverage: '40\u201359', average: '60\u201369', good: '70\u201384', verygood: '85\u2013100' };
     return map[k] || '';
   }
+  // One colour per grade, from the top down: Very good gold, Good+ one step down (green), Good a step further, then Average (yellow),
+  // Below average (orange), Poor (red). The green, yellow and orange are the ones HRToolkit uses for 1G+ 9A 2BA.
+  var GRADE_COLOURS = { VG: '#F2A900', 'G+': '#4CC464', G: '#A5D66A', A: '#F7E08C', BA: '#EE9A6F', P: '#E0584F' };
+  function gradeColour(labelOrLetter) {
+    var s = String(labelOrLetter || '').trim();
+    var key = GRADE_COLOURS[s] ? s : confGradeLetter(s);
+    return GRADE_COLOURS[key] || '';
+  }
   function confGradeLetter(label) {
     var k = String(label || '').toLowerCase().replace(/\s+/g, '');
     return { poor: 'P', belowaverage: 'BA', average: 'A', good: 'G', 'good+': 'G+', verygood: 'VG' }[k] || '';
@@ -4305,6 +4313,8 @@
     confStatText: confStatText,
     confRangeShort: confRangeShort,
     confGradeLetter: confGradeLetter,
+    gradeColour: gradeColour,
+    GRADE_COLOURS: GRADE_COLOURS,
     goodPlusTraits: goodPlusTraits,
     confStatScore: confStatScore,
     refreshBreedTotals: refreshBreedTotals,

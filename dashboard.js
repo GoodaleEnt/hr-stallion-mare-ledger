@@ -2410,9 +2410,16 @@
     return null;
   }
   function ratingChipHtml(text) {
-    var rank = ratingRank(text);
-    var colour = rank >= 3 ? ['var(--success-bg)', 'var(--success)'] : (rank === 1 ? ['var(--danger-bg)', 'var(--danger)'] : ['var(--warn-bg)', 'var(--warn)']);
-    return '<span title="' + L.esc(L.labelRangeText('conf', text)) + '" style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:' + (rank >= 4 ? '800' : '600') + ';background:' + colour[0] + ';color:' + colour[1] + ';' + (rank === 4 ? 'box-shadow:0 0 0 2px #B8860B inset;' : '') + '">' + L.esc(text) + '</span>';
+    var col = L.gradeColour(text);
+    return '<span title="' + L.esc(L.labelRangeText('conf', text)) + '" style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:700;background:' + (col || 'var(--surface-2)') + ';color:#1b1b1b;' + (/^very good$/i.test(String(text).trim()) ? 'box-shadow:0 0 0 2px #FFF3C4 inset;' : '') + '">' + (/^very good$/i.test(String(text).trim()) ? '★ ' : '') + L.esc(text) + '</span>';
+  }
+  // The conformation stats line with each count in its grade colour: 1VG 1G+ 2G 7A 1BA
+  function confStatHtml(info) {
+    var tc = L.traitCounts(info);
+    if (!tc || !(tc.VG + tc.GP + tc.G + tc.A + tc.BA)) return info && info.conformation ? L.esc(info.conformation) : '';
+    return [['VG', tc.VG], ['G+', tc.GP], ['G', tc.G], ['A', tc.A], ['BA', tc.BA]].filter(function (p) { return p[1]; }).map(function (p) {
+      return '<span style="color:' + L.gradeColour(p[0]) + ';font-weight:700;">' + p[1] + p[0] + '</span>';
+    }).join(' ');
   }
   function traitsCompareHtml(mareLife, studLife) {
     var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
@@ -2703,7 +2710,7 @@
       if (h.low) out += '<div class="row"><span>Lowest conformation</span><span class="v mono">' + L.esc(h.low.value) + ' <span class="sub">(range ' + L.esc(h.low.range) + (h.low.full ? ' of ' + L.esc(h.low.full) : '') + ')</span></span></div>' + '<div style="' + sub + '">' + L.esc([h.low.when, h.low.event].filter(Boolean).join(' · ')) + '</div>' + (h.low.ranged ? '<div style="' + sub + 'color:var(--near);font-weight:600;">\u25C6 Ranged: high and low span the full range</div>' : '');
     }
     if (!compFirst) out += compRow;
-    if (h.gplus) out += '<div class="row"><span title="Good+ is our estimate of the top of Good, about 80 to 84">Good+ traits</span><span class="v mono" style="color:#B8860B;">' + h.gplus + ' G+</span></div>';
+    if (h.gplus) out += '<div class="row"><span title="Good+ is our estimate of the top of Good, about 80 to 84">Good+ traits</span><span class="v mono" style="color:' + L.gradeColour('G+') + ';font-weight:700;">' + h.gplus + ' G+</span></div>';
     if (h.bt) {
       out += '<div class="row"><span>Breed Total (BT)</span><span class="v mono">' + L.esc(h.bt.value) + '</span></div>' +
         '<div style="' + sub + '">' + L.esc([h.bt.when, h.bt.formula].filter(Boolean).join(' · ')) + '</div>';
@@ -2720,7 +2727,7 @@
     if (h.low) out += '<span class="tag mono" title="' + L.esc(['Lowest conformation show score', h.low.event].filter(Boolean).join(' — ')) + '">Low confo ' + L.esc(h.low.value) + (h.low.when ? ' · ' + L.esc(h.low.when) : '') + '</span>';
     if (h.low && h.low.ranged) out += '<span class="tag mono" style="color:var(--near);border-color:var(--near);" title="Highest minus lowest conformation score has reached the full range of ' + L.esc(h.low.full) + ' for this breed, so no later show can widen it">\u25C6 Ranged</span>';
     if (!(fxt.comp && !fxt.conf)) out += compTag;
-    if (h.gplus) out += '<span class="tag mono" style="color:#B8860B;border-color:#B8860B;" title="' + h.gplus + ' conformation trait' + (h.gplus === 1 ? '' : 's') + ' at Good+' + (L.goodPlusTraits(info).length ? ': ' + L.goodPlusTraits(info).join(', ') : '') + ' (about 80 to 84, the top of Good). Find them with #gplus.">G+ \u00d7' + h.gplus + (L.goodPlusTraits(info).length ? ' ' + L.esc(L.goodPlusTraits(info).join(', ')) : '') + '</span>';
+    if (h.gplus) out += '<span class="tag mono" style="background:' + L.gradeColour('G+') + ';color:#1b1b1b;border-color:' + L.gradeColour('G+') + ';font-weight:700;" title="' + h.gplus + ' conformation trait' + (h.gplus === 1 ? '' : 's') + ' at Good+' + (L.goodPlusTraits(info).length ? ': ' + L.goodPlusTraits(info).join(', ') : '') + ' (about 80 to 84, the top of Good). Find them with #gplus.">G+ \u00d7' + h.gplus + (L.goodPlusTraits(info).length ? ' ' + L.esc(L.goodPlusTraits(info).join(', ')) : '') + '</span>';
     if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
     return out;
   }
@@ -3010,12 +3017,12 @@
     var names = traits ? TRAIT_ORDER.filter(function (n) { return traits[n]; }).concat(Object.keys(traits).filter(function (n) { return TRAIT_ORDER.indexOf(n) < 0; })) : [];
     var confRows = names.map(function (n) {
       var v = traits[n], g = L.confGradeLetter(v);
-      return '<tr><td>' + L.esc(n) + '</td><td>' + ratingChipHtml(v) + '</td><td class="num mono">' + L.esc(g) + '</td><td class="num mono">' + L.esc(L.confRangeShort(v)) + '</td></tr>';
+      return '<tr><td>' + L.esc(n) + '</td><td>' + ratingChipHtml(v) + '</td><td class="num mono"><span style="display:inline-block;min-width:28px;text-align:center;padding:0 6px;border-radius:6px;background:' + (L.gradeColour(g) || 'var(--surface-2)') + ';color:#1b1b1b;font-weight:700;">' + L.esc(g) + '</span></td><td class="num mono">' + L.esc(L.confRangeShort(v)) + '</td></tr>';
     }).join('');
-    var confHtml = '<div><strong>Conformation stats</strong> <span class="tag mono">' + L.esc(L.confStatText(info) || '?') + '</span>' +
+    var confHtml = '<div><strong>Conformation stats</strong> <span class="tag mono">' + (confStatHtml(info) || '?') + '</span>' +
       (confRows ? '<table class="an-table" style="margin-top:6px;"><thead><tr><th>Stat</th><th>Grade</th><th class="num"></th><th class="num">Number</th></tr></thead><tbody>' + confRows + '</tbody></table>'
         : '<p class="notes-line" style="margin:6px 0 0;">The grade of each stat is read when you open this horse\'s Stats tab on Horse Reality.</p>') +
-      '<p class="notes-line" style="margin:6px 0 0;">The number is the hidden value behind the grade: Poor 0\u201339, Below average 40\u201359, Average 60\u201369, Good 70\u201384, Very good 85\u2013100. Good+ (\u224880\u201384) is the top of Good.</p></div>';
+      '<p class="notes-line" style="margin:6px 0 0;">The number is the hidden value behind the grade: Poor 0\u201339, Below average 40\u201359, Average 60\u201369, Good 70\u201384, Very good 85\u2013100. Good+ (\u224880\u201384) is the top of Good. Colours run from the top: <span style="color:' + L.gradeColour('VG') + ';font-weight:700;">Very good gold</span>, <span style="color:' + L.gradeColour('G+') + ';font-weight:700;">Good+</span>, <span style="color:' + L.gradeColour('G') + ';font-weight:700;">Good</span>, <span style="color:' + L.gradeColour('A') + ';font-weight:700;">Average</span>, <span style="color:' + L.gradeColour('BA') + ';font-weight:700;">Below average</span>.</p></div>';
     var gKeys = genes ? Object.keys(genes) : [];
     var gSum = gKeys.reduce(function (t, k) { return t + genes[k]; }, 0);
     var genHtml = '<div><strong>Genetic potential</strong> <span class="tag mono">' + L.esc(info.geneticPotential != null ? info.geneticPotential : (gKeys.length ? gSum : '?')) + '</span>' +
@@ -3437,7 +3444,7 @@
     if (!info) return '';
     var tags = [];
     if (info.geneticPotential != null) tags.push('<span class="tag mono">GP ' + L.esc(info.geneticPotential) + '</span>');
-    if (info.conformation) tags.push('<span class="tag mono" title="Conformation stats: VG very good, G+ Good+ (about 80 to 84), G good, A average, BA below average">' + L.esc(L.confStatText(info)) + '</span>');
+    if (info.conformation) tags.push('<span class="tag mono" title="Conformation stats: VG very good, G+ Good+ (about 80 to 84), G good, A average, BA below average">' + confStatHtml(info) + '</span>');
     if (info.testedColours) tags.push('<span class="tag mono">' + L.esc(info.testedColours) + '</span>');
     var extraGenes = info.lifeNumber ? savedGenesText(info.lifeNumber) : '';
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');

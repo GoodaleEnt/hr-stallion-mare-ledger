@@ -2352,6 +2352,29 @@
         if (rating) out[name] = rating;
       });
     });
+    if (Object.keys(out).length >= 8) return out;
+    return readConfTraitsByText();
+  }
+  // The Stats tab's Conformation panel (a trait name, then its rating, e.g. Hindquarters | Good+) whatever its markup: find the
+  // trait names and read the rating next to each. Ratings: Very good, Good+, Good, Average, Below average, Poor.
+  var CONF_RATING_RE = /^(very good|good\s*\+|good|average|below average|poor)$/i;
+  function readConfTraitsByText() {
+    var out = {};
+    function visit(root) {
+      var all = root.querySelectorAll('*');
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (el.shadowRoot) visit(el.shadowRoot);
+        if (el.children.length) continue;
+        var name = (el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (CONF_TRAIT_NAMES.indexOf(name) === -1 || out[name]) continue;
+        // the rating is in the next cell, or in the cell next to this one's container
+        var cand = el.nextElementSibling || (el.parentElement && el.parentElement.nextElementSibling);
+        var rating = cand ? (cand.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        if (CONF_RATING_RE.test(rating)) out[name] = rating.replace(/\s+/g, '').replace(/^good\+$/i, 'Good+').replace(/^verygood$/i, 'Very good').replace(/^belowaverage$/i, 'Below average').replace(/^average$/i, 'Average').replace(/^good$/i, 'Good').replace(/^poor$/i, 'Poor');
+      }
+    }
+    try { visit(document); } catch (e) { return null; }
     return Object.keys(out).length >= 8 ? out : null;
   }
   function scrapeConformationTraits() {

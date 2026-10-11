@@ -730,13 +730,14 @@
   // Horse Reality's conformation summary, e.g. "2G 7A 3BA": how many of the
   // horse's traits are rated Good, Average and Below average.
   function parseConformation(text) {
-    var out = { G: 0, A: 0, BA: 0, total: 0, ok: false };
-    String(text || '').replace(/(\d+)\s*(BA|G|A)\b/g, function (m, n, code) {
-      out[code] += parseInt(n, 10);
+    // "1VG 1G+ 2G 7A 1BA": G+ is Good+ (about 80 to 84), kept apart from plain G
+    var out = { VG: 0, GP: 0, G: 0, A: 0, BA: 0, total: 0, ok: false };
+    String(text || '').replace(/(\d+)\s*(VG|G\+|BA|G|A)(?![A-Za-z+])/g, function (m, n, code) {
+      out[code === 'G+' ? 'GP' : code] += parseInt(n, 10);
       out.ok = true;
       return m;
     });
-    out.total = out.G + out.A + out.BA;
+    out.total = out.VG + out.GP + out.G + out.A + out.BA;
     return out;
   }
 
@@ -817,7 +818,11 @@
   function traitCounts(info) {
     var t = info && info.confTraits;
     var tag = info && info.tagCounts ? Object.assign({ VG: 0, GP: 0, G: 0, A: 0, BA: 0 }, info.tagCounts) : null;
-    if (!t) return tag;
+    if (!t) {
+      if (tag) return tag;
+      var pc = parseConformation(info && info.conformation);
+      return pc.ok ? { VG: pc.VG, GP: pc.GP, G: pc.G, A: pc.A, BA: pc.BA } : null;
+    }
     // Ratings: Very good (VG), Good+ (G+), Good (G), Average (A), Below average (BA).
     var c = { VG: 0, GP: 0, G: 0, A: 0, BA: 0 };
     Object.keys(t).forEach(function (k) {
@@ -3736,10 +3741,15 @@
     if (!tc || !(tc.VG + tc.GP + tc.G + tc.A + tc.BA)) return info && info.conformation ? String(info.conformation) : '';
     return [tc.VG ? tc.VG + 'VG' : '', tc.GP ? tc.GP + 'G+' : '', tc.G ? tc.G + 'G' : '', tc.A ? tc.A + 'A' : '', tc.BA ? tc.BA + 'BA' : ''].filter(Boolean).join(' ');
   }
+  // The traits rated Good+ (when the trait ratings were read from the horse's page): ["Hindquarters"]
+  function goodPlusTraits(info) {
+    var t = info && info.confTraits, out = [];
+    if (t) Object.keys(t).forEach(function (k) { if (/^good\s*\+$/i.test(String(t[k]).trim())) out.push(k); });
+    return out;
+  }
   // One number for the conformation stats, higher is better: the average rating (Below average 0, Average 1, Good 2, Good+ 3, Very good 4)
   function confStatScore(info) {
     var tc = traitCounts(info);
-    if (!tc && info && info.conformation) { var pc = parseConformation(info.conformation); if (pc.ok) tc = { VG: 0, GP: 0, G: pc.G, A: pc.A, BA: pc.BA }; }
     var n = tc ? tc.VG + tc.GP + tc.G + tc.A + tc.BA : 0;
     return n > 0 ? (4 * tc.VG + 3 * tc.GP + 2 * tc.G + tc.A) / n : null;
   }
@@ -4280,6 +4290,7 @@
     goalCheck: goalCheck,
     traitCounts: traitCounts,
     confStatText: confStatText,
+    goodPlusTraits: goodPlusTraits,
     confStatScore: confStatScore,
     refreshBreedTotals: refreshBreedTotals,
     parseConformation: parseConformation,

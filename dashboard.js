@@ -2404,14 +2404,15 @@
     var t = String(text || '').toLowerCase();
     if (/below|poor|bad/.test(t)) return 1;
     if (/average/.test(t)) return 2;
+    if (/very good|excellent|great|superb/.test(t)) return 5;
+    if (/good\s*\+/.test(t)) return 4;
     if (/good/.test(t)) return 3;
-    if (/excellent|great|superb/.test(t)) return 4;
     return null;
   }
   function ratingChipHtml(text) {
     var rank = ratingRank(text);
-    var colour = rank === 3 || rank === 4 ? ['var(--success-bg)', 'var(--success)'] : (rank === 1 ? ['var(--danger-bg)', 'var(--danger)'] : ['var(--warn-bg)', 'var(--warn)']);
-    return '<span title="' + L.esc(L.labelRangeText('conf', text)) + '" style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:' + colour[0] + ';color:' + colour[1] + ';">' + L.esc(text) + '</span>';
+    var colour = rank >= 3 ? ['var(--success-bg)', 'var(--success)'] : (rank === 1 ? ['var(--danger-bg)', 'var(--danger)'] : ['var(--warn-bg)', 'var(--warn)']);
+    return '<span title="' + L.esc(L.labelRangeText('conf', text)) + '" style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:' + (rank >= 4 ? '800' : '600') + ';background:' + colour[0] + ';color:' + colour[1] + ';' + (rank === 4 ? 'box-shadow:0 0 0 2px #B8860B inset;' : '') + '">' + L.esc(text) + '</span>';
   }
   function traitsCompareHtml(mareLife, studLife) {
     var mare = state.horseInfo[mareLife] || {}, stud = state.horseInfo[studLife] || {};
@@ -2719,7 +2720,7 @@
     if (h.low) out += '<span class="tag mono" title="' + L.esc(['Lowest conformation show score', h.low.event].filter(Boolean).join(' — ')) + '">Low confo ' + L.esc(h.low.value) + (h.low.when ? ' · ' + L.esc(h.low.when) : '') + '</span>';
     if (h.low && h.low.ranged) out += '<span class="tag mono" style="color:var(--near);border-color:var(--near);" title="Highest minus lowest conformation score has reached the full range of ' + L.esc(h.low.full) + ' for this breed, so no later show can widen it">\u25C6 Ranged</span>';
     if (!(fxt.comp && !fxt.conf)) out += compTag;
-    if (h.gplus) out += '<span class="tag mono" style="color:#B8860B;border-color:#B8860B;" title="' + h.gplus + ' conformation trait' + (h.gplus === 1 ? '' : 's') + ' at Good+ (our estimate: the top of Good, about 80 to 84). Find them with #gplus.">G+ \u00d7' + h.gplus + '</span>';
+    if (h.gplus) out += '<span class="tag mono" style="color:#B8860B;border-color:#B8860B;" title="' + h.gplus + ' conformation trait' + (h.gplus === 1 ? '' : 's') + ' at Good+' + (L.goodPlusTraits(info).length ? ': ' + L.goodPlusTraits(info).join(', ') : '') + ' (about 80 to 84, the top of Good). Find them with #gplus.">G+ \u00d7' + h.gplus + (L.goodPlusTraits(info).length ? ' ' + L.esc(L.goodPlusTraits(info).join(', ')) : '') + '</span>';
     if (h.bt) out += '<span class="tag mono" title="Breed Total = ((Genetic Potential ÷ 10) + top conformation) ÷ 2: ' + L.esc(h.bt.formula) + '">BT ' + L.esc(h.bt.value) + (h.bt.when ? ' · ' + L.esc(h.bt.when) : '') + '</span>';
     return out;
   }

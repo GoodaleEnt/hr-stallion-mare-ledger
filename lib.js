@@ -1890,11 +1890,53 @@
     };
     if (f.score > 0 && f.score <= 100) rec.foalScore = f.score;
     state.breedings[sid].push(rec);
+    mergeFoalCoverings(state);
     return 'added';
   }
   // One "Foal Born" row per foal: when the same foal turns up more than once (under one or several
   // stallions), keep the best copy (under a stallion you own, with a score and picture) and fold
   // the missing details of the others into it. Returns how many copies were removed.
+  // A foal read from the Foals tab (or a mare's foal list) is saved as its own "Foal Born" row with no date. When the same
+  // stallion already has a covering of that mare with no foal on it (Pending, Succeeded, or marked Foal Born by hand), the
+  // foal belongs to that covering: its foal details are moved onto it and the extra row is removed, so one covering shows
+  // its foal. Several foals of one mare are paired with her coverings in date order (a covering dated after the foal's birth,
+  // or more than 35 days before it, is not a match). Returns how many were joined.
+  function mergeFoalCoverings(state) {
+    var joined = 0, ts = function (t) { var d = new Date(t); return t && !isNaN(d.getTime()) ? d.getTime() : null; };
+    Object.keys(state.breedings || {}).forEach(function (sid) {
+      var list = state.breedings[sid] || [];
+      var foals = list.filter(function (b) { return b.foalUrl && b.status === 'Foal Born' && !b.date && !(b.price > 0); });
+      if (!foals.length) return;
+      foals.sort(function (a, b) { return (ts(a.dateBorn) || 0) - (ts(b.dateBorn) || 0); });
+      foals.forEach(function (f) {
+        var born = ts(f.dateBorn), mare = String(f.mareLifeNumber || '');
+        if (!mare) return;
+        var cands = list.filter(function (c) {
+          if (c === f || c.foalUrl || String(c.mareLifeNumber || '') !== mare) return false;
+          if (c.status !== 'Pending' && c.status !== 'Succeeded' && c.status !== 'Foal Born') return false;
+          var cd = ts(c.date);
+          if (cd != null && born != null && (cd > born + 86400000 || born - cd > 35 * 86400000)) return false;
+          return true;
+        });
+        if (!cands.length) return;
+        // the covering dated closest before the birth, else the oldest one with no date
+        cands.sort(function (a, b) {
+          var da = ts(a.date), db = ts(b.date);
+          if (da != null && db != null) return db - da;
+          if (da != null) return -1;
+          if (db != null) return 1;
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+        var c = cands[0];
+        ['foalUrl', 'foalName', 'dateBorn', 'foalScore', 'foalImageUrl', 'foalLife'].forEach(function (k) { if (f[k] != null && f[k] !== '') c[k] = f[k]; });
+        c.status = 'Foal Born';
+        list.splice(list.indexOf(f), 1);
+        joined++;
+      });
+      state.breedings[sid] = list;
+    });
+    return joined;
+  }
   // A covering saved the wrong way round (the stallion as the mare and the mare as the stallion): found by the saved horses'
   // sexes and put right, moving the record to the real stallion. Returns the number fixed.
   function repairSwappedBreedings(state) {
@@ -4196,6 +4238,7 @@
     recordCoveringFromPage: recordCoveringFromPage,
     dedupeFoals: dedupeFoals,
     repairSwappedBreedings: repairSwappedBreedings,
+    mergeFoalCoverings: mergeFoalCoverings,
     mareBreedStatus: mareBreedStatus,
     goalMisses: goalMisses,
     recordFoalsFromList: recordFoalsFromList,

@@ -596,6 +596,14 @@
             (state.breedings[matchId] || []).forEach(function (b) {
               if (rowLife && b.foalUrl && b.foalUrl !== row.foalUrl && HRLib.foalLifeOf(b.foalUrl) === rowLife) b.foalUrl = row.foalUrl;
             });
+            // this foal already sits on a covering of this stallion (joined to it earlier): only fill in what is missing
+            var have = rowLife && (state.breedings[matchId] || []).find(function (b) { return b.foalUrl && HRLib.foalLifeOf(b.foalUrl) === rowLife; });
+            if (have) {
+              if (row.foalName && !have.foalName) { have.foalName = row.foalName; updated++; }
+              if (row.foalScore && !have.foalScore) { have.foalScore = row.foalScore; updated++; }
+              if (have.status !== 'Foal Born' && row.status === 'Foal Born') { have.status = 'Foal Born'; updated++; }
+              return;
+            }
             var result = HRStorage.upsertBreeding(state, matchId, {
               mareName: row.mareName, mareLifeNumber: row.mareLifeNumber, mareUrl: row.mareUrl,
               breederName: row.breederName, breederUrl: row.breederUrl,
@@ -605,6 +613,8 @@
             });
             if (result === 'added') added++; else updated++;
           });
+          // a foal row that belongs to a covering you already have joins it instead of standing alone
+          if (HRLib.mergeFoalCoverings(state)) updated++;
         }
       }
 

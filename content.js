@@ -2898,7 +2898,11 @@
       window.HRLedgerOpenProfile(id);
       return;
     }
-    chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { void chrome.runtime.lastError; });
+    // after the extension is updated or reloaded this page's copy of the script loses its connection: reload the page to get the new one
+    if (!storageAlive()) { location.reload(); return; }
+    try {
+      chrome.runtime.sendMessage({ type: 'HR_OPEN_PROFILE', life: id }, function () { if (chrome.runtime.lastError) { showToast('HR Ledger could not reach the extension — reloading this page'); setTimeout(function () { location.reload(); }, 900); } });
+    } catch (e) { location.reload(); }
   }
   function removeLedgerButton() {
     deepQueryAll('#' + LEDGER_PILL_ID + ', #' + LEDGER_BTN_ID).forEach(function (el) { el.remove(); });
@@ -3000,7 +3004,12 @@
   var lastHref = location.href;
   var tickTimer = setInterval(function () {
     // after the extension is reloaded or updated this old copy of the script is orphaned: stop quietly
-    if (!storageAlive()) { clearInterval(tickTimer); return; }
+    if (!storageAlive()) {
+      clearInterval(tickTimer);
+      // the extension was updated: say so on the button, which then reloads the page
+      var dead = deepQuery('#' + LEDGER_PILL_ID); if (dead) { var tn = dead.lastChild; if (tn && tn.nodeType === 3) tn.textContent = 'Ledger updated — click to reload'; }
+      return;
+    }
     injectLedgerButton(); // put it back if the site's own scripts removed it
     scrapeFoalsTab();
     scrapeStatusPills();

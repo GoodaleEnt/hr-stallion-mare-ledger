@@ -341,6 +341,7 @@
       '</div></div>';
     html += breedCleanupHtml();
     html += starsPanelHtml();
+    html += presetsPanelHtml();
     html += goalsPanelHtml();
     html += notesPanelHtml();
     html += purchasePanelHtml();
@@ -3006,6 +3007,22 @@
     if (pk) out += '<span class="tag" style="margin:0;white-space:nowrap;" title="Peacock expressed' + (pk.strength != null ? ', line strength estimate ' + pk.strength + '%' : '') + '">Peacock' + (pk.strength != null ? ' ' + L.esc(pk.strength) + '%' : '') + '</span>';
     return out;
   }
+  // ---- Settings: presets for the Update horse form on Horse Reality ----
+  function presetsPanelHtml() {
+    var list = L.presetsOf(state);
+    var kinds = L.PRESET_KINDS;
+    var rows = list.map(function (p) {
+      return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--border);padding:8px 0;">' +
+        '<select data-action="preset-edit" data-id="' + L.esc(p.id) + '" data-field="kind" aria-label="Field">' + kinds.map(function (k) { return '<option value="' + k[0] + '"' + (p.kind === k[0] ? ' selected' : '') + '>' + L.esc(k[1]) + '</option>'; }).join('') + '</select>' +
+        '<input type="text" data-action="preset-edit" data-id="' + L.esc(p.id) + '" data-field="title" value="' + L.esc(p.title) + '" placeholder="Name of the preset" style="flex:1 1 160px;min-width:120px;">' +
+        '<input type="text" class="mono" data-action="preset-edit" data-id="' + L.esc(p.id) + '" data-field="template" value="' + L.esc(p.template) + '" placeholder="e.g. {ln}|{hidden}" style="flex:2 1 260px;min-width:160px;">' +
+        '<button type="button" class="btn btn-sm" data-action="preset-del" data-id="' + L.esc(p.id) + '">Remove</button></div>';
+    }).join('');
+    return '<details class="card" style="padding:14px 16px;margin-bottom:14px;"><summary style="cursor:pointer;font-weight:600;">Presets for the Update horse form on Horse Reality (' + list.length + ')</summary>' +
+      '<p class="notes-line" style="margin:8px 0;">On a horse\'s Update horse page, the Change name, Change tagline, Private notes and Public notes fields get a <em>Ledger preset</em> box. Choosing one fills the field from the template, with each <code>{token}</code> replaced by what the ledger knows about that horse. Unknown tokens are left as written.</p>' +
+      '<p class="notes-line" style="margin:0 0 8px;">Tokens: ' + L.PRESET_TOKENS.map(function (t) { return '<code>{' + t[0] + '}</code> ' + L.esc(t[1]); }).join(' \u00b7 ') + '</p>' +
+      rows + '<div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-primary" data-action="preset-add">+ Add a preset</button> <button type="button" class="btn btn-sm" data-action="preset-reset">Back to the starting presets</button></div></details>';
+  }
   // The conformation stats (each trait's grade and the number range behind it) and the genetic potential stats (each stat's
   // number), as read from the horse's Stats tab.
   var TRAIT_ORDER = ['Walk', 'Trot', 'Canter', 'Gallop', 'Posture', 'Head', 'Neck', 'Back', 'Shoulders', 'Frontlegs', 'Hindquarters', 'Socks'];
@@ -3030,8 +3047,13 @@
         return '<tr><td>' + L.esc(k) + '</td><td class="num mono">' + L.esc(genes[k]) + '</td><td style="width:40%;"><div style="height:7px;border-radius:4px;background:var(--surface-2);"><div style="height:7px;border-radius:4px;background:#1A9E9E;width:' + Math.max(0, Math.min(100, genes[k])) + '%;"></div></div></td></tr>';
       }).join('') + '</tbody></table><p class="notes-line" style="margin:6px 0 0;">The ten stats add up to ' + L.esc(gSum) + (info.geneticPotential != null && Number(info.geneticPotential) !== gSum ? ' (the horse\'s genetic potential says ' + L.esc(info.geneticPotential) + ')' : ', the genetic potential') + '.</p>'
         : '<p class="notes-line" style="margin:6px 0 0;">The ten genetic potential stats are read when you open this horse\'s Stats tab on Horse Reality.</p>') + '</div>';
+    var sumRows = L.showSummary(state, life, (state.horseMeta && state.horseMeta[life] && state.horseMeta[life].showWindow) || null);
+    var sumHtml = sumRows.length ? '<div style="margin-top:14px;"><strong>Show results summary</strong><table class="an-table" style="margin-top:6px;"><thead><tr><th></th><th class="num">High</th><th class="num">Low</th><th class="num">Max Range</th><th class="num">Gap</th></tr></thead><tbody>' + sumRows.map(function (r) {
+      var f = function (n) { return n == null ? '\u2013' : L.esc(n); };
+      return '<tr><td>' + L.esc(r.label) + '</td><td class="num mono">' + f(r.high) + '</td><td class="num mono">' + f(r.low) + '</td><td class="num mono">' + f(r.max) + '</td><td class="num mono">' + f(r.gap) + '</td></tr>';
+    }).join('') + '</tbody></table><p class="notes-line" style="margin:6px 0 0;">Max Range is the highest score this horse can reach: its lowest score plus the full range for its breed (6.928 with 12 stats). Gap is how far its high is from that. The Current rows use the 25 scores last seen on its Stats tab.</p></div>' : '';
     return '<details class="card profile-block" open style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;font-weight:600;">Conformation stats &amp; genetic potential</summary>' +
-      '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:10px;">' + confHtml + genHtml + '</div></details>';
+      '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:10px;">' + confHtml + genHtml + '</div>' + sumHtml + '</details>';
   }
   function geneticsPanelHtml(life) {
     var info = state.horseInfo[life];
@@ -3701,6 +3723,9 @@
         document.querySelectorAll('details.an-sec').forEach(function (s) { s.open = openAll; anOpen[s.getAttribute('data-sec')] = openAll; });
         saveUi();
       }
+      else if (action === 'preset-add') { var np = L.presetsOf(state).slice(); np.push({ id: 'p' + Date.now(), kind: 'tagline', title: 'New preset', template: '{tagline}' }); state.settings.presets = np; persist(); }
+      else if (action === 'preset-del') { var did = t.getAttribute('data-id'); state.settings.presets = L.presetsOf(state).filter(function (p) { return p.id !== did; }); persist(); }
+      else if (action === 'preset-reset') { delete state.settings.presets; persist(); }
       else if (action === 'sugg-expand-all' || action === 'sugg-collapse-all') { var open = action === 'sugg-expand-all'; document.querySelectorAll('details.sugg-card').forEach(function (e) { e.open = open; }); }
       else if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-pick-stallion') { calcStallion = t.getAttribute('data-life'); saveUi(); render(); }
@@ -4027,6 +4052,12 @@
           deleteStallionRec(sid3);
           if (selectedId === sid3) selectedId = null;
         }
+      }
+      else if (action === 'preset-edit') {
+        var pid = t.getAttribute('data-id'), pf = t.getAttribute('data-field');
+        var plist = L.presetsOf(state).map(function (p) { return Object.assign({}, p); });
+        var pp = plist.find(function (p) { return p.id === pid; });
+        if (pp && (pf === 'kind' || pf === 'title' || pf === 'template')) { pp[pf] = t.value; state.settings.presets = plist; persist(); }
       }
       else if (action === 'calc-show-all') { calcShowAll = !!t.checked; render(); }
       else if (action === 'list-sort') { listSort[activeTab] = t.value; saveUi(); render(); }

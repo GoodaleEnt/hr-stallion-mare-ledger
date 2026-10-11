@@ -373,6 +373,14 @@ Each horse's profile has a **Conformation stats & genetic potential** box. On th
 
 **Grade colours.** Grades run from the top down in colour: **Very good gold** (with a star), **Good+ green**, **Good light green**, **Average yellow**, **Below average orange**, **Poor red**. The same colours are used on the stat chips in the profile box and the Foal Calculator's trait comparison, in the stats line (`1VG 1G+ 2G 7A 1BA`), and on the Good+ and Very good pills on ranch cards.
 
+## Presets for the Update horse form
+
+On a horse's **Update horse** page on Horse Reality, the *Change name*, *Change tagline*, *Private notes* and *Public notes* fields each get a **Ledger preset** box. Pick a preset and the field is filled from its template, with each `{token}` replaced by what the ledger knows about that horse: for example `{tagline}` gives `1+G|9A|2BA|557|63|71.286`, `{high}-{low}|{health}` gives `71.29-64.42|GEGGG`, and `{ln}|{hidden}` gives the life number and hidden colour genes. Nothing is saved until you press the site's own Update button. Make, edit and remove presets in Settings → *Presets for the Update horse form*; the tokens are listed there. Four starting presets are provided.
+
+## Show results summary
+
+On a horse's Stats tab, under *Latest 25 show results*, the ledger draws a summary of **High**, **Low**, **Max Range** and **Gap** for All-time and Current Breed Total and conformation (only when HRToolkit is not already drawing it). Max Range is the highest score the horse can reach: its lowest score plus the full range for its breed (6.928 with 12 stats). Gap is how far its high is from that. The same table is in the profile's *Conformation stats & genetic potential* box.
+
 ## Good+ (G+) traits
 
 The game's page only says **Good** for a trait whose hidden number is 70 to 84. HRToolkit's tag splits that band: the **+G** in `1+G|9A|2BA` (and `1+1G` for one Good+ and one Good) counts traits at **Good+**, which we take to be the top of Good, a hidden number of about **80 to 84** (a Good trait scores 70 to 79; Very good starts at 85). The spreadsheet's herd tracker uses the same split, with the middle of each band as its score: Average 64.5, Good- 74.5, Good 76.5, Good+ 82, Very good 92.5.

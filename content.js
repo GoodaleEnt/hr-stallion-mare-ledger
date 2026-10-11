@@ -2416,6 +2416,107 @@
     try { visit(document); } catch (e) { return null; }
     return Object.keys(out).length >= 8 ? out : null;
   }
+  // ---- the Update horse form: presets for Change name, Change tagline, Private notes and Public notes ----
+  // Each of those fields gets a "Ledger preset" box next to it. Choosing a preset fills the field with the preset's template, with the
+  // {tokens} replaced by what the ledger knows about this horse (set the presets in the ledger's Settings).
+  var PRESET_FIELDS = { 'change name': 'name', 'change tagline': 'tagline', 'private notes': 'private', 'public notes': 'public' };
+  function findFormField(labelEl) {
+    if (labelEl.control) return labelEl.control;
+    var el = labelEl, hops = 0;
+    while (el && hops < 4) {
+      var sib = el.nextElementSibling;
+      while (sib) {
+        if (/^(INPUT|TEXTAREA)$/.test(sib.tagName) && sib.type !== 'hidden' && sib.type !== 'submit') return sib;
+        var inner = sib.querySelector && sib.querySelector('textarea, input[type=text], input:not([type])');
+        if (inner) return inner;
+        sib = sib.nextElementSibling;
+      }
+      el = el.parentElement; hops++;
+    }
+    return null;
+  }
+  function injectPresetPickers() {
+    var life = parseHorseIdFromUrl();
+    if (!life || !/Update horse/i.test((document.body && document.body.textContent) || '')) return;
+    var labels = [];
+    document.querySelectorAll('label, td, th, div, span, b, strong, p').forEach(function (el) {
+      if (el.children.length > 1) return;
+      var t = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (PRESET_FIELDS[t]) labels.push({ el: el, kind: PRESET_FIELDS[t] });
+    });
+    if (!labels.length) return;
+    HRStorage.peekState(function (state) {
+      var presets = HRLib.presetsOf(state);
+      labels.forEach(function (lb) {
+        var field = findFormField(lb.el);
+        if (!field || field.getAttribute('data-hr-presets') === '1') return;
+        var mine = presets.filter(function (p) { return p.kind === lb.kind; });
+        if (!mine.length) return;
+        field.setAttribute('data-hr-presets', '1');
+        var sel = document.createElement('select');
+        sel.className = 'hr-ledger-preset';
+        sel.title = 'HR Ledger: fill this field from a preset (edit the presets in the ledger\'s Settings)';
+        sel.style.cssText = 'margin:0 0 0 6px;font:inherit;max-width:260px;' + (field.tagName === 'TEXTAREA' ? 'display:block;margin:4px 0;' : '');
+        var first = document.createElement('option'); first.value = ''; first.textContent = 'Ledger preset\u2026'; sel.appendChild(first);
+        mine.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.title || p.template; sel.appendChild(o); });
+        sel.addEventListener('change', function () {
+          var p = mine.find(function (x) { return x.id === sel.value; });
+          sel.value = '';
+          if (!p) return;
+          HRStorage.peekState(function (st2) {
+            field.value = HRLib.presetRender(p.template, HRLib.presetTokens(st2, life));
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        });
+        field.parentNode.insertBefore(sel, field.nextSibling);
+      });
+    });
+  }
+  // ---- the show results summary on the Stats tab (when HRToolkit is not drawing it) ----
+  function injectShowSummary() {
+    var id = parseHorseIdFromUrl();
+    if (!id) return;
+    var block = null;
+    document.querySelectorAll('.half_block').forEach(function (b) {
+      var top = b.querySelector('.top');
+      if (top && /show results/i.test(top.textContent || '') && !/competition/i.test(top.textContent || '')) block = b;
+    });
+    if (!block || block.querySelector('.hrtoolkit-score-summary')) return;
+    var scores = [];
+    block.querySelectorAll('.row_460').forEach(function (row) {
+      var cols = row.querySelectorAll(':scope > div');
+      var m = cols.length >= 3 && /\d+(?:\.\d+)?/.exec((cols[2].textContent || '').replace(/,/g, ''));
+      if (m) scores.push(parseFloat(m[0]));
+    });
+    var sig = id + '|' + scores.join(',');
+    var old = block.querySelector('.hr-ledger-score-summary');
+    if (old && old.getAttribute('data-sig') === sig) return;
+    // keep the 25 scores for the profile's "Current" rows
+    if (scores.length) HRStorage.getState(function (st0) {
+      var m0 = Object.assign({}, st0.horseMeta && st0.horseMeta[id]);
+      if (JSON.stringify(m0.showWindow || null) === JSON.stringify(scores.slice(0, 25))) return;
+      m0.showWindow = scores.slice(0, 25);
+      if (!st0.horseMeta) st0.horseMeta = {};
+      st0.horseMeta[id] = m0;
+      HRStorage.setState(st0);
+    });
+    HRStorage.peekState(function (state) {
+      var rows = HRLib.showSummary(state, id, scores);
+      if (old) old.remove();
+      if (!rows.length) return;
+      var t = document.createElement('table');
+      t.className = 'hr-ledger-score-summary'; t.setAttribute('data-sig', sig);
+      t.style.cssText = 'width:100%;border-collapse:collapse;';
+      var cell = function (txt, head, first) { return '<' + (head ? 'th' : 'td') + ' style="padding:6px 10px;text-align:left;border:0;' + (head ? 'background:#4a7a9b;color:#fff;font-weight:bold;' : (first ? 'color:#4a7a9b;font-weight:bold;white-space:nowrap;' : '')) + '">' + txt + '</' + (head ? 'th' : 'td') + '>'; };
+      var f = function (n) { return n == null ? '\u2013' : String(n); };
+      t.innerHTML = '<tr>' + ['', 'High', 'Low', 'Max Range', 'Gap'].map(function (h) { return cell(h, true); }).join('') + '</tr>' +
+        rows.map(function (r, i) { return '<tr style="background:' + (i % 2 ? '#eef1f4' : '#fff') + ';">' + cell(r.label, false, true) + cell(f(r.high)) + cell(f(r.low)) + cell(f(r.max)) + cell(f(r.gap)) + '</tr>'; }).join('');
+      t.title = 'HR Ledger: Max Range is the highest score this horse can reach (its lowest score plus the full range for its breed); Gap is how far its high is from it.';
+      var top = block.querySelector('.top');
+      top.parentNode.insertBefore(t, top.nextSibling);
+    });
+  }
   function scrapeConformationTraits() {
     var id = parseHorseIdFromUrl();
     if (!id) return;
@@ -3102,6 +3203,8 @@
     annotateShowEntry();
     scrapeCompetitionResults();
     scrapeCompetitionStats();
+    injectPresetPickers();
+    injectShowSummary();
     scrapeAgeFromProfile();
     if (location.href !== lastHref) {
       lastHref = location.href;

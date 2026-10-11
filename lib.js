@@ -2616,6 +2616,98 @@
     if (changed) { meta.toolkitSeenAt = Date.now(); state.horseMeta[life] = meta; }
     return changed;
   }
+  // ---------- presets for the Horse Reality "Update horse" form, and the show results summary ----------
+  // A preset is a template with {tokens} filled from what the ledger knows about the horse: for the name, the tagline, the
+  // private notes or the public notes. settings.presets = [{ id, kind, title, template }] (the defaults below until you change them).
+  var PRESET_KINDS = [['name', 'Change name'], ['tagline', 'Change tagline'], ['private', 'Private notes'], ['public', 'Public notes']];
+  var PRESET_TOKENS = [
+    ['ln', 'life number'], ['name', 'its name'], ['tagline', 'counts|GP|BT|top score, like 1+G|9A|2BA|557|63|71.286'], ['counts', 'stat counts, like 1+G|9A|2BA'],
+    ['gp', 'genetic potential'], ['bt', 'Breed Total (rounded)'], ['bt1', 'Breed Total, one decimal'], ['conf', 'top conformation score'], ['high', 'highest score, 2 decimals'],
+    ['low', 'lowest score, 2 decimals'], ['range', 'high minus low'], ['health', 'five health letters, like GEGGG'], ['fertility', 'fertility letter'],
+    ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
+  ];
+  function defaultPresets() {
+    return [
+      { id: 'd-name', kind: 'name', title: 'Number + hidden genes', template: '{ln}|{hidden}' },
+      { id: 'd-tagline', kind: 'tagline', title: 'Stats tagline (HRToolkit style)', template: '{tagline}' },
+      { id: 'd-private', kind: 'private', title: 'Score range + health', template: '{high}-{low}|{health}' },
+      { id: 'd-public', kind: 'public', title: 'Breeding summary', template: 'GP {gp} \u00b7 BT {bt1} \u00b7 top conformation {conf} \u00b7 {counts}' }
+    ];
+  }
+  function presetsOf(state) { var p = state && state.settings && state.settings.presets; return Array.isArray(p) ? p : defaultPresets(); }
+  // 1+G|9A|2BA: Good+ is written as a plus before the G, and a count of 0 is left out
+  function toolkitCounts(info) {
+    var tc = traitCounts(info);
+    if (!tc || !(tc.VG + tc.GP + tc.G + tc.A + tc.BA)) return '';
+    var out = [];
+    if (tc.VG) out.push(tc.VG + 'VG');
+    if (tc.GP) out.push(tc.GP + '+' + (tc.G || '') + 'G'); else if (tc.G) out.push(tc.G + 'G');
+    if (tc.A) out.push(tc.A + 'A');
+    if (tc.BA) out.push(tc.BA + 'BA');
+    return out.join('|');
+  }
+  function healthLetters(info) {
+    var h = info && info.health;
+    if (!h || typeof h !== 'object') return '';
+    var rev = { excellent: 'E', good: 'G', average: 'A', fair: 'F', poor: 'P' };
+    var out = TOOLKIT_HEALTH_ORDER.map(function (k) { return rev[String(h[k] || '').toLowerCase()] || '?'; }).join('');
+    return /^\?+$/.test(out) ? '' : out;
+  }
+  function hiddenGenesText(state, life) {
+    var out = [], man = manualGenes(state, life) || {}, sus = suspectedGenes(state, life) || {};
+    MANUAL_LOCI.forEach(function (lc) {
+      var code = lc.label ? lc.id : lc.id;
+      if (man[lc.id] && man[lc.id].join('/') !== lc.absent.join('/')) out.push(code + (man[lc.id].filter(function (a) { return a === lc.alleles[0]; }).length > 1 ? '\u00b2' : ''));
+      else if (sus[lc.id]) out.push(code + '?');
+    });
+    return out.join(' ');
+  }
+  function presetTokens(state, life) {
+    life = String(life || '');
+    var info = (state.horseInfo && state.horseInfo[life]) || {}, meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var hi = bestConformation(meta).best, lo = Number(meta.confLow) || 0, bt = horseBT(state, life), gp = Number(info.geneticPotential) || 0;
+    var fx = function (n, d) { return n > 0 ? n.toFixed(d) : ''; };
+    var counts = toolkitCounts(info), fert = { excellent: 'E', good: 'G', average: 'A', fair: 'F', poor: 'P' }[String(info.fertility || '').toLowerCase()] || '';
+    var tokens = {
+      ln: life, name: info.name || '', counts: counts, gp: gp ? String(gp) : '', bt: bt > 0 ? String(Math.round(bt)) : '', bt1: fx(bt, 1), conf: hi > 0 ? String(Math.round(hi * 1000) / 1000) : '',
+      high: fx(hi, 2), low: fx(lo, 2), range: hi > 0 && lo > 0 && lo <= hi ? (hi - lo).toFixed(2) : '', health: healthLetters(info), fertility: fert,
+      hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
+      sire: (info.sire && info.sire.name) || '', dam: (info.dam && info.dam.name) || '', discipline: String(info.training || '').split(',')[0].replace(/\s*-\s*Level.*$/i, '').trim()
+    };
+    tokens.tagline = [counts, tokens.gp, tokens.bt, tokens.conf].filter(Boolean).join('|');
+    return tokens;
+  }
+  function presetRender(template, tokens) {
+    return String(template || '').replace(/\{(\w+)\}/g, function (m, k) { return tokens[k] != null ? tokens[k] : m; });
+  }
+  // The "Latest 25 show results" summary (what HRToolkit draws): high, low, the highest score the horse could ever reach (its
+  // lowest score plus the full range for its breed) and how far its high is from that, for conformation and for Breed Total.
+  // window = the scores listed on the page right now (the "Current" rows); null when not known.
+  function showSummary(state, life, windowScores) {
+    life = String(life || '');
+    var info = (state.horseInfo && state.horseInfo[life]) || {}, meta = (state.horseMeta && state.horseMeta[life]) || {};
+    var gp = Number(info.geneticPotential) || 0, full = fullScoreRange(info);
+    var hiAll = bestConformation(meta).best, loAll = Number(meta.confLow) || 0;
+    var win = (windowScores || []).filter(function (n) { return n > 0; });
+    var hiCur = win.length ? Math.max.apply(null, win) : 0, loCur = win.length ? Math.min.apply(null, win) : 0;
+    var r3 = function (n) { return Math.round(n * 1000) / 1000; };
+    var btOf = function (c) { return c > 0 && gp ? r3((gp / 10 + c) / 2) : 0; };
+    var rows = [];
+    function build(label, hi, lo, bt) {
+      var row = { label: label, high: hi > 0 ? r3(bt ? btOf(hi) : hi) : null, low: lo > 0 ? r3(bt ? btOf(lo) : lo) : null, max: null, gap: null };
+      if (lo > 0 && full) {
+        var maxC = lo + full;
+        row.max = r3(bt ? btOf(maxC) : maxC);
+        if (!bt && hi > 0) row.gap = r3(maxC - hi);
+      }
+      return row;
+    }
+    if (gp && hiAll > 0) rows.push(build('All-time BT', hiAll, loAll, true));
+    if (gp && hiCur > 0) rows.push(build('Current BT', hiCur, loCur, true));
+    if (hiAll > 0) rows.push(build('All-time Confo', hiAll, loAll, false));
+    if (hiCur > 0) rows.push(build('Current Confo', hiCur, loCur, false));
+    return rows;
+  }
   // The widest a horse's conformation score can range, by how many conformation stats its breed has: a horse with 12 stats can
   // vary by 6.928 between its lowest and its highest score. A horse whose highest minus lowest score reaches that is "ranged":
   // both ends are found, so no later show can widen it. (Only the 12-stat range is known; other breeds are not marked.)
@@ -4194,6 +4286,14 @@
     marketRowInfo: marketRowInfo,
     recordCompScore: recordCompScore,
     compSummary: compSummary,
+    PRESET_KINDS: PRESET_KINDS,
+    PRESET_TOKENS: PRESET_TOKENS,
+    defaultPresets: defaultPresets,
+    presetsOf: presetsOf,
+    presetTokens: presetTokens,
+    presetRender: presetRender,
+    toolkitCounts: toolkitCounts,
+    showSummary: showSummary,
     starsOf: starsOf,
     studAccess: studAccess,
     compScoreOf: compScoreOf,

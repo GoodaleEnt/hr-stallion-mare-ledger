@@ -2427,6 +2427,9 @@
         var info = state.horseInfo[id];
         if (!info) { info = { lifeNumber: id }; state.horseInfo[id] = info; }
         var changed = false;
+        // The Info page (passport) says plain "Good" for every Good+ trait: only HRToolkit's mark on the Stats tab says Good+. A horse's
+        // conformation does not change, so a Good+ already saved is kept when the Info page is read afterwards.
+        if (traits && info.confTraits) Object.keys(traits).forEach(function (k) { if (/^good\s*\+$/i.test(String(info.confTraits[k] || '')) && /^good$/i.test(String(traits[k]))) traits[k] = info.confTraits[k]; });
         if (traits && JSON.stringify(info.confTraits || null) !== JSON.stringify(traits)) { info.confTraits = traits; changed = true; }
         if (genes && JSON.stringify(info.geneStats || null) !== JSON.stringify(genes)) { info.geneStats = genes; changed = true; }
         if (changed) HRStorage.setState(state);

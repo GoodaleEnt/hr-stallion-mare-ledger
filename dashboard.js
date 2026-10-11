@@ -3649,6 +3649,15 @@
         state.horseMeta[msl] = Object.assign({}, state.horseMeta[msl], { status: 'For Sale' });
         persist();
       }
+      else if (action === 'an-jump') {
+        var sec = document.getElementById(t.getAttribute('data-id'));
+        if (sec) { sec.open = true; anOpen[sec.getAttribute('data-sec')] = true; saveUi(); sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+      else if (action === 'an-all') {
+        var openAll = t.getAttribute('data-open') === '1';
+        document.querySelectorAll('details.an-sec').forEach(function (s) { s.open = openAll; anOpen[s.getAttribute('data-sec')] = openAll; });
+        saveUi();
+      }
       else if (action === 'sugg-expand-all' || action === 'sugg-collapse-all') { var open = action === 'sugg-expand-all'; document.querySelectorAll('details.sugg-card').forEach(function (e) { e.open = open; }); }
       else if (action === 'calc-pick-mare') { calcMare = t.getAttribute('data-life'); saveUi(); render(); }
       else if (action === 'calc-pick-stallion') { calcStallion = t.getAttribute('data-life'); saveUi(); render(); }
@@ -3975,15 +3984,6 @@
           deleteStallionRec(sid3);
           if (selectedId === sid3) selectedId = null;
         }
-      }
-      else if (action === 'an-jump') {
-        var sec = document.getElementById(t.getAttribute('data-id'));
-        if (sec) { sec.open = true; anOpen[sec.getAttribute('data-sec')] = true; saveUi(); sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-      }
-      else if (action === 'an-all') {
-        var openAll = t.getAttribute('data-open') === '1';
-        document.querySelectorAll('details.an-sec').forEach(function (s) { s.open = openAll; anOpen[s.getAttribute('data-sec')] = openAll; });
-        saveUi();
       }
       else if (action === 'calc-show-all') { calcShowAll = !!t.checked; render(); }
       else if (action === 'list-sort') { listSort[activeTab] = t.value; saveUi(); render(); }

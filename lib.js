@@ -193,6 +193,29 @@
   // content.js (which auto-marks these Failed) and background.js (which
   // badges them first, since the stud owner never gets the failure
   // notification for a customer's mare — only she does).
+  // A Pending covering of a mare who has a later (or same-day) covering that is already Succeeded or has a foal born: a mare
+  // carries one foal at a time, so the older one cannot be waiting for a result any more.
+  function coveringSuperseded(state, b) {
+    var at = coveredAtOf(b);
+    if (!b.mareLifeNumber || !at) return false;
+    return (state.stallions || []).some(function (s) {
+      return ((state.breedings && state.breedings[s.id]) || []).some(function (o) {
+        return o !== b && o.mareLifeNumber === b.mareLifeNumber && (o.status === 'Succeeded' || o.status === 'Foal Born') && coveredAtOf(o) >= at;
+      });
+    });
+  }
+  // Settle what her page already answers: older Pending coverings of a mare now in foal or with a foal are marked Failed, and a
+  // Pending covering is marked Failed when her page (seen on day 5 or later) shows no pregnancy. Returns how many were settled.
+  function settleCoverings(state) {
+    var n = 0;
+    (state.stallions || []).forEach(function (s) {
+      ((state.breedings && state.breedings[s.id]) || []).forEach(function (b) {
+        if (b.status !== 'Pending') return;
+        if (coveringSuperseded(state, b) || coveringLooksFailed(state, b)) { b.status = 'Failed'; n++; }
+      });
+    });
+    return n;
+  }
   function findReviewCandidates(state, minDays) {
     var out = [];
     (state.stallions || []).forEach(function (s) {
@@ -201,6 +224,7 @@
         if (b.status !== 'Pending' || !b.date) return;
         var age = daysSince(b.date);
         if (age == null || age < minDays) return;
+        if (coveringSuperseded(state, b)) return;
         var hasFoal = list.some(function (other) {
           return other !== b && other.mareLifeNumber && other.mareLifeNumber === b.mareLifeNumber && other.status === 'Foal Born';
         });
@@ -4363,6 +4387,9 @@
     learnedFailure: learnedFailure,
     coveringStage: coveringStage,
     coveringLooksFailed: coveringLooksFailed,
+    coveringSuperseded: coveringSuperseded,
+    coveredAtOf: coveredAtOf,
+    settleCoverings: settleCoverings,
     foalAgeInfo: foalAgeInfo,
     fmtTime: fmtTime,
     dueWindow: dueWindow,

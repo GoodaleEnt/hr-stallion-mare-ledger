@@ -855,8 +855,11 @@
           sireId = sireRes.id;
         }
         var sireList = state.breedings[sireId] || [];
-        var pregMatch = sireList.find(function (b) {
-          return b.mareLifeNumber === horseInfo.lifeNumber && b.status !== 'Failed' && b.status !== 'Foal Born';
+        // the newest open covering of her by this stallion (older ones are settled below)
+        var pregMatch = null;
+        sireList.forEach(function (b) {
+          if (b.mareLifeNumber !== horseInfo.lifeNumber || b.status === 'Failed' || b.status === 'Foal Born') return;
+          if (!pregMatch || HRLib.coveredAtOf(b) >= HRLib.coveredAtOf(pregMatch)) pregMatch = b;
         });
         if (pregMatch) {
           if (pregMatch.status !== 'Succeeded') { pregMatch.status = 'Succeeded'; pregnancyMarked = true; }
@@ -879,6 +882,8 @@
           pregnancyMarked = true;
         }
       }
+
+      if (HRLib.settleCoverings(state)) pregnancyMarked = true;
 
       // This horse is a foal of one of your mares: make sure her breeding history lists it.
       var foalRecorded = HRLib.recordFoalFromHorse(state, horseInfo);
@@ -1084,9 +1089,7 @@
   function sweepStaleFailedCoverings(state) {
     // between day 5 and day 17 a Pending covering may be a real pregnancy not seen yet: only call it failed when her page
     // (saved on day 5 or later) shows she is not in foal, or the longest pregnancy has passed
-    var candidates = HRLib.findReviewCandidates(state, STALE_PENDING_DAYS).filter(function (c) { return HRLib.coveringLooksFailed(state, c.breeding); });
-    candidates.forEach(function (c) { c.breeding.status = 'Failed'; });
-    return candidates.length;
+    return HRLib.settleCoverings(state);
   }
   function sweepAndPersistStaleFailures() {
     HRStorage.getState(function (state) {

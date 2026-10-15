@@ -4278,7 +4278,7 @@
   // ---------- boot ----------
   HRStorage.getState(function (loaded) {
     state = loaded;
-    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state) + L.purgeTrash(state) + L.repairSwappedBreedings(state) + L.mergeFoalCoverings(state);
+    var scoresChanged = L.refreshBreedTotals(state) + L.dedupeFoals(state) + L.purgeIgnored(state) + L.purgeTrash(state) + L.repairSwappedBreedings(state) + L.mergeFoalCoverings(state) + L.settleCoverings(state);
     if (L.adoptOwnedStallions(state) || scoresChanged) { persist(function () { openFromHash(); bringInImages(); }); return; }
     recompute();
     render();

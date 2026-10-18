@@ -375,7 +375,7 @@ Each horse's profile has a **Conformation stats & genetic potential** box. On th
 
 ## Presets for the Update horse form
 
-On a horse's **Update horse** page on Horse Reality, the *Change name*, *Change tagline*, *Private notes* and *Public notes* fields each get a **Ledger preset** box. Pick a preset and the field is filled from its template, with each `{token}` replaced by what the ledger knows about that horse: for example `{tagline}` gives `1+G|9A|2BA|557|63|71.286`, `{high}-{low}|{health}` gives `71.29-64.42|GEGGG`, and `{ln}|{hidden}` gives the life number and hidden colour genes. Nothing is saved until you press the site's own Update button. Make, edit and remove presets in Settings → *Presets for the Update horse form*; the tokens are listed there. Four starting presets are provided.
+On a horse's **Update horse** page on Horse Reality, the *Change name*, *Change tagline*, *Private notes* and *Public notes* fields each get a **Ledger preset** box. Pick a preset and the field is filled from its template, with each `{token}` replaced by what the ledger knows about that horse: for example `{tagline}` gives `1+G|9A|2BA|557|63|71.286`, `{high}-{low}|{health}` gives `71.29-64.42|GEGGG`, and `{ln}|{hidden}` gives the life number and hidden colour genes. Nothing is saved until you press the site's own Update button. Make, edit and remove presets in Settings → *Presets for the Update horse form*; the tokens are listed there. Four starting presets are provided. The genes are available too: `{genes}` (every known gene with its copy count, like E² A¹a¹), `{ext}` (Extension, like E¹e¹) and `{agouti}` (Agouti), the copy count written as a small superscript.
 
 ## Show results summary
 

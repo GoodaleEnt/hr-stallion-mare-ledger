@@ -2648,7 +2648,7 @@
     ['ln', 'life number'], ['name', 'its name'], ['tagline', 'counts|GP|BT|top score, like 1+G|9A|2BA|557|63|71.286'], ['counts', 'stat counts, like 1+G|9A|2BA'],
     ['gp', 'genetic potential'], ['bt', 'Breed Total (rounded)'], ['bt1', 'Breed Total, one decimal'], ['conf', 'top conformation score'], ['high', 'highest score, 2 decimals'],
     ['low', 'lowest score, 2 decimals'], ['range', 'high minus low'], ['health', 'five health letters, like GEGGG'], ['fertility', 'fertility letter'],
-    ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
+    ['genes', 'known genes with copy counts, like E² A+¹a¹'], ['ext', 'Extension, like E¹e¹'], ['agouti', 'Agouti, like A²'], ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
   ];
   function defaultPresets() {
     return [
@@ -2686,6 +2686,22 @@
     });
     return out.join(' ');
   }
+  // The genes the ledger knows for a horse as text with the copy count as a superscript, the allele that shows first:
+  // "E² A+¹a¹ f²". only = a list of locus ids to limit it to.
+  var SUPS = ['⁰', '¹', '²', '³'];
+  function genesText(state, life, only) {
+    var geno = horseGenotype(state, life), out = [];
+    ALL_LOCI.forEach(function (l) {
+      var pair = geno[l.id];
+      if (!pair || (only && only.indexOf(l.id) === -1)) return;
+      var seen = {}, order = [];
+      pair.forEach(function (a) { if (!seen[a]) { seen[a] = 0; order.push(a); } seen[a]++; });
+      var shows = l.recessive ? l.alleles[1] : l.alleles[0];
+      order.sort(function (a, b) { return (a === shows ? 0 : 1) - (b === shows ? 0 : 1); });
+      out.push(order.map(function (a) { return a + SUPS[Math.min(3, seen[a])]; }).join(''));
+    });
+    return out.join(' ');
+  }
   function presetTokens(state, life) {
     life = String(life || '');
     var info = (state.horseInfo && state.horseInfo[life]) || {}, meta = (state.horseMeta && state.horseMeta[life]) || {};
@@ -2695,7 +2711,7 @@
     var tokens = {
       ln: life, name: info.name || '', counts: counts, gp: gp ? String(gp) : '', bt: bt > 0 ? String(Math.round(bt)) : '', bt1: fx(bt, 1), conf: hi > 0 ? String(Math.round(hi * 1000) / 1000) : '',
       high: fx(hi, 2), low: fx(lo, 2), range: hi > 0 && lo > 0 && lo <= hi ? (hi - lo).toFixed(2) : '', health: healthLetters(info), fertility: fert,
-      hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
+      genes: genesText(state, life), ext: genesText(state, life, ['E']), agouti: genesText(state, life, ['A']), hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
       sire: (info.sire && info.sire.name) || '', dam: (info.dam && info.dam.name) || '', discipline: String(info.training || '').split(',')[0].replace(/\s*-\s*Level.*$/i, '').trim()
     };
     tokens.tagline = [counts, tokens.gp, tokens.bt, tokens.conf].filter(Boolean).join('|');

@@ -2648,12 +2648,12 @@
     ['ln', 'life number'], ['name', 'its name'], ['tagline', 'counts|GP|BT|top score, like 1+G|9A|2BA|557|63|71.286'], ['counts', 'stat counts, like 1+G|9A|2BA'],
     ['gp', 'genetic potential'], ['bt', 'Breed Total (rounded)'], ['bt1', 'Breed Total, one decimal'], ['conf', 'top conformation score'], ['high', 'highest score, 2 decimals'],
     ['low', 'lowest score, 2 decimals'], ['range', 'high minus low'], ['health', 'five health letters, like GEGGG'], ['fertility', 'fertility letter'],
-    ['genes', 'known genes with copy counts, like E² A+¹a¹'], ['ext', 'Extension, like E¹e¹'], ['agouti', 'Agouti, like A²'], ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
+    ['genes', 'genes that show, with copy counts, like E¹ A¹ nd1¹'], ['allgenes', 'every known gene with copy counts, like E¹e¹ A¹a¹'], ['ext', 'Extension that shows, like E¹'], ['agouti', 'Agouti that shows, like A¹'], ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
   ];
   function defaultPresets() {
     return [
       { id: 'd-name', kind: 'name', title: 'Number + hidden genes', template: '{ln}|{hidden}' },
-      { id: 'd-genes', kind: 'name', title: 'Number + genes with copy counts', template: '{ln}|{genes}' },
+      { id: 'd-genes', kind: 'name', title: 'Number + genes that show (E¹ A¹ nd1¹)', template: '{ln}|{genes}' },
       { id: 'd-colour', kind: 'name', title: 'Number + tested colours', template: '{ln}|{colour}' },
       { id: 'd-tagline', kind: 'tagline', title: 'Stats tagline (HRToolkit style)', template: '{tagline}' },
       { id: 'd-private', kind: 'private', title: 'Score range + health', template: '{high}-{low}|{health}' },
@@ -2688,19 +2688,23 @@
     });
     return out.join(' ');
   }
-  // The genes the ledger knows for a horse as text with the copy count as a superscript, the allele that shows first:
-  // "E² A+¹a¹ f²". only = a list of locus ids to limit it to.
-  var SUPS = ['⁰', '¹', '²', '³'];
-  function genesText(state, life, only) {
+  // The genes a horse shows, as text with the copy count as a superscript: "E¹ A¹ nd1¹". Only the alleles that show are listed:
+  // the dominant ones (for Agouti A+, A and At, for Dun D and nd1), never the most recessive allele (e, a, g, nd2), except
+  // for a recessive gene such as Flaxen, where it is the f that shows (f¹ or f²). A gene with no showing copy is left out.
+  // only = a list of locus ids to limit it to; all = true lists every allele the horse has.
+  var SUPS = ['\u2070', '\u00b9', '\u00b2', '\u00b3'];
+  function genesText(state, life, only, all) {
     var geno = horseGenotype(state, life), out = [];
     ALL_LOCI.forEach(function (l) {
       var pair = geno[l.id];
       if (!pair || (only && only.indexOf(l.id) === -1)) return;
-      var seen = {}, order = [];
-      pair.forEach(function (a) { if (!seen[a]) { seen[a] = 0; order.push(a); } seen[a]++; });
-      var shows = l.recessive ? l.alleles[1] : l.alleles[0];
-      order.sort(function (a, b) { return (a === shows ? 0 : 1) - (b === shows ? 0 : 1); });
-      out.push(order.map(function (a) { return a + SUPS[Math.min(3, seen[a])]; }).join(''));
+      var shown = l.recessive ? [l.alleles[1]] : l.alleles.slice(0, l.alleles.length > 2 ? l.alleles.length - 1 : 1);
+      var parts = [];
+      (all ? l.alleles : shown).forEach(function (a) {
+        var n = pair.filter(function (x) { return x === a; }).length;
+        if (n) parts.push(a + SUPS[Math.min(3, n)]);
+      });
+      if (parts.length) out.push(parts.join(''));
     });
     return out.join(' ');
   }
@@ -2713,7 +2717,7 @@
     var tokens = {
       ln: life, name: info.name || '', counts: counts, gp: gp ? String(gp) : '', bt: bt > 0 ? String(Math.round(bt)) : '', bt1: fx(bt, 1), conf: hi > 0 ? String(Math.round(hi * 1000) / 1000) : '',
       high: fx(hi, 2), low: fx(lo, 2), range: hi > 0 && lo > 0 && lo <= hi ? (hi - lo).toFixed(2) : '', health: healthLetters(info), fertility: fert,
-      genes: genesText(state, life), ext: genesText(state, life, ['E']), agouti: genesText(state, life, ['A']), hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
+      genes: genesText(state, life), allgenes: genesText(state, life, null, true), ext: genesText(state, life, ['E']), agouti: genesText(state, life, ['A']), hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
       sire: (info.sire && info.sire.name) || '', dam: (info.dam && info.dam.name) || '', discipline: String(info.training || '').split(',')[0].replace(/\s*-\s*Level.*$/i, '').trim()
     };
     tokens.tagline = [counts, tokens.gp, tokens.bt, tokens.conf].filter(Boolean).join('|');

@@ -3055,6 +3055,21 @@
     return '<details class="card profile-block" open style="padding:12px 16px;margin-bottom:16px;"><summary style="cursor:pointer;font-weight:600;">Conformation stats &amp; genetic potential</summary>' +
       '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:10px;">' + confHtml + genHtml + '</div>' + sumHtml + '</details>';
   }
+  // The alleles a horse has at one gene with how many copies, the count as a small superscript: E² (two big E), E¹ e¹, e²
+  // (recessive). Flaxen (f) is recessive, so it shows when f is there. The hover text says which allele is dominant.
+  var SUP = ['⁰', '¹', '²', '³'];
+  function alleleCountsHtml(l, pair) {
+    var seen = {}, order = [];
+    pair.forEach(function (a) { if (!seen[a]) { seen[a] = 0; order.push(a); } seen[a]++; });
+    // the allele that shows in the coat first
+    var shows = l.recessive ? l.alleles[1] : l.alleles[0];
+    order.sort(function (a, b) { return (a === shows ? 0 : 1) - (b === shows ? 0 : 1); });
+    var tip = order.map(function (a) {
+      var dom = l.recessive ? a !== l.alleles[1] : (l.alleles.length > 2 ? a !== l.alleles[l.alleles.length - 1] : a === l.alleles[0]);
+      return a + ' ' + (dom ? 'dominant' : 'recessive') + ' ×' + seen[a];
+    }).join(', ');
+    return { html: order.map(function (a) { return L.esc(a) + SUP[Math.min(3, seen[a])]; }).join(' '), tip: tip };
+  }
   function geneticsPanelHtml(life) {
     var info = state.horseInfo[life];
     if (!info) return '';
@@ -3066,8 +3081,8 @@
     var chips = L.preferLoci().concat(L.ALL_LOCI.filter(function (l) { return l.id === 'E' || l.id === 'A'; })).filter(function (l) { return geno[l.id]; }).map(function (l) {
       var lvl = pm[l.id], carries = lvl && geno[l.id].indexOf(l.recessive ? l.alleles[1] : l.alleles[0]) > -1;
       var bad = carries && lvl === 'avoid', good = carries && !bad;
-      var nm = l.label || l.name.replace(/ \(.*\)$/, '');
-      return '<span class="tag" style="margin:0;white-space:nowrap;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '')) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + L.esc(l.id === 'FL' ? L.genotypeText(l, geno[l.id]) : geno[l.id].join('/')) + '</span></span>';
+      var nm = l.label || l.name.replace(/ \(.*\)$/, ''), ac = alleleCountsHtml(l, geno[l.id]);
+      return '<span class="tag" style="margin:0;white-space:nowrap;' + (good ? 'color:var(--accent-strong);border-color:var(--accent-strong);font-weight:600;' : bad ? 'color:var(--danger);border-color:var(--danger);font-weight:600;' : '') + '" title="' + L.esc(l.name + (tested[l.id] ? '' : ' (entered by hand)') + (good ? ' \u2014 a gene you ' + (lvl === 'keep' ? 'want to keep' : 'prefer') : bad ? " \u2014 a gene you don't want" : '') + ' \u2014 ' + ac.tip) + '">' + (good ? '\u2726 ' : bad ? '\u2716 ' : '') + L.esc(nm) + ' <span class="mono" style="font-size:11.5px;">' + ac.html + '</span></span>';
     }).join('');
     var wanted = L.preferredGenesOf(state, life);
     var hasBad = wanted.some(function (g) { return g.level === 'avoid'; }), hasGood = wanted.some(function (g) { return g.level !== 'avoid'; });

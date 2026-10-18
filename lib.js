@@ -2653,6 +2653,8 @@
   function defaultPresets() {
     return [
       { id: 'd-name', kind: 'name', title: 'Number + hidden genes', template: '{ln}|{hidden}' },
+      { id: 'd-genes', kind: 'name', title: 'Number + genes with copy counts', template: '{ln}|{genes}' },
+      { id: 'd-colour', kind: 'name', title: 'Number + tested colours', template: '{ln}|{colour}' },
       { id: 'd-tagline', kind: 'tagline', title: 'Stats tagline (HRToolkit style)', template: '{tagline}' },
       { id: 'd-private', kind: 'private', title: 'Score range + health', template: '{high}-{low}|{health}' },
       { id: 'd-public', kind: 'public', title: 'Breeding summary', template: 'GP {gp} \u00b7 BT {bt1} \u00b7 top conformation {conf} \u00b7 {counts}' }

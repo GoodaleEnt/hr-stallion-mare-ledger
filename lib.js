@@ -2648,6 +2648,7 @@
     ['ln', 'life number'], ['name', 'its name'], ['tagline', 'counts|GP|BT|top score, like 1+G|9A|2BA|557|63|71.286'], ['counts', 'stat counts, like 1+G|9A|2BA'],
     ['gp', 'genetic potential'], ['bt', 'Breed Total (rounded)'], ['bt1', 'Breed Total, one decimal'], ['conf', 'top conformation score'], ['high', 'highest score, 2 decimals'],
     ['low', 'lowest score, 2 decimals'], ['range', 'high minus low'], ['health', 'five health letters, like GEGGG'], ['fertility', 'fertility letter'],
+    ['earned', 'total earned (stud fees + competition winnings), like 12,500 HRC'], ['studearned', 'stud fees earned'], ['compearned', 'competition winnings you entered'],
     ['genes', 'genes that show, with copy counts, like E¹ A¹ nd1¹'], ['allgenes', 'every known gene with copy counts, like E¹e¹ A¹a¹'], ['ext', 'Extension that shows, like E¹'], ['agouti', 'Agouti that shows, like A¹'], ['hidden', 'hidden colour genes, like STY?'], ['colour', 'tested colour genes'], ['breed', 'breed'], ['age', 'age'], ['sire', 'sire name'], ['dam', 'dam name'], ['discipline', 'trained discipline']
   ];
   function defaultPresets() {
@@ -2657,7 +2658,8 @@
       { id: 'd-colour', kind: 'name', title: 'Number + tested colours', template: '{ln}|{colour}' },
       { id: 'd-tagline', kind: 'tagline', title: 'Stats tagline (HRToolkit style)', template: '{tagline}' },
       { id: 'd-private', kind: 'private', title: 'Score range + health', template: '{high}-{low}|{health}' },
-      { id: 'd-public', kind: 'public', title: 'Breeding summary', template: 'GP {gp} \u00b7 BT {bt1} \u00b7 top conformation {conf} \u00b7 {counts}' }
+      { id: 'd-public', kind: 'public', title: 'Breeding summary', template: 'GP {gp} \u00b7 BT {bt1} \u00b7 top conformation {conf} \u00b7 {counts}' },
+      { id: 'd-earned', kind: 'public', title: 'Breeding summary + earnings', template: 'GP {gp} \u00b7 BT {bt1} \u00b7 earned {earned}' }
     ];
   }
   function presetsOf(state) { var p = state && state.settings && state.settings.presets; return Array.isArray(p) ? p : defaultPresets(); }
@@ -2708,13 +2710,32 @@
     });
     return out.join(' ');
   }
+  // What a horse has earned: stud fees (the prices of the coverings by this stallion) and competition winnings you entered
+  // (horseMeta[life].earnings = [{ id, date, amount, currency, note }]). Each is { HRC: n, DP: n ... }.
+  function horseEarnings(state, life) {
+    life = String(life || '');
+    var stud = {}, comp = {}, total = {};
+    (state.stallions || []).forEach(function (s) {
+      if (String(s.lifeNumber || '') !== life) return;
+      ((state.breedings && state.breedings[s.id]) || []).forEach(function (b) {
+        if (b.price > 0 && b.status !== 'Failed') { var c = b.currency || 'HRC'; stud[c] = (stud[c] || 0) + Number(b.price); }
+      });
+    });
+    var list = ((state.horseMeta && state.horseMeta[life] && state.horseMeta[life].earnings) || []);
+    list.forEach(function (e) { var n = Number(e.amount); if (n > 0) { var c = e.currency || 'HRC'; comp[c] = (comp[c] || 0) + n; } });
+    [stud, comp].forEach(function (o) { Object.keys(o).forEach(function (c) { total[c] = (total[c] || 0) + o[c]; }); });
+    return { stud: stud, comp: comp, total: total, list: list };
+  }
+  function moneyText(totals) { var t = moneyLine(totals); return t === '\u2014' ? '' : t; }
   function presetTokens(state, life) {
     life = String(life || '');
     var info = (state.horseInfo && state.horseInfo[life]) || {}, meta = (state.horseMeta && state.horseMeta[life]) || {};
     var hi = bestConformation(meta).best, lo = Number(meta.confLow) || 0, bt = horseBT(state, life), gp = Number(info.geneticPotential) || 0;
     var fx = function (n, d) { return n > 0 ? n.toFixed(d) : ''; };
     var counts = toolkitCounts(info), fert = { excellent: 'E', good: 'G', average: 'A', fair: 'F', poor: 'P' }[String(info.fertility || '').toLowerCase()] || '';
+    var earn = horseEarnings(state, life);
     var tokens = {
+      earned: moneyText(earn.total), studearned: moneyText(earn.stud), compearned: moneyText(earn.comp),
       ln: life, name: info.name || '', counts: counts, gp: gp ? String(gp) : '', bt: bt > 0 ? String(Math.round(bt)) : '', bt1: fx(bt, 1), conf: hi > 0 ? String(Math.round(hi * 1000) / 1000) : '',
       high: fx(hi, 2), low: fx(lo, 2), range: hi > 0 && lo > 0 && lo <= hi ? (hi - lo).toFixed(2) : '', health: healthLetters(info), fertility: fert,
       genes: genesText(state, life), allgenes: genesText(state, life, null, true), ext: genesText(state, life, ['E']), agouti: genesText(state, life, ['A']), hidden: hiddenGenesText(state, life), colour: info.testedColours || '', breed: info.breed || '', age: (function () { var m = effectiveAgeMonths(info); return m == null ? '' : formatAgeMonths(m); })(),
@@ -4334,6 +4355,8 @@
     compSummary: compSummary,
     PRESET_KINDS: PRESET_KINDS,
     PRESET_TOKENS: PRESET_TOKENS,
+    horseEarnings: horseEarnings,
+    moneyText: moneyText,
     defaultPresets: defaultPresets,
     presetsOf: presetsOf,
     presetTokens: presetTokens,

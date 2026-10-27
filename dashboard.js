@@ -655,7 +655,7 @@
     html += keeperPanelHtml(selectedPassportLife) + saleHistoryPanelHtml(selectedPassportLife) + geneticsPanelHtml(selectedPassportLife) + statsPanelHtml(selectedPassportLife) + producerPanelHtml(selectedPassportLife) + healthPanelHtml(selectedPassportLife) + disciplinePanelHtml(selectedPassportLife) + showLogPanelHtml(selectedPassportLife);
     html += studProfilePanelHtml(selectedPassportLife);
     html += removeHorsePanelHtml(selectedPassportLife, info.name);
-    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + compPanelHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
+    html += purchaseDetailsHtml(selectedPassportLife) + scoreDetailsHtml(selectedPassportLife) + compPanelHtml(selectedPassportLife) + earningsPanelHtml(selectedPassportLife) + tagsPanelHtml(selectedPassportLife);
     html += saleDetailsHtml(selectedPassportLife);
 
     // A horse can already exist as a (possibly stub, owned:false) stallion
@@ -1322,7 +1322,7 @@
     html += geneDetailsHtml(m.mareLifeNumber);
     html += mareStatusPanelHtml(m.mareLifeNumber);
     html += keeperPanelHtml(m.mareLifeNumber) + saleHistoryPanelHtml(m.mareLifeNumber) + geneticsPanelHtml(m.mareLifeNumber) + statsPanelHtml(m.mareLifeNumber) + producerPanelHtml(m.mareLifeNumber) + healthPanelHtml(m.mareLifeNumber) + disciplinePanelHtml(m.mareLifeNumber) + showLogPanelHtml(m.mareLifeNumber);
-    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + compPanelHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
+    html += purchaseDetailsHtml(m.mareLifeNumber) + scoreDetailsHtml(m.mareLifeNumber) + compPanelHtml(m.mareLifeNumber) + earningsPanelHtml(m.mareLifeNumber) + tagsPanelHtml(m.mareLifeNumber);
     html += saleDetailsHtml(m.mareLifeNumber);
     html += removeHorsePanelHtml(m.mareLifeNumber, m.mareName);
 
@@ -2964,6 +2964,32 @@
         '<p class="notes-line" style="margin:0;grid-column:1/-1;">Pick a discipline, then enter its highest and lowest score by hand if the ledger has not read them (it reads them when you open a competition\'s results page or the horse\'s stats page). The high only goes up and the low only goes down when read automatically; one you enter is always kept, and clearing a box removes it. Competition scores show on the card (Top competition) and in the page header, and count in ranking and suggestions most for a competition breeder (Settings \u2192 Breeder focus). Conformation shows are kept apart (Highest conformation score).</p>' +
       '</div></div></details>';
   }
+  // Earnings: stud fees (worked out from the coverings) and competition winnings entered by hand, with a list to add to
+  var earnDraft = {};
+  function earningsPanelHtml(life) {
+    if (!life || !state.horseInfo[life]) return '';
+    var e = L.horseEarnings(state, life), id = L.esc(life), d = earnDraft[life] || {};
+    var any = L.moneyText(e.total);
+    var att = function (f) { return ' data-action="earn-draft" data-life="' + id + '" data-field="' + f + '"'; };
+    var rows = e.list.map(function (x) {
+      return '<tr><td>' + L.esc(x.date ? L.fmtDate(x.date) : '\u2014') + '</td><td class="num mono">' + L.esc(L.fmtMoney(x.amount)) + ' ' + L.esc(x.currency || 'HRC') + '</td><td>' + L.esc(x.note || '') + '</td>' +
+        '<td><button type="button" class="link-btn" data-action="earn-del" data-life="' + id + '" data-id="' + L.esc(x.id) + '">Remove</button></td></tr>';
+    }).join('');
+    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Earnings \u2014 ' + (any ? L.esc(any) : 'none recorded') + '</summary>' +
+      '<div class="card" style="padding:14px;margin-top:8px;">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:18px;"><div><div class="sub">Stud fees (from the coverings)</div><strong class="mono">' + L.esc(L.moneyText(e.stud) || '\u2014') + '</strong></div>' +
+      '<div><div class="sub">Competition winnings (entered here)</div><strong class="mono">' + L.esc(L.moneyText(e.comp) || '\u2014') + '</strong></div>' +
+      '<div><div class="sub">Total</div><strong class="mono">' + L.esc(any || '\u2014') + '</strong></div></div>' +
+      (rows ? '<div style="overflow-x:auto;margin-top:10px;"><table class="an-table"><thead><tr><th>Date</th><th class="num">Won</th><th>Where</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
+      '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:12px;align-items:end;">' +
+        '<div class="field"><label for="en-amt-' + id + '">Winnings</label><input id="en-amt-' + id + '" type="number" min="0" step="any"' + att('amount') + ' value="' + L.esc(d.amount || '') + '" placeholder="e.g. 500"></div>' +
+        '<div class="field"><label for="en-cur-' + id + '">Currency</label><select id="en-cur-' + id + '"' + att('currency') + '>' + L.CURRENCIES.map(function (c) { return '<option' + ((d.currency || 'HRC') === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="en-date-' + id + '">Date (optional)</label><input id="en-date-' + id + '" type="date"' + att('date') + ' value="' + L.esc(d.date || '') + '"></div>' +
+        '<div class="field"><label for="en-note-' + id + '">Where (optional)</label><input id="en-note-' + id + '" type="text"' + att('note') + ' value="' + L.esc(d.note || '') + '" placeholder="e.g. Western Reining, Level 3"></div>' +
+        '<div><button type="button" class="btn btn-sm btn-primary" data-action="earn-add" data-life="' + id + '">Add</button></div>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Stud fees add up on their own from the coverings. Enter what a competition paid by hand; the total is available to the Update horse presets as {earned} (also {studearned} and {compearned}).</p>' +
+      '</div></div></details>';
+  }
   // Keep or sell: the level, how it was worked out, and (for a mare or a foal of a mare of yours) the foals as keepers
   function keeperPanelHtml(life) {
     var info = state.horseInfo[life], me = String((state.settings && state.settings.myUsername) || '').trim().toLowerCase();
@@ -3606,7 +3632,7 @@
 
     html += geneDetailsHtml(s.lifeNumber);
     html += keeperPanelHtml(s.lifeNumber) + saleHistoryPanelHtml(s.lifeNumber) + geneticsPanelHtml(s.lifeNumber) + statsPanelHtml(s.lifeNumber) + healthPanelHtml(s.lifeNumber) + disciplinePanelHtml(s.lifeNumber) + showLogPanelHtml(s.lifeNumber);
-    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + compPanelHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
+    html += purchaseDetailsHtml(s.lifeNumber) + scoreDetailsHtml(s.lifeNumber) + compPanelHtml(s.lifeNumber) + earningsPanelHtml(s.lifeNumber) + tagsPanelHtml(s.lifeNumber);
     html += saleDetailsHtml(s.lifeNumber);
     html += studFeesPanelHtml(s);
     html += removeHorsePanelHtml(s.lifeNumber, s.name);
@@ -3738,6 +3764,14 @@
         document.querySelectorAll('details.an-sec').forEach(function (s) { s.open = openAll; anOpen[s.getAttribute('data-sec')] = openAll; });
         saveUi();
       }
+      else if (action === 'earn-add') {
+        var ea = t.getAttribute('data-life'), dr = earnDraft[ea] || {}, amt = Number(dr.amount);
+        if (amt > 0) {
+          var elist = ((state.horseMeta[ea] || {}).earnings || []).concat([{ id: 'e' + Date.now(), date: dr.date || '', amount: amt, currency: dr.currency || 'HRC', note: String(dr.note || '').slice(0, 80) }]);
+          delete earnDraft[ea]; setHorseMeta(ea, { earnings: elist });
+        }
+      }
+      else if (action === 'earn-del') { var ed = t.getAttribute('data-life'); setHorseMeta(ed, { earnings: ((state.horseMeta[ed] || {}).earnings || []).filter(function (x) { return x.id !== t.getAttribute('data-id'); }) }); }
       else if (action === 'preset-add') { var np = L.presetsOf(state).slice(); np.push({ id: 'p' + Date.now(), kind: 'tagline', title: 'New preset', template: '{tagline}' }); state.settings.presets = np; persist(); }
       else if (action === 'preset-del') { var did = t.getAttribute('data-id'); state.settings.presets = L.presetsOf(state).filter(function (p) { return p.id !== did; }); persist(); }
       else if (action === 'preset-reset') { delete state.settings.presets; persist(); }
@@ -4220,6 +4254,7 @@
       }
       else if (action === 'horse-sale') { setHorseSale(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'comp-best') { setCompBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
+      else if (action === 'earn-draft') { var el0 = t.getAttribute('data-life'); earnDraft[el0] = Object.assign({}, earnDraft[el0]); earnDraft[el0][t.getAttribute('data-field')] = t.value; }
       else if (action === 'comp-disc') { compEditDisc[t.getAttribute('data-life')] = t.value; persist(); }
       else if (action === 'horse-best') { setHorseBest(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }
       else if (action === 'horse-purchase') { setHorsePurchase(t.getAttribute('data-life'), t.getAttribute('data-field'), t.value); }

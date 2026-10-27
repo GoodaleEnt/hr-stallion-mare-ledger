@@ -648,3 +648,7 @@ Everything lives in `chrome.storage.local` inside your own browser profile and n
 - **Nothing is showing up.** Make sure you've set your username in Settings (Stallions tab) — most auto-tracking depends on matching it against a horse's owner.
 - **A stallion I don't own is cluttering things.** If it only exists to anchor one of your mares' breeding history with an outside stud, it's intentionally kept off the Stallions grid — check that mare's own detail page instead.
 - **Data seems stale after a Horse Reality update.** The extension reads Horse Reality's own API and page content directly; if the site changes its markup or API shape, some captures may need an update. Open an issue on the [GitHub repository](https://github.com/GoodaleEnt/hr-stallion-mare-ledger/issues) if something stops working.
+
+## Earnings
+
+Each horse's profile has an **Earnings** panel (collapsed, next to Competition scores). **Stud fees** add up on their own from the coverings by that stallion (failed coverings are left out). **Competition winnings** you enter by hand (amount, currency, optional date and where); each one can be removed. The total shows in the panel heading. On Horse Reality's *Update horse* page the presets can use `{earned}` (stud fees plus winnings), `{studearned}` and `{compearned}`, for example the *Breeding summary + earnings* public-notes preset (press *Reset to defaults* in Settings to get it if you changed your presets before).

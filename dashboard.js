@@ -2975,7 +2975,7 @@
       return '<tr><td>' + L.esc(x.date ? L.fmtDate(x.date) : '\u2014') + '</td><td class="num mono">' + L.esc(L.fmtMoney(x.amount)) + ' ' + L.esc(x.currency || 'HRC') + '</td><td>' + L.esc(x.note || '') + '</td>' +
         '<td><button type="button" class="link-btn" data-action="earn-del" data-life="' + id + '" data-id="' + L.esc(x.id) + '">Remove</button></td></tr>';
     }).join('');
-    return '<details class="profile-block" style="margin:0 0 16px;"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Earnings \u2014 ' + (any ? L.esc(any) : 'none recorded') + '</summary>' +
+    return '<details class="profile-block" style="margin:0 0 16px;" open><summary style="cursor:pointer;color:var(--text-muted);font-size:13px;">Earnings \u2014 ' + (any ? L.esc(any) : 'none recorded') + '</summary>' +
       '<div class="card" style="padding:14px;margin-top:8px;">' +
       '<div style="display:flex;flex-wrap:wrap;gap:18px;"><div><div class="sub">Stud fees (from the coverings)</div><strong class="mono">' + L.esc(L.moneyText(e.stud) || '\u2014') + '</strong></div>' +
       '<div><div class="sub">Competition winnings (entered here)</div><strong class="mono">' + L.esc(L.moneyText(e.comp) || '\u2014') + '</strong></div>' +
@@ -3513,6 +3513,8 @@
     if (extraGenes) tags.push('<span class="tag mono" title="Entered by hand">' + L.esc(extraGenes) + '</span>');
     var paidTags = info.lifeNumber ? purchaseTagsHtml(info.lifeNumber) : '';
     if (paidTags) tags.push(paidTags);
+    var earnTxt = info.lifeNumber ? L.moneyText(L.horseEarnings(state, info.lifeNumber).total) : '';
+    if (earnTxt) tags.push('<span class="tag mono" style="font-weight:600;" title="Stud fees plus competition winnings (see the Earnings panel)">Earned ' + L.esc(earnTxt) + '</span>');
     if (info.lifeNumber && lifeStatus(info.lifeNumber) === 'For Sale') tags.push('<span class="tag" style="background:#f1e6c9;border-color:#a9822f;color:#6b4f00;font-weight:600;">$ For sale</span>');
     var breedNow = info.lifeNumber ? L.mareBreedStatus(state, info.lifeNumber) : { status: '' };
     if (breedNow.status === 'pregnant') tags.push('<span class="tag" style="background:#f6dbe9;border-color:#b0407a;color:#8a2a5c;font-weight:600;">\u2665 In foal' + (breedNow.due ? ' \u00b7 ' + L.esc(breedNow.due.replace(/^Due /, 'due ')) : '') + '</span>');

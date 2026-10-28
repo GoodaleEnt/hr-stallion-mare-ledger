@@ -2987,7 +2987,7 @@
         '<div class="field"><label for="en-date-' + id + '">Date (optional)</label><input id="en-date-' + id + '" type="date"' + att('date') + ' value="' + L.esc(d.date || '') + '"></div>' +
         '<div class="field"><label for="en-note-' + id + '">Where (optional)</label><input id="en-note-' + id + '" type="text"' + att('note') + ' value="' + L.esc(d.note || '') + '" placeholder="e.g. Western Reining, Level 3"></div>' +
         '<div><button type="button" class="btn btn-sm btn-primary" data-action="earn-add" data-life="' + id + '">Add</button></div>' +
-        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Stud fees add up on their own from the coverings. Enter what a competition paid by hand; the total is available to the Update horse presets as {earned} (also {studearned} and {compearned}).</p>' +
+        '<p class="notes-line" style="margin:0;grid-column:1/-1;">Stud fees add up on their own from the coverings, and prizes are added when you open your Horse Reality Notifications page (\"became 1st in ... You received 30\"). Enter anything else a competition paid by hand; the total is available to the Update horse presets as {earned} (also {studearned} and {compearned}).</p>' +
       '</div></div></details>';
   }
   // Keep or sell: the level, how it was worked out, and (for a mare or a foal of a mare of yours) the foals as keepers
@@ -3773,7 +3773,11 @@
           delete earnDraft[ea]; setHorseMeta(ea, { earnings: elist });
         }
       }
-      else if (action === 'earn-del') { var ed = t.getAttribute('data-life'); setHorseMeta(ed, { earnings: ((state.horseMeta[ed] || {}).earnings || []).filter(function (x) { return x.id !== t.getAttribute('data-id'); }) }); }
+      else if (action === 'earn-del') {
+        var ed = t.getAttribute('data-life'), em0 = state.horseMeta[ed] || {}, did2 = t.getAttribute('data-id');
+        var gone = (em0.earnings || []).filter(function (x) { return x.id === did2 && x.key; }).map(function (x) { return x.key; });
+        setHorseMeta(ed, { earnings: (em0.earnings || []).filter(function (x) { return x.id !== did2; }), earnSkip: (em0.earnSkip || []).concat(gone) });
+      }
       else if (action === 'preset-add') { var np = L.presetsOf(state).slice(); np.push({ id: 'p' + Date.now(), kind: 'tagline', title: 'New preset', template: '{tagline}' }); state.settings.presets = np; persist(); }
       else if (action === 'preset-del') { var did = t.getAttribute('data-id'); state.settings.presets = L.presetsOf(state).filter(function (p) { return p.id !== did; }); persist(); }
       else if (action === 'preset-reset') { delete state.settings.presets; persist(); }

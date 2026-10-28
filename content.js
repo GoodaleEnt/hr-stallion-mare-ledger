@@ -1576,6 +1576,41 @@
       });
     });
   }
+  // Show and competition prizes from the notifications page: "Your horse X became 1st in the Y show (category: Mares). You
+  // received 30 [coin icon]!" or "...became Day Champion in the Y. You received 250". Each one goes into that horse's earnings
+  // (once: the time on the row and the show make its key), so the totals on the profiles are what the horse has won.
+  var prizeSig = '';
+  function scrapePrizeNotifications() {
+    if (!/notif/i.test(location.pathname)) return;
+    var rows = document.querySelectorAll('tr.notifications-table');
+    if (!rows.length) return;
+    var sig = rows.length + '|' + (rows[0].textContent || '').length;
+    if (sig === prizeSig) return;
+    prizeSig = sig;
+    var found = [];
+    rows.forEach(function (row) {
+      var cells = row.querySelectorAll('td');
+      var text = String((cells[0] || row).textContent || '').replace(/\s+/g, ' ').trim();
+      var m = /Your horse .+? became (Day Champion|\d+(?:st|nd|rd|th)|[A-Za-z ]+?) in (?:the )?(.+?)(?: \(category: ([^)]+)\))?\.\s*You received ([\d,]+)/i.exec(text);
+      var hl = row.querySelector('a[href*="/horses/"]');
+      var life = hl && (/\/horses\/(\d+)/.exec(hl.getAttribute('href') || '') || [])[1];
+      if (!m || !life) return;
+      var icon = row.querySelector('img.currency-icon, img[src*="/icon/"]'), src = icon ? String(icon.getAttribute('src') || '') : '';
+      var currency = /coin/i.test(src) || !icon ? 'HRC' : '';
+      if (!currency) return;
+      var when = String((cells[1] || {}).textContent || '').replace(/\s+/g, ' ').trim();
+      var date = parseRowDate(when), time = (/\d{1,2}:\d{2}/.exec(when) || [''])[0];
+      var place = m[1], show = m[2].trim(), cat = m[3] || '';
+      found.push({ life: life, prize: { key: [life, date, time, show, place, cat].join('|'), date: date, amount: parseInt(m[4].replace(/,/g, ''), 10), currency: currency, note: place + ' \u00b7 ' + show + (cat ? ' (' + cat + ')' : '') } });
+    });
+    if (!found.length) return;
+    HRStorage.getState(function (state) {
+      var added = 0;
+      found.forEach(function (f) { if (HRLib.recordPrize(state, f.life, f.prize)) added++; });
+      if (!added) return;
+      HRStorage.setState(state, function () { showToast('HR Ledger: ' + added + ' prize' + (added === 1 ? '' : 's') + ' added to your horses\' earnings'); });
+    });
+  }
   function today10Local() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function bidMark(outer, bid) {
     var host = outer.querySelector('.market-office-table-row-horse-info') || outer;
@@ -3206,6 +3241,7 @@
     annotateShowEntry();
     scrapeCompetitionResults();
     scrapeCompetitionStats();
+    scrapePrizeNotifications();
     injectPresetPickers();
     injectShowSummary();
     scrapeAgeFromProfile();

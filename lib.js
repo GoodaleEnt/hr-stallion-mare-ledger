@@ -2726,6 +2726,19 @@
     [stud, comp].forEach(function (o) { Object.keys(o).forEach(function (c) { total[c] = (total[c] || 0) + o[c]; }); });
     return { stud: stud, comp: comp, total: total, list: list };
   }
+  // One prize from a "Your horse X became 1st in the Y show (category: Z). You received 30 coins" notification. The key makes
+  // reading the same notification twice add it once. Returns true when it was new.
+  function recordPrize(state, life, prize) {
+    life = String(life || '');
+    if (!life || !(Number(prize.amount) > 0) || !prize.key) return false;
+    state.horseMeta = state.horseMeta || {};
+    var meta = Object.assign({}, state.horseMeta[life]), list = (meta.earnings || []).slice();
+    if (list.some(function (e) { return e.key === prize.key; }) || (meta.earnSkip || []).indexOf(prize.key) > -1) return false;
+    list.push({ id: 'n' + Date.now() + list.length, key: prize.key, src: 'notification', date: prize.date || '', amount: Number(prize.amount), currency: prize.currency || 'HRC', note: String(prize.note || '').slice(0, 120) });
+    meta.earnings = list;
+    state.horseMeta[life] = meta;
+    return true;
+  }
   function moneyText(totals) { var t = moneyLine(totals); return t === '\u2014' ? '' : t; }
   function presetTokens(state, life) {
     life = String(life || '');
@@ -4356,6 +4369,7 @@
     PRESET_KINDS: PRESET_KINDS,
     PRESET_TOKENS: PRESET_TOKENS,
     horseEarnings: horseEarnings,
+    recordPrize: recordPrize,
     moneyText: moneyText,
     defaultPresets: defaultPresets,
     presetsOf: presetsOf,
